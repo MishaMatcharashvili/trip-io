@@ -24,6 +24,12 @@
 .DS_Store
 *.pem
 
+# windows alternate data stream metadata (created when copying files in via WSL)
+*:Zone.Identifier
+
+# local, machine-specific agent settings
+.claude/settings.local.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
