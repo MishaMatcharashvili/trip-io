@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { HealthCheck } from "./health-check";
 
 export default function Home() {
   return (
@@ -37,6 +38,7 @@ export default function Home() {
             </a>{" "}
             center.
           </p>
+          <HealthCheck />
         </div>
         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
           <a

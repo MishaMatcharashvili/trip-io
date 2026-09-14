@@ -1,0 +1,129 @@
+import {
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  real,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { geography, id, tstz } from "./columns";
+import { trip, tripNode, tripPatch } from "./trip";
+
+export const deliveryChannel = pgEnum("delivery_channel", [
+  "push",
+  "email",
+  "briefing",
+]);
+export const eventRoute = pgEnum("event_route", [
+  "interrupt",
+  "briefing",
+  "drop",
+]);
+export const interventionOutcome = pgEnum("intervention_outcome", [
+  "accepted",
+  "dismissed",
+  "ignored",
+  "muted",
+]);
+
+export const worldEvent = pgTable(
+  "world_event",
+  {
+    id: id(),
+    source: text("source").notNull(),
+    kind: text("kind").notNull(),
+    severity: text("severity").notNull(),
+    confidence: real("confidence").notNull(),
+    geom: geography()("geom").notNull(),
+    validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+    validTo: timestamp("valid_to", { withTimezone: true }),
+    observedAt: tstz("observed_at"),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    payload: jsonb("payload").notNull(),
+  },
+  (t) => [
+    // Spatial half of the match query's event x node join.
+    index("world_event_geom_idx").using("gist", t.geom),
+    // Temporal half: only events whose validity window is still open.
+    index("world_event_validity_idx").on(t.validFrom, t.validTo),
+  ],
+);
+
+// One watch per trip; `trip_id` is the primary key rather than a synthetic id.
+export const tripWatch = pgTable(
+  "trip_watch",
+  {
+    tripId: uuid("trip_id")
+      .primaryKey()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    activeFrom: timestamp("active_from", { withTimezone: true }).notNull(),
+    activeTo: timestamp("active_to", { withTimezone: true }).notNull(),
+    regions: geography()("regions").notNull(),
+    channels: deliveryChannel("channels").array().notNull(),
+    quietHours: jsonb("quiet_hours").notNull(),
+    cap: integer("cap").notNull(),
+  },
+  (t) => [
+    index("trip_watch_regions_idx").using("gist", t.regions),
+    index("trip_watch_active_idx").on(t.activeFrom, t.activeTo),
+  ],
+);
+
+export const eventMatch = pgTable(
+  "event_match",
+  {
+    id: id(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => worldEvent.id, { onDelete: "cascade" }),
+    tripId: uuid("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    nodeId: uuid("node_id")
+      .notNull()
+      .references(() => tripNode.id, { onDelete: "cascade" }),
+    matchedAt: tstz("matched_at"),
+    verdict: jsonb("verdict"),
+    score: real("score").notNull(),
+    judgedAt: timestamp("judged_at", { withTimezone: true }),
+    route: eventRoute("route"),
+  },
+  (t) => [
+    index("event_match_event_node_idx").on(t.eventId, t.nodeId),
+    index("event_match_trip_id_idx").on(t.tripId),
+    // The judge queue drains rows that matched but haven't been judged yet.
+    index("event_match_unjudged_idx").on(t.judgedAt),
+  ],
+);
+
+// `intervention.outcome` is the moat (context/architecture.md): an aggregate
+// record per region/season/trip type that must outlive the ephemeral
+// `world_event` rows it cites, so event deletion is restricted, not cascaded.
+export const intervention = pgTable(
+  "intervention",
+  {
+    id: id(),
+    tripId: uuid("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => worldEvent.id, { onDelete: "restrict" }),
+    channel: deliveryChannel("channel").notNull(),
+    sentAt: tstz("sent_at"),
+    patchId: uuid("patch_id").references(() => tripPatch.id, {
+      onDelete: "set null",
+    }),
+    outcome: interventionOutcome("outcome"),
+    outcomeAt: timestamp("outcome_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("intervention_trip_id_idx").on(t.tripId),
+    index("intervention_event_id_idx").on(t.eventId),
+    // The hourly sweep marks un-actioned interventions `ignored`.
+    index("intervention_outcome_idx").on(t.outcome, t.sentAt),
+  ],
+);

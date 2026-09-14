@@ -2,21 +2,32 @@
 
 Last updated: 2026-09-14.
 
-## Current status: pre-build, Phase 0
+## Current status: Phase 0 in progress
 
 Planning is complete (`docs/concept.md`, `docs/market.md`, `docs/watch-layer.md`,
 `docs/implementation-plan.md`), and the architecture decisions are recorded in
-`context/architecture.md`. The repo is still the unmodified `create-next-app` scaffold — no
-application code has been written yet.
+`context/architecture.md`. The code-buildable slice of Phase 0 is wired; the procurement items
+(external accounts, recruiting) are still outstanding — see the checklist below.
 
 | Area | State |
 |---|---|
-| Repo | `create-next-app` scaffold only (`src/app/page.tsx`, `layout.tsx`, default styling) |
-| Dependencies | Next.js 16.3.4, React 19.2.8, Tailwind 4, Biome. None of the app-specific stack (Hono, Drizzle, Neon, Better Auth, MapLibre, Resend, Expo) installed yet |
-| Database | Not provisioned |
+| Repo | Hono mounted at `app/api/[[...route]]/route.ts` (`GET /api/health` proven end-to-end via `hc<AppType>()`), Better Auth wired at `app/api/auth/[...all]/route.ts` (Google OAuth + anonymous sessions — `GOOGLE_CLIENT_ID`/`SECRET` not yet supplied) |
+| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`. Still not installed: MapLibre (Phase 6), Resend (Phase 4), Expo (Phase 7) |
+| Database | All 11 domain tables (from `context/architecture.md`) + Better Auth's tables defined in `src/db/schema/`, with GiST indexes on every geography column. First migration generated at `src/db/migrations/0000_brown_invisible_woman.sql`; `npm run db:migrate` creates the PostGIS extension (via `src/db/migrate.ts`) before applying it. **Not yet applied** — no live Neon project; `.env` holds a placeholder `DATABASE_URL` |
 | Detectors | None built |
 | Catalogue | 0 / 600 curated places verified |
 | Recruiting | Not started |
+
+### Phase 0 procurement checklist (blocks on you, not on code)
+
+- [ ] Neon project + PostGIS enabled → give me the pooled `DATABASE_URL`, I'll run the migration
+- [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- [ ] Vercel Pro enabled, preview deploys working, `CRON_SECRET` set
+- [ ] Apple Developer enrolment started (APNs key)
+- [ ] FCM project created
+- [ ] Open-Meteo commercial plan account
+- [ ] AeroDataBox account (dark detector, minimum tier)
+- [ ] Start recruiting: line up 3–4 Tbilisi hostels for the Phase 10 cohort, keep warm
 
 ## Phase status
 
@@ -25,7 +36,7 @@ be updated as phases close, not item-by-item.
 
 | Phase | Focus | Status |
 |---|---|---|
-| 0 | Foundations + procurement | Not started |
+| 0 | Foundations + procurement | Code done; procurement 0/8 |
 | 1 | Catalogue + corridors | Not started |
 | 2 | Trip document + patch log | Not started |
 | 3 | Pipeline, weather only | Not started |
@@ -73,3 +84,7 @@ above gets resolved. Keep entries short — this is a log, not a report.
 
 - **2026-09-14** — Planning complete. Architecture, build plan, and this tracker created in
   `context/`. No code written yet.
+- **2026-09-14** — Phase 0 code-buildable slice wired: Drizzle schema (all 11 domain tables) +
+  first migration generated, Hono mounted with a typed `/api/health` route proven via `hc<AppType>()`,
+  Better Auth wired (Google OAuth + anonymous). Not yet applied against a live database — waiting on
+  the Neon project and Google OAuth app from the procurement checklist above.
