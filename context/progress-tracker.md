@@ -1,27 +1,27 @@
 # Progress tracker
 
-Last updated: 2026-09-14.
+Last updated: 2026-09-16.
 
-## Current status: Phase 0 in progress
+## Current status: Phase 1 code done; blocked on Neon for the load, on you for the 600
 
-Planning is complete (`docs/concept.md`, `docs/market.md`, `docs/watch-layer.md`,
-`docs/implementation-plan.md`), and the architecture decisions are recorded in
-`context/architecture.md`. The code-buildable slice of Phase 0 is wired; the procurement items
-(external accounts, recruiting) are still outstanding — see the checklist below.
+Phase 0's code is merged; its procurement items are still outstanding (checklist below). Phase 1's
+pipeline is built and has run against real Overture data locally. Nothing is in Postgres yet: the load
+waits on Neon, and the curation queue at `/curate` waits on Neon + Google OAuth + `CURATOR_EMAILS`.
 
 | Area | State |
 |---|---|
 | Repo | Hono mounted at `app/api/[[...route]]/route.ts` (`GET /api/health` proven end-to-end via `hc<AppType>()`), Better Auth wired at `app/api/auth/[...all]/route.ts` (Google OAuth + anonymous sessions — `GOOGLE_CLIENT_ID`/`SECRET` not yet supplied) |
-| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`. Still not installed: MapLibre (Phase 6), Resend (Phase 4), Expo (Phase 7) |
-| Database | All 11 domain tables (from `context/architecture.md`) + Better Auth's tables defined in `src/db/schema/`, with GiST indexes on every geography column. First migration generated at `src/db/migrations/0000_brown_invisible_woman.sql`; `npm run db:migrate` creates the PostGIS extension (via `src/db/migrate.ts`) before applying it. **Not yet applied** — no live Neon project; `.env` holds a placeholder `DATABASE_URL` |
+| Catalogue pipeline | `npm run catalogue:extract` (Overture 2026-08-19.0 → gated Parquet, ~2 min cold), `catalogue:corridors` (OSRM → checked-in GeoJSON), `catalogue:load` (→ Postgres, idempotent). `/curate` review queue + add-missing-place form. 60 tests (`npm test`) |
+| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`. Phase 1: + `@duckdb/node-api` (dev). Still not installed: MapLibre (Phase 6), Resend (Phase 4), Expo (Phase 7) |
+| Database | 11 domain tables + Better Auth's in `src/db/schema/`, plus Phase 1's `region` and `place_review` (migration `0001`). `npm run db:migrate` creates PostGIS, then applies both. **Not yet applied** — no live Neon project; `.env` holds a placeholder `DATABASE_URL` |
 | Detectors | None built |
-| Catalogue | 0 / 600 curated places verified |
+| Catalogue | Extracted, not loaded: 64 sense regions; 65,705 Overture places in bbox → 13,337 kept (11,590 `verified`, 1,747 `raw`; 103 merged as duplicates). 12 corridors routed. **0 / 600 curated** |
 | Recruiting | Not started |
 
 ### Phase 0 procurement checklist (blocks on you, not on code)
 
-- [ ] Neon project + PostGIS enabled → give me the pooled `DATABASE_URL`, I'll run the migration
-- [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- [ ] Neon project + PostGIS enabled → give me the pooled `DATABASE_URL`, I'll run the migration and `catalogue:load`
+- [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — also gates `/curate`; set `CURATOR_EMAILS` to your Google address
 - [ ] Vercel Pro enabled, preview deploys working, `CRON_SECRET` set
 - [ ] Apple Developer enrolment started (APNs key)
 - [ ] FCM project created
@@ -37,7 +37,7 @@ be updated as phases close, not item-by-item.
 | Phase | Focus | Status |
 |---|---|---|
 | 0 | Foundations + procurement | Code done; procurement 0/8 |
-| 1 | Catalogue + corridors | Not started |
+| 1 | Catalogue + corridors | Code done; load blocked on Neon; curation 0/600 |
 | 2 | Trip document + patch log | Not started |
 | 3 | Pipeline, weather only | Not started |
 | 4 | Daily briefing | Not started |
@@ -88,3 +88,12 @@ above gets resolved. Keep entries short — this is a log, not a report.
   first migration generated, Hono mounted with a typed `/api/health` route proven via `hc<AppType>()`,
   Better Auth wired (Google OAuth + anonymous). Not yet applied against a live database — waiting on
   the Neon project and Google OAuth app from the procurement checklist above.
+- **2026-09-16** — Phase 1 code-buildable slice done, run against Overture 2026-08-19.0 locally.
+  Decisions made along the way: the gate (trigram dedupe included) runs in DuckDB before load, not in
+  PostGIS after it, so it's testable without a database; dedupe compares distinctive name tokens at
+  similarity 0.6 (measured: whole-name trigrams merged different guesthouses on the same street);
+  `verified` = website or phone, which is 87% of kept places since Meta supplies phones for most —
+  consider a confidence floor if the judge proposes junk; sense regions are municipalities (not
+  corridors + grid), excluding Abkhazia and South Ossetia; corridor geometry is OSRM-routed, with the
+  Zagari Pass on the bike profile because the car profile won't cross it; curated places require
+  opening hours (skip instead of guessing). Load, and all 600 curated places, still to do.

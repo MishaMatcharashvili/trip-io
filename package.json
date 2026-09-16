@@ -2,6 +2,7 @@
   "name": "trip-io",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +11,11 @@
     "format": "biome format --write",
     "db:generate": "drizzle-kit generate && node src/db/unquote-geography.ts",
     "db:migrate": "node --env-file=.env src/db/migrate.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
+    "catalogue:extract": "node scripts/catalogue/extract.ts",
+    "catalogue:corridors": "node scripts/catalogue/build-corridors.ts",
+    "catalogue:load": "node --env-file=.env scripts/catalogue/load.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.9.1",
@@ -25,6 +30,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.2",
+    "@duckdb/node-api": "^1.5.5-r.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
