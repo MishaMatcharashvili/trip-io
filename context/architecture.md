@@ -27,6 +27,7 @@ schema and cron design this section summarizes.
 | Validation | Zod, via `@hono/zod-validator` | same schemas convert to JSON Schema for LLM structured output — one definition, three consumers |
 | Database | Neon Postgres + PostGIS | `CREATE EXTENSION postgis`; use the **pooled** connection string |
 | ORM | Drizzle + drizzle-kit | raw SQL where PostGIS gets interesting (matching query, corridor geometry) |
+| Catalogue ETL | DuckDB (`@duckdb/node-api`, dev-only scripts) | reads Overture's Parquet from S3 with bbox pushdown; the whole programmatic gate runs here, testable without a database |
 | Auth | Better Auth | anonymous trip in local state → account created at save → trip claimed; Expo support built in |
 | Map | MapLibre GL + PMTiles | one `.pmtiles` file on Vercel Blob or R2, read via HTTP range requests; no tile server |
 | Queue | Postgres table + `SELECT ... FOR UPDATE SKIP LOCKED` | no Redis; cron handlers enqueue, a drain handler claims and processes |
@@ -81,8 +82,15 @@ place          id, name, name_ka, category, geom geography,
                tier(curated|verified|raw), source, source_id,
                opening_hours jsonb, attrs jsonb, verified_at, verified_by
 
-corridor       id, name, geom geography(LineString), buffer_m,
+corridor       id, slug, name, geom geography(LineString), buffer_m,
                season_risk jsonb          -- the 12 curated corridors
+
+region         id, slug, name, name_ka, kind(municipality|city), iso_region,
+               source, source_id, geom geography(MultiPolygon),
+               poll_point geography(Point) -- sense-loop polling unit
+
+place_review   id, place_id, decision(curate|reject|skip), reviewer_id,
+               note, created_at           -- append-only curation log
 
 -- watch layer
 world_event    id, source, kind, severity, confidence, geom geography,
@@ -106,6 +114,21 @@ job            id, kind, payload jsonb, run_after, attempts,
 `place.tier` is what keeps the hand-verified catalogue trustworthy: only `curated` places are
 proposable in a generated itinerary; `verified` places can be suggested by the judge; `raw` is
 searchable but never proposable. Enforced server-side in the validator, never just in the prompt.
+
+### Catalogue pipeline
+
+```
+npm run catalogue:extract   Overture S3 → data/overture/<release>/*.parquet (bbox cache)
+                            → regions + gate + tier → data/catalogue/<release>/*.parquet
+npm run catalogue:corridors OSRM → src/core/catalogue/corridors.geo.json (checked in)
+npm run catalogue:load      regions, corridors, places → Postgres (idempotent upsert)
+/curate                     hand-verification queue → `curated` tier + opening_hours
+```
+
+The Overture release is pinned (`scripts/catalogue/extract.ts`). Reloads never demote `curated`
+rows or overwrite the curator's name/category/position; non-curated rows missing from a newer release
+are demoted to `raw`, never deleted (`trip_node.place_id` would null out). Sense regions are the 64
+municipalities and self-governing cities of Georgia, excluding Abkhazia and South Ossetia.
 
 `intervention.outcome` is the product's only defensibility claim — a record of which world-changes
 actually moved a traveller's plan. The write path ships in the same commit as the accept/dismiss

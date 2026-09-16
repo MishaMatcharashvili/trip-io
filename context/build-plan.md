@@ -22,12 +22,13 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 1 — catalogue and corridors
 
-- [ ] Overture Places pulled via DuckDB from S3, filtered to Georgia bbox, written to Parquet, `COPY`'d into PostGIS
-- [ ] Programmatic gate implemented: require name, category in ~40-entry allowlist, trigram dedupe within 100m, drop no-website-and-no-phone-and-no-address
-- [ ] `place.tier` assignment (`raw` / `verified`) per the gate
-- [ ] 600 hand-verified `curated` places: Tbilisi core, Kazbegi corridor, Kakheti, Svaneti — capture `opening_hours` while verifying
-- [ ] 12-corridor table as buffered LineStrings with seasonal risk annotations
-- [ ] Region decomposition for the sense loop (municipality polygons or corridors + coarse grid)
+- [x] Overture Places pulled via DuckDB from S3, filtered to Georgia bbox, written to Parquet
+- [ ] …loaded into PostGIS — `npm run catalogue:load` is written, blocked on Neon (Phase 0 procurement)
+- [x] Programmatic gate implemented: require name, category in ~40-entry allowlist (45), trigram dedupe within 100m, drop no-website-and-no-phone-and-no-address
+- [x] `place.tier` assignment (`raw` / `verified`) per the gate — OSM-counterpart signal not implemented (no OSM extract)
+- [ ] 600 hand-verified `curated` places: Tbilisi core, Kazbegi corridor, Kakheti, Svaneti — capture `opening_hours` while verifying (queue built at `/curate`; 0/600)
+- [x] 12-corridor table as buffered LineStrings with seasonal risk annotations (seed values — verify before Phase 5 cites them)
+- [x] Region decomposition for the sense loop: 64 municipality/city polygons with poll points
 
 ## Phase 2 — trip document and patch log
 

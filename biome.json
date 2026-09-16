@@ -13,7 +13,8 @@
       "!.next",
       "!dist",
       "!build",
-      "!src/db/migrations"
+      "!src/db/migrations",
+      "!src/core/catalogue/corridors.geo.json"
     ]
   },
   "formatter": {
