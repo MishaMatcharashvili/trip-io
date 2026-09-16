@@ -13,6 +13,8 @@ waits on Neon, and the curation queue at `/curate` waits on Neon + Google OAuth 
 | Repo | Hono mounted at `app/api/[[...route]]/route.ts` (`GET /api/health` proven end-to-end via `hc<AppType>()`), Better Auth wired at `app/api/auth/[...all]/route.ts` (Google OAuth + anonymous sessions — `GOOGLE_CLIENT_ID`/`SECRET` not yet supplied) |
 | Catalogue pipeline | `npm run catalogue:extract` (Overture 2026-08-19.0 → gated Parquet, ~2 min cold), `catalogue:corridors` (OSRM → checked-in GeoJSON), `catalogue:load` (→ Postgres, idempotent). `/curate` review queue + add-missing-place form. 60 tests (`npm test`) |
 | Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`. Phase 1: + `@duckdb/node-api` (dev). Still not installed: MapLibre (Phase 6), Resend (Phase 4), Expo (Phase 7) |
+| Design system | `src/ui/` — Mist tokens in `app/globals.css` (`@theme`), primitives (button, card, chip, dot, controls, nav, bars, sheet, 28-glyph icon set) and composites in `src/features/`. Reference page at `/design` |
+| Screens | 17 fixture-backed screens under `src/app` (see `/design`). Layout and states are final; no API, no MapLibre — maps are the canvas's schematic charts in `src/ui/map/` |
 | Database | 11 domain tables + Better Auth's in `src/db/schema/`, plus Phase 1's `region` and `place_review` (migration `0001`). `npm run db:migrate` creates PostGIS, then applies both. **Not yet applied** — no live Neon project; `.env` holds a placeholder `DATABASE_URL` |
 | Detectors | None built |
 | Catalogue | Extracted, not loaded: 64 sense regions; 65,705 Overture places in bbox → 13,337 kept (11,590 `verified`, 1,747 `raw`; 103 merged as duplicates). 12 corridors routed. **0 / 600 curated** |
@@ -42,7 +44,7 @@ be updated as phases close, not item-by-item.
 | 3 | Pipeline, weather only | Not started |
 | 4 | Daily briefing | Not started |
 | 5 | Interrupts, budget, road form | Not started |
-| 6 | Web client | Not started |
+| 6 | Web client | Screens built against fixtures; nothing wired to the API or to MapLibre |
 | 7 | Native shell | Not started |
 | 8 | Detector expansion + road spike | Not started |
 | 9 | Instrumentation + dashboard | Not started |
@@ -88,6 +90,16 @@ above gets resolved. Keep entries short — this is a log, not a report.
   first migration generated, Hono mounted with a typed `/api/health` route proven via `hc<AppType>()`,
   Better Auth wired (Google OAuth + anonymous). Not yet applied against a live database — waiting on
   the Neon project and Google OAuth app from the procurement checklist above.
+- **2026-09-16** — Design system and screens built from the Claude Design canvas ("trip.io Wireframe
+  Concepts"). Chosen direction: **Concept A — map-first, in the Mist palette**. Colour does exactly
+  three jobs — periwinkle is the agent, coral is a real disruption, green is all clear — and that
+  rule is what lets a single dot carry urgency. Light-only by design, so the dark variants were
+  stripped from `/curate` too. Every screen runs on `src/data/trip.ts`, whose shapes mirror the
+  Drizzle schema (checkpoint = `trip_node`, advisory = `intervention` citing a `world_event`), so
+  Phase 2–6 wiring replaces the loader rather than the components. The four states that decide
+  whether the watch layer feels trustworthy — advisory, nothing-to-report, change-applied, watch
+  paused — are all built, reachable at `?state=`. Not built, deliberately: Explore and Saved are nav
+  stubs only.
 - **2026-09-16** — Phase 1 code-buildable slice done, run against Overture 2026-08-19.0 locally.
   Decisions made along the way: the gate (trigram dedupe included) runs in DuckDB before load, not in
   PostGIS after it, so it's testable without a database; dedupe compares distinctive name tokens at

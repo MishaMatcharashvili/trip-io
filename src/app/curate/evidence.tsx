@@ -39,28 +39,26 @@ export function Evidence({ place }: { place: QueuePlace }) {
   ] as const;
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <section className="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4">
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold">{place.name}</h2>
           <span
             className={`rounded px-1.5 py-0.5 text-xs ${
               place.tier === "verified"
-                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-zinc-100 text-zinc-600"
             }`}
           >
             {place.tier}
           </span>
           {place.lastDecision === "skip" && (
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
               skipped before
             </span>
           )}
         </div>
-        {place.nameKa && (
-          <p className="text-zinc-600 dark:text-zinc-400">{place.nameKa}</p>
-        )}
+        {place.nameKa && <p className="text-zinc-600">{place.nameKa}</p>}
         <p className="text-sm text-zinc-500">
           {humanise(place.category)}
           {typeof attrs.confidence === "number" &&
@@ -89,7 +87,7 @@ export function Evidence({ place }: { place: QueuePlace }) {
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md border border-zinc-300 px-2.5 py-1 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            className="rounded-md border border-zinc-300 px-2.5 py-1 text-sm hover:bg-zinc-100:bg-zinc-900"
           >
             {label} ↗
           </a>

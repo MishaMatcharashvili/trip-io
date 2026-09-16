@@ -1,26 +1,148 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * trip.io — "Mist" design tokens.
+ *
+ * Colour does exactly three jobs. Periwinkle is the agent: its route, its
+ * proposals, its primary actions, anything it wants you to look at. Coral is a
+ * real disruption and nothing else. Green means all clear. Everything else is
+ * neutral, so a single coloured dot carries urgency without the screen looking
+ * alarmed.
+ */
+@theme {
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* surfaces */
+  --color-canvas: #f7f9fb;
+  --color-surface: #ffffff;
+  /* Aliases the curation tool (`/curate`) is written against. */
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-ink);
+  --color-surface-subtle: #fbfcfd;
+  --color-fill: #eaeff3;
+  --color-fill-strong: #dce4ea;
+  --color-track: #eff2f5;
+  --color-track-pill: #edf1f4;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* lines */
+  --color-hairline: #e7ecf0;
+  --color-hairline-strong: #e1e7ec;
+  --color-control: #d6dee5;
+
+  /* ink */
+  --color-ink: #1d232a;
+  --color-ink-muted: #616c77;
+  --color-ink-faint: #939da6;
+  --color-ink-idle: #c6d0d8;
+
+  /* the agent */
+  --color-agent: #4a63e7;
+  --color-agent-hover: #3a4fcc;
+  --color-agent-soft: #c9d0f7;
+  --color-agent-line: #d8ddfb;
+  --color-agent-tint: #eef0fe;
+
+  /* a real disruption */
+  --color-alert: #c8492c;
+  --color-alert-bright: #e2664a;
+  --color-alert-soft: #f3c0b0;
+  --color-alert-line: #f6d9d0;
+  --color-alert-tint: #fdf0ec;
+
+  /* all clear */
+  --color-ok: #1d7a57;
+  --color-ok-line: #cfe9df;
+  --color-ok-tint: #eaf6f1;
+
+  /* one size ramp, no serif and no mono — DM Sans throughout */
+  --text-micro: 10px;
+  --text-micro--line-height: 1.4;
+  --text-mini: 11.5px;
+  --text-mini--line-height: 1.45;
+  --text-small: 12.5px;
+  --text-small--line-height: 1.45;
+  --text-body: 14px;
+  --text-body--line-height: 1.45;
+  --text-title: 14.5px;
+  --text-title--line-height: 1.35;
+  --text-headline: 19px;
+  --text-headline--line-height: 1.22;
+  --text-display: 28px;
+  --text-display--line-height: 1.14;
+
+  --radius-control: 8px;
+  --radius-card: 10px;
+  --radius-panel: 12px;
+  --radius-sheet: 18px;
+
+  --shadow-card: 0 1px 2px rgba(29, 35, 42, 0.04);
+  --shadow-panel:
+    0 1px 2px rgba(29, 35, 42, 0.04), 0 14px 34px rgba(29, 35, 42, 0.09);
+  --shadow-lifted:
+    0 1px 2px rgba(20, 26, 33, 0.04), 0 14px 40px rgba(20, 26, 33, 0.06);
+  --shadow-agent:
+    0 1px 2px rgba(29, 35, 42, 0.04), 0 16px 38px rgba(74, 99, 231, 0.1);
+  --shadow-sheet: 0 -10px 30px rgba(29, 35, 42, 0.07);
+  --shadow-chip: 0 2px 8px rgba(29, 35, 42, 0.06);
+  --shadow-notification: 0 6px 20px rgba(29, 35, 42, 0.1);
+
+  /* The route pin the agent is standing on, and the "still watching" pulse. */
+  --animate-ping-slow: ping-slow 2.8s ease-out infinite;
+  --animate-breathe: breathe 2.6s ease-in-out infinite;
+
+  @keyframes ping-slow {
+    0% {
+      transform: scale(1);
+      opacity: 0.28;
+    }
+    70% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-size: var(--text-body);
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The screens lean on animation only for "I am still watching" signals —
+     none of it carries meaning on its own, so it can all stop. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+      transition-duration: 0.01ms;
+    }
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-agent);
+    outline-offset: 2px;
+  }
 }
