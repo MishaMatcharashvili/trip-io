@@ -55,22 +55,22 @@ export default async function PushPage({
         eyebrow="How an alert reaches you"
       />
 
-      <main className="flex flex-1 justify-center bg-[#e8edf2] px-4 py-5">
+      <main className="flex flex-1 justify-center bg-backdrop px-4 py-5">
         <div className="flex w-full max-w-[390px] flex-col gap-3.5">
-          <Eyebrow className="text-[#5a6b77]">How an alert reaches you</Eyebrow>
+          <Eyebrow className="text-ink-muted">How an alert reaches you</Eyebrow>
 
           {notifications.map((notification) => (
             <div
               key={notification.title}
               className={cx(
-                "overflow-hidden rounded-[16px] border border-white/90 bg-white/92 shadow-notification",
+                "overflow-hidden rounded-[16px] border border-hairline bg-surface/92 shadow-notification",
                 notification.dim && "opacity-80",
               )}
             >
               <div className="flex items-start gap-3 px-3.5 py-3">
                 <span
                   className={cx(
-                    "flex size-8 shrink-0 items-center justify-center rounded-control text-white",
+                    "flex size-8 shrink-0 items-center justify-center rounded-control text-on-accent",
                     notification.tone === "agent" ? "bg-agent" : "bg-alert",
                   )}
                 >
@@ -114,7 +114,7 @@ export default async function PushPage({
             </div>
           ))}
 
-          <p className="text-mini text-[#5a6b77]">
+          <p className="text-mini text-ink-muted">
             Only disruptions and the morning briefing push. Opportunities wait
             until you open the app.
           </p>

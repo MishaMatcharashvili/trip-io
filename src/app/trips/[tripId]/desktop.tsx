@@ -180,7 +180,7 @@ function AppliedPanel({ className }: { className?: string }) {
   return (
     <Panel accent="ok" className={`overflow-hidden ${className ?? ""}`}>
       <div className="flex items-center gap-2.5 border-b border-ok-line bg-ok-tint px-3.5 py-3">
-        <span className="flex size-5 items-center justify-center rounded-full bg-ok text-white">
+        <span className="flex size-5 items-center justify-center rounded-full bg-ok text-on-accent">
           <Icon name="check" size={11} strokeWidth={2.6} />
         </span>
         <Eyebrow tone="ok">Day updated · 2 changes applied</Eyebrow>

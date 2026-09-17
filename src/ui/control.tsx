@@ -34,7 +34,7 @@ export function Toggle({
         on ? "justify-end bg-agent" : "justify-start bg-fill-strong",
       )}
     >
-      <span className={cx("rounded-full bg-surface", knob)} />
+      <span className={cx("rounded-full bg-knob", knob)} />
     </button>
   );
 }

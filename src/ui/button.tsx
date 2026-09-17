@@ -6,7 +6,7 @@ type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   // The agent's own actions. One per surface, never two.
-  primary: "bg-agent text-white hover:bg-agent-hover",
+  primary: "bg-agent text-on-accent hover:bg-agent-hover",
   secondary: "bg-surface border-control text-ink hover:bg-canvas",
   ghost: "bg-transparent text-ink-muted hover:text-ink",
 };

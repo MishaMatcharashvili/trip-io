@@ -118,6 +118,20 @@ const glyphs = {
     </>
   ),
   filter: <path d="M5 7h14M7.5 12h9M10 17h4" />,
+  // Not on the canvas — drawn to the same grid and stroke for the theme switch.
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+    </>
+  ),
+  moon: <path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" />,
+  display: (
+    <>
+      <rect x="3" y="4.5" width="18" height="12" rx="2" />
+      <path d="M8.5 20h7M12 16.5V20" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof glyphs;

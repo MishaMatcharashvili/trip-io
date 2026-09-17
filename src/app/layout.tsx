@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
+import { themeScript } from "@/ui/theme-script";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -18,7 +19,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${dmSans.variable} h-full`}>
+    <html
+      lang="en"
+      data-theme="light"
+      className={`${dmSans.variable} h-full`}
+      suppressHydrationWarning
+    >
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: a fixed, first-party string that must run before paint */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="flex min-h-full flex-col font-sans">{children}</body>
     </html>
   );
