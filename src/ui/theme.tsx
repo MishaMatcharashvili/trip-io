@@ -99,11 +99,8 @@ export function ThemeSegmented() {
   const [preference, set] = useThemePreference();
 
   return (
-    <div
-      role="group"
-      aria-label="Theme"
-      className="flex gap-0.5 rounded-[10px] bg-track-pill p-[3px]"
-    >
+    <fieldset className="flex gap-0.5 rounded-[10px] bg-track-pill p-[3px]">
+      <legend className="sr-only">Theme</legend>
       {options.map((option) => {
         const on = option.value === preference;
         return (
@@ -124,6 +121,6 @@ export function ThemeSegmented() {
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }

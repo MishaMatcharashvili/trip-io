@@ -170,8 +170,9 @@ export default function BuildingPage() {
             { day: "Day 5 · Sat", widths: ["66%", "78%"] },
           ].map((placeholder) => (
             <Card
+              tint
               key={placeholder.day}
-              className="flex flex-col gap-2.5 bg-surface-subtle px-3.5 py-3"
+              className="flex flex-col gap-2.5 px-3.5 py-3"
             >
               <Eyebrow>{placeholder.day}</Eyebrow>
               {placeholder.widths.map((width) => (
