@@ -12,6 +12,7 @@ export default async function SignInPage({
 
   return (
     <AuthShell
+      icon="user"
       eyebrow="Welcome back"
       title="Sign in to trip.io"
       lead="Your trips, and everything I am watching on them, are waiting where you left them."

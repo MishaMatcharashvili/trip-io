@@ -118,6 +118,13 @@ const glyphs = {
     </>
   ),
   filter: <path d="M5 7h14M7.5 12h9M10 17h4" />,
+  // Not on the canvas — the user glyph with a plus, for creating an account.
+  userPlus: (
+    <>
+      <circle cx="10" cy="8.5" r="3.6" />
+      <path d="M2.5 20a7.5 7.5 0 0 1 12.2-5.8M18.5 13.5v6M15.5 16.5h6" />
+    </>
+  ),
   // Not on the canvas — drawn to the same grid and stroke for the theme
   // switch and search.
   sun: (

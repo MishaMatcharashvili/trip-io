@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Brand, TopBar } from "@/features/chrome";
+import { AccountButton, Brand, TopBar } from "@/features/chrome";
 import { ButtonLink } from "@/ui/button";
 import { Card, Divider } from "@/ui/card";
 import { Chip } from "@/ui/chip";
@@ -144,7 +144,7 @@ export default function NewTripPage() {
         <div className="flex items-center gap-2 pt-2.5">
           <Brand size={19} />
           <div className="flex-1" />
-          <span className="size-7 rounded-full border border-control bg-fill" />
+          <AccountButton size={28} />
         </div>
 
         <div className="flex flex-col gap-3 pt-11">

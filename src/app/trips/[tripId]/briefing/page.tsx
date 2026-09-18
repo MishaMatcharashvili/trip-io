@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTrip } from "@/data/trip";
+import { AccountButton } from "@/features/chrome";
 import { ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Chip } from "@/ui/chip";
@@ -61,7 +62,7 @@ export default async function BriefingPage({
           Watching · {trip.sourceCount} sources
         </Chip>
         <div className="flex-1" />
-        <span className="size-[30px] rounded-full border border-control bg-surface" />
+        <AccountButton floating />
       </div>
 
       <main className="relative z-10 mt-[214px] flex flex-1 flex-col rounded-t-[20px] border-t border-hairline bg-surface shadow-sheet lg:mx-auto lg:mt-[240px] lg:w-[560px] lg:rounded-[20px] lg:border">

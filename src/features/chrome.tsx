@@ -22,13 +22,35 @@ export function Brand({
   );
 }
 
-function Avatar() {
+/**
+ * The way into your account — and, when you don't have one yet, into sign-in
+ * and sign-up. It carries the person glyph so it reads as a button rather than
+ * an empty placeholder waiting for a photo.
+ */
+export function AccountButton({
+  size = 30,
+  floating = false,
+  className,
+}: {
+  size?: number;
+  /** Over the map: surface fill and lift, like the other floating controls. */
+  floating?: boolean;
+  className?: string;
+}) {
   return (
     <Link
       href="/account"
       aria-label="Your account"
-      className="size-[30px] rounded-full border border-control bg-fill"
-    />
+      title="Your account"
+      style={{ width: size, height: size }}
+      className={cx(
+        "flex shrink-0 items-center justify-center rounded-full border border-control text-ink-muted transition-colors hover:text-ink",
+        floating ? "bg-surface shadow-chip" : "bg-fill",
+        className,
+      )}
+    >
+      <Icon name="user" size={Math.round(size * 0.53)} strokeWidth={1.7} />
+    </Link>
   );
 }
 
@@ -107,7 +129,7 @@ export function TopBar({
       ) : null}
       {watch === "paused" ? <WatchChip state="paused" label="Paused" /> : null}
       <ThemeToggle />
-      <Avatar />
+      <AccountButton />
     </header>
   );
 }

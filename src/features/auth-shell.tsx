@@ -1,4 +1,5 @@
 import { Panel } from "@/ui/card";
+import { Icon, type IconName } from "@/ui/icon";
 import { BasemapCalm } from "@/ui/map/basemap-calm";
 import { Display, Eyebrow, Prose } from "@/ui/text";
 import { ThemeToggle } from "@/ui/theme";
@@ -10,11 +11,13 @@ import { Brand } from "./chrome";
  * navigate away to except the logo.
  */
 export function AuthShell({
+  icon,
   eyebrow,
   title,
   lead,
   children,
 }: {
+  icon: IconName;
   eyebrow: string;
   title: string;
   lead: string;
@@ -36,6 +39,9 @@ export function AuthShell({
       <main className="relative z-10 flex flex-1 items-start justify-center px-4 pb-12 pt-6 lg:items-center lg:pt-0">
         <Panel className="w-full max-w-[420px] p-6 lg:p-7">
           <div className="flex flex-col gap-1.5 pb-6">
+            <span className="mb-2 flex size-10 items-center justify-center rounded-full border border-agent-line bg-agent-tint text-agent">
+              <Icon name={icon} size={19} strokeWidth={1.7} />
+            </span>
             <Eyebrow tone="agent">{eyebrow}</Eyebrow>
             <Display className="text-[26px]">{title}</Display>
             <Prose>{lead}</Prose>

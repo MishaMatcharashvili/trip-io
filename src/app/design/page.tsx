@@ -121,6 +121,7 @@ const iconNames: IconName[] = [
   "sun",
   "moon",
   "display",
+  "userPlus",
 ];
 
 const screens = [

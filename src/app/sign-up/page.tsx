@@ -12,6 +12,7 @@ export default async function SignUpPage({
 
   return (
     <AuthShell
+      icon="userPlus"
       eyebrow="Create an account"
       title="Keep your trips, and let me watch them"
       lead="An account saves what you plan and lets the watch layer follow it while you travel. Planning itself stays free."
