@@ -101,8 +101,9 @@ above gets resolved. Keep entries short — this is a log, not a report.
   Drizzle schema (checkpoint = `trip_node`, advisory = `intervention` citing a `world_event`), so
   Phase 2–6 wiring replaces the loader rather than the components. The four states that decide
   whether the watch layer feels trustworthy — advisory, nothing-to-report, change-applied, watch
-  paused — are all built, reachable at `?state=`. Not built, deliberately: Explore and Saved are nav
-  stubs only.
+  paused — are all built, reachable at `?state=`. Explore and Saved are left undesigned in the
+  canvas (nav stubs only); they are built here in the same grammar from the real catalogue shape —
+  focus areas, category groups, corridor season risk — in `src/data/explore.ts`.
 - **2026-09-16** — Phase 1 code-buildable slice done, run against Overture 2026-08-19.0 locally.
   Decisions made along the way: the gate (trigram dedupe included) runs in DuckDB before load, not in
   PostGIS after it, so it's testable without a database; dedupe compares distinctive name tokens at

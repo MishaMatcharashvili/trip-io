@@ -117,6 +117,10 @@ const iconNames: IconName[] = [
   "chevronRight",
   "chevronLeft",
   "chevronDown",
+  "search",
+  "sun",
+  "moon",
+  "display",
 ];
 
 const screens = [
@@ -137,6 +141,8 @@ const screens = [
   ["What I watch", "/trips/georgia/watch"],
   ["Push notifications", "/trips/georgia/watch/push"],
   ["Plans & the watch layer", "/plans"],
+  ["Explore", "/explore"],
+  ["Saved", "/saved"],
 ];
 
 function Spec({

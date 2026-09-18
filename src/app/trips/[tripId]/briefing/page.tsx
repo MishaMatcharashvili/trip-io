@@ -96,8 +96,9 @@ export default async function BriefingPage({
         </div>
 
         <Card
+          tint
           accent="agent"
-          className="mx-[18px] mt-4 flex flex-col gap-3 bg-agent-tint p-3.5"
+          className="mx-[18px] mt-4 flex flex-col gap-3 p-3.5"
         >
           <div className="flex items-center gap-2">
             <Icon name="sparkle" size={15} className="text-agent" />
