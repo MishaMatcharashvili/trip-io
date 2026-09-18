@@ -16,7 +16,7 @@ const rejectReasons = [
 
 const inputClass = (error?: string) =>
   `rounded-md border bg-transparent px-2 py-1.5 ${
-    error ? "border-red-500" : "border-zinc-300"
+    error ? "border-red-500" : "border-zinc-300 dark:border-zinc-700"
   }`;
 
 /**
@@ -152,17 +152,17 @@ export function PlaceForm({
             type="button"
             disabled={busy}
             onClick={() => onSkip(note())}
-            className="rounded-md border border-zinc-300 px-4 py-2 disabled:opacity-50"
+            className="rounded-md border border-zinc-300 px-4 py-2 disabled:opacity-50 dark:border-zinc-700"
           >
             Skip for now
           </button>
         )}
         {onReject && (
           <details className="relative">
-            <summary className="cursor-pointer list-none rounded-md border border-red-300 px-4 py-2 text-red-700">
+            <summary className="cursor-pointer list-none rounded-md border border-red-300 px-4 py-2 text-red-700 dark:border-red-900 dark:text-red-400">
               Reject…
             </summary>
-            <div className="absolute z-10 mt-1 flex w-56 flex-col rounded-md border border-zinc-200 bg-background p-1 shadow-lg">
+            <div className="absolute z-10 mt-1 flex w-56 flex-col rounded-md border border-zinc-200 bg-background p-1 shadow-lg dark:border-zinc-800">
               {rejectReasons.map((reason) => (
                 <button
                   key={reason}
@@ -171,7 +171,7 @@ export function PlaceForm({
                   onClick={() =>
                     onReject([reason, note()].filter(Boolean).join(" — "))
                   }
-                  className="rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100:bg-zinc-900"
+                  className="rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-900"
                 >
                   {reason}
                 </button>

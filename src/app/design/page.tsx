@@ -20,6 +20,7 @@ import { Dot } from "@/ui/dot";
 import { Icon, type IconName } from "@/ui/icon";
 import { PillNav } from "@/ui/nav";
 import { Display, Eyebrow, Headline, Num, Prose, Title } from "@/ui/text";
+import { ThemeSegmented } from "@/ui/theme";
 
 export const metadata: Metadata = {
   title: "Design system",
@@ -116,6 +117,10 @@ const iconNames: IconName[] = [
   "chevronRight",
   "chevronLeft",
   "chevronDown",
+  "search",
+  "sun",
+  "moon",
+  "display",
 ];
 
 const screens = [
@@ -136,6 +141,11 @@ const screens = [
   ["What I watch", "/trips/georgia/watch"],
   ["Push notifications", "/trips/georgia/watch/push"],
   ["Plans & the watch layer", "/plans"],
+  ["Explore", "/explore"],
+  ["Saved", "/saved"],
+  ["Sign in", "/sign-in"],
+  ["Create an account", "/sign-up"],
+  ["Account", "/account"],
 ];
 
 function Spec({
@@ -165,6 +175,7 @@ export default function DesignSystemPage() {
         <Title>Design system</Title>
         <div className="flex-1" />
         <Chip>Mist · map-first</Chip>
+        <ThemeSegmented />
       </header>
 
       <main className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-4 py-10">

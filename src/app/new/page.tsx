@@ -87,7 +87,7 @@ export default function NewTripPage() {
                 Or say it out loud
               </span>
               <div className="flex-1" />
-              <ButtonLink href="/new" variant="ghost">
+              <ButtonLink href="/saved" variant="ghost">
                 Start from a saved route
               </ButtonLink>
               <ButtonLink
@@ -122,8 +122,9 @@ export default function NewTripPage() {
           </div>
 
           <Card
+            tint
             accent="agent"
-            className="flex w-full items-center gap-3 bg-agent-tint px-4 py-3.5"
+            className="flex w-full items-center gap-3 px-4 py-3.5"
           >
             <Icon name="signal" size={18} className="text-agent" />
             <p className="flex-1 text-small">
@@ -193,10 +194,7 @@ export default function NewTripPage() {
 
         <div className="flex-1" />
 
-        <Card
-          accent="agent"
-          className="mt-6 flex items-start gap-3 bg-agent-tint p-3.5"
-        >
+        <Card tint accent="agent" className="mt-6 flex items-start gap-3 p-3.5">
           <Icon name="signal" size={18} className="text-agent" />
           <p className="flex-1 text-mini">
             Once a trip is live I watch weather, roads, transport and local

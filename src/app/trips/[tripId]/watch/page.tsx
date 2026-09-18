@@ -9,6 +9,7 @@ import { RadioRow, Toggle } from "@/ui/control";
 import { Icon } from "@/ui/icon";
 import { BottomNav, homeTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num } from "@/ui/text";
+import { ThemeSegmented } from "@/ui/theme";
 
 export const metadata: Metadata = { title: "What I watch" };
 
@@ -159,6 +160,14 @@ export default async function WatchSettingsPage({
               </div>
               <Num className="text-small font-semibold">22:00 – 07:00</Num>
             </div>
+          </Card>
+        </section>
+
+        <section className="flex flex-col gap-2.5">
+          <SectionRule>Appearance</SectionRule>
+          <Card className="flex items-center gap-3 px-3.5 py-2.5">
+            <span className="flex-1 text-small font-medium">Theme</span>
+            <ThemeSegmented />
           </Card>
         </section>
 

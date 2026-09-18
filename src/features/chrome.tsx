@@ -5,6 +5,7 @@ import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
 import { type NavItem, PillNav } from "@/ui/nav";
 import { Eyebrow, Title } from "@/ui/text";
+import { ThemeToggle } from "@/ui/theme";
 
 export function Brand({
   size = 20,
@@ -24,7 +25,7 @@ export function Brand({
 function Avatar() {
   return (
     <Link
-      href="/plans"
+      href="/account"
       aria-label="Your account"
       className="size-[30px] rounded-full border border-control bg-fill"
     />
@@ -105,6 +106,7 @@ export function TopBar({
         />
       ) : null}
       {watch === "paused" ? <WatchChip state="paused" label="Paused" /> : null}
+      <ThemeToggle />
       <Avatar />
     </header>
   );

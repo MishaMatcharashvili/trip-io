@@ -73,8 +73,9 @@ export default async function DayPage({
 
       {hasConflict ? (
         <Card
+          tint
           accent="agent"
-          className="fixed inset-x-4 bottom-24 z-20 flex items-center gap-3 bg-agent-tint px-3.5 py-2.5 lg:static lg:mx-auto lg:mb-8 lg:w-full lg:max-w-[720px]"
+          className="fixed inset-x-4 bottom-24 z-20 flex items-center gap-3 px-3.5 py-2.5 lg:static lg:mx-auto lg:mb-8 lg:w-full lg:max-w-[720px]"
         >
           <Icon name="sparkle" size={16} className="text-agent" />
           <span className="flex-1 text-small font-medium">

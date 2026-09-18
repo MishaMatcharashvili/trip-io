@@ -15,6 +15,16 @@ export function getAuth() {
   return instance;
 }
 
+/**
+ * Whether Google sign-in is registered. The auth pages read this to show the
+ * button as unavailable rather than letting it fail after a redirect.
+ */
+export function isGoogleConfigured() {
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+  );
+}
+
 function build() {
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -37,6 +47,13 @@ function build() {
             },
           }
         : {},
+    // Email and password sit alongside Google so an account doesn't depend on
+    // a Google login. No verification or reset emails yet: both need a sender,
+    // which arrives with Resend in Phase 4. Until then sign-up signs straight in.
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+    },
     plugins: [
       // Better Auth deletes the anonymous user when it links to a real account.
       // With `trip.userId` set null on delete, that would silently orphan the

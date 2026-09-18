@@ -93,10 +93,10 @@ export const tripTabs = (tripId: string): NavItem[] => [
   { label: "AI", href: `/trips/${tripId}/alerts`, icon: "sparkle" },
 ];
 
-/** The tabs outside a trip. Explore and Saved are stubs, deliberately. */
+/** The tabs outside a trip. */
 export const homeTabs: NavItem[] = [
   { label: "Trips", href: "/", icon: "route" },
   { label: "Explore", href: "/explore", icon: "explore" },
   { label: "Saved", href: "/saved", icon: "bookmark" },
-  { label: "Profile", href: "/plans", icon: "user" },
+  { label: "Profile", href: "/account", icon: "user" },
 ];
