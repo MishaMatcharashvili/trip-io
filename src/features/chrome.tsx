@@ -25,7 +25,7 @@ export function Brand({
 function Avatar() {
   return (
     <Link
-      href="/plans"
+      href="/account"
       aria-label="Your account"
       className="size-[30px] rounded-full border border-control bg-fill"
     />

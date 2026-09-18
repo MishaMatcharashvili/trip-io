@@ -143,6 +143,9 @@ const screens = [
   ["Plans & the watch layer", "/plans"],
   ["Explore", "/explore"],
   ["Saved", "/saved"],
+  ["Sign in", "/sign-in"],
+  ["Create an account", "/sign-up"],
+  ["Account", "/account"],
 ];
 
 function Spec({

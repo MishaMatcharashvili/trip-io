@@ -98,5 +98,5 @@ export const homeTabs: NavItem[] = [
   { label: "Trips", href: "/", icon: "route" },
   { label: "Explore", href: "/explore", icon: "explore" },
   { label: "Saved", href: "/saved", icon: "bookmark" },
-  { label: "Profile", href: "/plans", icon: "user" },
+  { label: "Profile", href: "/account", icon: "user" },
 ];

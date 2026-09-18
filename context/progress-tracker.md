@@ -90,6 +90,12 @@ above gets resolved. Keep entries short — this is a log, not a report.
   first migration generated, Hono mounted with a typed `/api/health` route proven via `hc<AppType>()`,
   Better Auth wired (Google OAuth + anonymous). Not yet applied against a live database — waiting on
   the Neon project and Google OAuth app from the procurement checklist above.
+- **2026-09-18** — Auth screens: `/sign-in`, `/sign-up`, `/account`. Email and password enabled
+  alongside Google (no migration — Better Auth's `account.password` already existed); guest sessions
+  via the anonymous plugin. No verification or reset emails until Resend (Phase 4). Nothing can
+  actually sign in yet: every auth call needs the Neon `DATABASE_URL` from the procurement list.
+  Also recovered dark mode + Explore/Saved, which PR #4 had merged into `design-system-screens`
+  after #3 had already landed, so they never reached `main`.
 - **2026-09-16** — Design system and screens built from the Claude Design canvas ("trip.io Wireframe
   Concepts"). Chosen direction: **Concept A — map-first, in the Mist palette**. Colour does exactly
   three jobs — periwinkle is the agent, coral is a real disruption, green is all clear — and that
