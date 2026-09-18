@@ -51,7 +51,7 @@ export function HoursEditor({
             className={`rounded-md border px-3 py-1.5 text-sm ${
               value.kind === kind
                 ? "border-foreground bg-foreground text-background"
-                : "border-zinc-300"
+                : "border-zinc-300 dark:border-zinc-700"
             }`}
           >
             {label}
@@ -72,7 +72,9 @@ export function HoursEditor({
                 }
                 placeholder="10:00-19:00 or closed"
                 className={`flex-1 rounded-md border bg-transparent px-2 py-1 font-mono ${
-                  errors[day] ? "border-red-500" : "border-zinc-300"
+                  errors[day]
+                    ? "border-red-500"
+                    : "border-zinc-300 dark:border-zinc-700"
                 }`}
               />
               {day === "mon" && (
@@ -121,7 +123,7 @@ export function HoursEditor({
                   className={`h-7 w-7 rounded ${
                     on
                       ? "bg-foreground text-background"
-                      : "border border-zinc-300"
+                      : "border border-zinc-300 dark:border-zinc-700"
                   }`}
                 >
                   {label}
@@ -136,7 +138,7 @@ export function HoursEditor({
             value={value.note}
             onChange={(e) => set({ note: e.target.value })}
             placeholder="Hours note (e.g. closed on religious holidays)"
-            className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-700"
           />
         </>
       )}

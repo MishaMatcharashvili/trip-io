@@ -173,11 +173,13 @@ export function CurationQueue() {
                 setMode("review");
               }}
               className={`flex flex-col gap-1.5 rounded-lg border p-3 text-left ${
-                area === a.slug ? "border-foreground" : "border-zinc-200"
+                area === a.slug
+                  ? "border-foreground"
+                  : "border-zinc-200 dark:border-zinc-800"
               }`}
             >
               <span className="font-medium">{a.name}</span>
-              <span className="h-1.5 overflow-hidden rounded bg-zinc-200">
+              <span className="h-1.5 overflow-hidden rounded bg-zinc-200 dark:bg-zinc-800">
                 <span
                   className="block h-full bg-emerald-600"
                   style={{ width: `${pct}%` }}
@@ -207,7 +209,7 @@ export function CurationQueue() {
             className={`rounded-full border px-3 py-1 text-sm ${
               group === g && mode === "review"
                 ? "border-foreground bg-foreground text-background"
-                : "border-zinc-300"
+                : "border-zinc-300 dark:border-zinc-700"
             }`}
           >
             {g ? humanise(g) : "All"}
@@ -219,7 +221,7 @@ export function CurationQueue() {
           className={`ml-auto rounded-full border px-3 py-1 text-sm ${
             mode === "add"
               ? "border-foreground bg-foreground text-background"
-              : "border-zinc-300"
+              : "border-zinc-300 dark:border-zinc-700"
           }`}
         >
           + Add a place Overture is missing
@@ -227,9 +229,15 @@ export function CurationQueue() {
       </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</p>
+        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-300">
+          {error}
+        </p>
       )}
-      {flash && !error && <p className="text-sm text-emerald-700">✓ {flash}</p>}
+      {flash && !error && (
+        <p className="text-sm text-emerald-700 dark:text-emerald-400">
+          ✓ {flash}
+        </p>
+      )}
 
       {mode === "add" ? (
         <section className="max-w-2xl">
