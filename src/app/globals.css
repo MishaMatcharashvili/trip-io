@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `dark:` follows the resolved theme on <html>, not the OS directly, so a
+   manual choice in the theme switch wins over the system preference. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /*
  * trip.io — "Mist" design tokens.
  *
@@ -53,6 +57,33 @@
   --color-ok: #1d7a57;
   --color-ok-line: #cfe9df;
   --color-ok-tint: #eaf6f1;
+
+  /* Text and glyphs sitting on a solid agent, alert or ok fill. */
+  --color-on-accent: #ffffff;
+  /* The thumb of a switch — always the lightest thing on its track. */
+  --color-knob: #ffffff;
+  /* The lock-screen wash behind the push notification preview. */
+  --color-backdrop: #e8edf2;
+
+  /* The schematic map. Elevation bands run low to high. */
+  --color-map-ground: #edf2f6;
+  --color-map-band-1: #e7edf2;
+  --color-map-band-2: #dfe7ed;
+  --color-map-band-3: #d6e0e8;
+  --color-map-band-4: #cbd7e1;
+  --color-map-band-5: #bfcdda;
+  --color-map-band-6: #b2c2d1;
+  --color-map-contour: #9fb0c0;
+  --color-map-contour-strong: #a7b2be;
+  --color-map-hatch: #93a5b6;
+  --color-map-wood: #c9dccd;
+  --color-map-snow: #fcfdfe;
+  --color-map-water: #bdd3e0;
+  --color-map-road: #ffffff;
+  --color-map-road-casing: #c2ccd6;
+  --color-map-pin: #ffffff;
+  --color-map-label: #5a6670;
+  --color-map-label-strong: #1d232a;
 
   /* one size ramp, no serif and no mono — DM Sans throughout */
   --text-micro: 10px;
@@ -113,6 +144,85 @@
       opacity: 0.3;
     }
   }
+}
+
+/*
+ * Dark — "Mist at night". Same hue family as the light palette (cool slate),
+ * inverted: surfaces step lighter as they rise, and the three signal colours
+ * are lifted so they keep their contrast. On a dark ground a lighter
+ * periwinkle can carry dark text, so solid fills flip `on-accent` to ink
+ * rather than staying white. The inline script in the root layout resolves a
+ * "system" preference to one of the two attributes before first paint.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-canvas: #0f1318;
+  --color-surface: #171c22;
+  --color-surface-subtle: #1b2129;
+  --color-fill: #232a33;
+  --color-fill-strong: #2d3640;
+  --color-track: #212830;
+  --color-track-pill: #1c232b;
+
+  --color-hairline: #262e37;
+  --color-hairline-strong: #2c353f;
+  --color-control: #3a4450;
+
+  --color-ink: #e6eaee;
+  --color-ink-muted: #a3adb7;
+  --color-ink-faint: #7a8591;
+  --color-ink-idle: #4a5561;
+
+  --color-agent: #8a9bf7;
+  --color-agent-hover: #a2b0f9;
+  --color-agent-soft: #3a4580;
+  --color-agent-line: #333d6e;
+  --color-agent-tint: #1c2240;
+
+  --color-alert: #f08a70;
+  --color-alert-bright: #f0876b;
+  --color-alert-soft: #6b3326;
+  --color-alert-line: #4d2c24;
+  --color-alert-tint: #2a1b18;
+
+  --color-ok: #5cc79a;
+  --color-ok-line: #1f4a39;
+  --color-ok-tint: #13261f;
+
+  --color-on-accent: #0f1318;
+  --color-knob: #e6eaee;
+  --color-backdrop: #0b0f13;
+
+  --color-map-ground: #131a21;
+  --color-map-band-1: #151d25;
+  --color-map-band-2: #18212a;
+  --color-map-band-3: #1b252f;
+  --color-map-band-4: #1f2a35;
+  --color-map-band-5: #232f3b;
+  --color-map-band-6: #283441;
+  --color-map-contour: #344150;
+  --color-map-contour-strong: #3d4a58;
+  --color-map-hatch: #4a5866;
+  --color-map-wood: #1a2a24;
+  --color-map-snow: #2e3a46;
+  --color-map-water: #1e3342;
+  --color-map-road: #2a333d;
+  --color-map-road-casing: #3a4450;
+  --color-map-pin: #171c22;
+  --color-map-label: #8f9ca8;
+  --color-map-label-strong: #e6eaee;
+
+  /* Shadows barely read on dark ground; depth comes from the lighter
+     surface instead, so these only need to separate edges. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 34px rgba(0, 0, 0, 0.45);
+  --shadow-lifted: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 40px rgba(0, 0, 0, 0.4);
+  --shadow-agent:
+    0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 38px rgba(138, 155, 247, 0.12);
+  --shadow-sheet: 0 -10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-chip: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-notification: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 @layer base {

@@ -56,6 +56,42 @@ export function ChipLink({
 }
 
 /**
+ * A filter. Selected chips are drawn in ink rather than periwinkle: choosing a
+ * filter is the traveller's action, and periwinkle is reserved for the agent.
+ */
+export function FilterChip({
+  selected,
+  onClick,
+  children,
+  size = "md",
+  className,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cx(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border transition-colors",
+        size === "md" ? "h-7 px-[11px] text-[12px]" : "h-6 px-2.5 text-mini",
+        selected
+          ? "border-ink bg-ink font-medium text-canvas"
+          : "border-hairline bg-surface text-ink-muted hover:border-control hover:text-ink",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
  * The product's heartbeat: whether the watch layer is running, and against how
  * many sources. It appears wherever a trip is live, because the state of the
  * product should be visible before you open anything.

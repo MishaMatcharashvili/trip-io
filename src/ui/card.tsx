@@ -10,16 +10,32 @@ const accents: Record<Accent, string> = {
   ok: "border-ok-line",
 };
 
-/** A flat card sitting on the canvas. */
+const tints: Record<Accent, string> = {
+  none: "bg-surface-subtle",
+  agent: "bg-agent-tint",
+  alert: "bg-alert-tint",
+  ok: "bg-ok-tint",
+};
+
+/**
+ * A flat card sitting on the canvas. `tint` fills it with its accent's wash —
+ * pass it rather than a `bg-*` class, because two background utilities on one
+ * element resolve by stylesheet order, not by the order you wrote them.
+ */
 export function Card({
   accent = "none",
+  tint = false,
   className,
   ...rest
-}: { accent?: Accent } & React.HTMLAttributes<HTMLDivElement>) {
+}: {
+  accent?: Accent;
+  tint?: boolean;
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cx(
-        "rounded-card border bg-surface",
+        "rounded-card border",
+        tint ? tints[accent] : "bg-surface",
         accents[accent],
         className,
       )}

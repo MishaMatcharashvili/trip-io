@@ -93,13 +93,17 @@ above gets resolved. Keep entries short — this is a log, not a report.
 - **2026-09-16** — Design system and screens built from the Claude Design canvas ("trip.io Wireframe
   Concepts"). Chosen direction: **Concept A — map-first, in the Mist palette**. Colour does exactly
   three jobs — periwinkle is the agent, coral is a real disruption, green is all clear — and that
-  rule is what lets a single dot carry urgency. Light-only by design, so the dark variants were
-  stripped from `/curate` too. Every screen runs on `src/data/trip.ts`, whose shapes mirror the
+  rule is what lets a single dot carry urgency. Dark mode added on top ("Mist at night"): the same
+  CSS variables overridden under `data-theme="dark"`, resolved before paint from a stored choice or
+  the OS, with a System / Light / Dark switch in the top bar and in watch settings. The map artwork
+  reads the same variables. The canvas has no dark boards, so the dark palette is ours; every text
+  pairing measures WCAG AA. Every screen runs on `src/data/trip.ts`, whose shapes mirror the
   Drizzle schema (checkpoint = `trip_node`, advisory = `intervention` citing a `world_event`), so
   Phase 2–6 wiring replaces the loader rather than the components. The four states that decide
   whether the watch layer feels trustworthy — advisory, nothing-to-report, change-applied, watch
-  paused — are all built, reachable at `?state=`. Not built, deliberately: Explore and Saved are nav
-  stubs only.
+  paused — are all built, reachable at `?state=`. Explore and Saved are left undesigned in the
+  canvas (nav stubs only); they are built here in the same grammar from the real catalogue shape —
+  focus areas, category groups, corridor season risk — in `src/data/explore.ts`.
 - **2026-09-16** — Phase 1 code-buildable slice done, run against Overture 2026-08-19.0 locally.
   Decisions made along the way: the gate (trigram dedupe included) runs in DuckDB before load, not in
   PostGIS after it, so it's testable without a database; dedupe compares distinctive name tokens at

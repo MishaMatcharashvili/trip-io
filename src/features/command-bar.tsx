@@ -58,7 +58,7 @@ export function CommandBar({
           type="submit"
           aria-label="Send"
           className={cx(
-            "flex items-center justify-center rounded-control bg-agent text-white transition-colors hover:bg-agent-hover",
+            "flex items-center justify-center rounded-control bg-agent text-on-accent transition-colors hover:bg-agent-hover",
             compact ? "size-[34px] rounded-[9px]" : "size-[38px]",
           )}
         >
