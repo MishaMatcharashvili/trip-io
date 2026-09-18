@@ -1,0 +1,125 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { getTrip } from "@/data/trip";
+import { MobileTitleBar, TopBar } from "@/features/chrome";
+import { cx } from "@/ui/cx";
+import { Icon, type IconName } from "@/ui/icon";
+import { Eyebrow } from "@/ui/text";
+
+export const metadata: Metadata = { title: "Push notifications" };
+
+/**
+ * Only disruptions and the morning briefing push. Opportunities wait until you
+ * open the app — a proactive product earns its interruptions by not spending
+ * them on things that can wait.
+ */
+const notifications = [
+  {
+    icon: "signal" as IconName,
+    tone: "agent" as const,
+    when: "now",
+    title: "Rain at 15:30 — move your hike?",
+    body: "Your 16:00 Gergeti hike is inside a 12 mm window. I can put it at 11:30 and the museum in the afternoon.",
+    actions: ["Apply", "Keep plan"],
+  },
+  {
+    icon: "signal" as IconName,
+    tone: "agent" as const,
+    when: "07:30",
+    title: "Good morning — day 3",
+    body: "Clear until mid-afternoon, roads open, one change worth making. Tap for the briefing.",
+  },
+  {
+    icon: "warning" as IconName,
+    tone: "alert" as const,
+    when: "yesterday",
+    title: "Road closed ahead — new route ready",
+    body: "Km 84 is down to one lane. I found a detour that costs 22 minutes instead of 1h 20m.",
+    dim: true,
+  },
+];
+
+export default async function PushPage({
+  params,
+}: PageProps<"/trips/[tripId]/watch/push">) {
+  const { tripId } = await params;
+  const trip = getTrip(tripId);
+  if (!trip) notFound();
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <TopBar active="Trips" />
+      <MobileTitleBar
+        back={`/trips/${trip.id}/watch`}
+        title="Push notifications"
+        eyebrow="How an alert reaches you"
+      />
+
+      <main className="flex flex-1 justify-center bg-[#e8edf2] px-4 py-5">
+        <div className="flex w-full max-w-[390px] flex-col gap-3.5">
+          <Eyebrow className="text-[#5a6b77]">How an alert reaches you</Eyebrow>
+
+          {notifications.map((notification) => (
+            <div
+              key={notification.title}
+              className={cx(
+                "overflow-hidden rounded-[16px] border border-white/90 bg-white/92 shadow-notification",
+                notification.dim && "opacity-80",
+              )}
+            >
+              <div className="flex items-start gap-3 px-3.5 py-3">
+                <span
+                  className={cx(
+                    "flex size-8 shrink-0 items-center justify-center rounded-control text-white",
+                    notification.tone === "agent" ? "bg-agent" : "bg-alert",
+                  )}
+                >
+                  <Icon name={notification.icon} size={17} />
+                </span>
+                <div className="flex flex-1 flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-mini font-semibold">
+                      trip.io
+                    </span>
+                    <span className="text-mini text-ink-faint">
+                      {notification.when}
+                    </span>
+                  </div>
+                  <span className="text-small font-semibold">
+                    {notification.title}
+                  </span>
+                  <span className="text-mini text-ink-muted">
+                    {notification.body}
+                  </span>
+                </div>
+              </div>
+
+              {notification.actions ? (
+                <div className="flex border-t border-hairline">
+                  {notification.actions.map((action, i) => (
+                    <div
+                      key={action}
+                      className={cx(
+                        "flex h-10 flex-1 items-center justify-center text-small",
+                        i === 0
+                          ? "border-r border-hairline font-semibold text-agent"
+                          : "text-ink-muted",
+                      )}
+                    >
+                      {action}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+
+          <p className="text-mini text-[#5a6b77]">
+            Only disruptions and the morning briefing push. Opportunities wait
+            until you open the app.
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}

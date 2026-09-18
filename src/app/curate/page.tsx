@@ -17,7 +17,7 @@ export default async function CuratePage() {
     return (
       <Centered>
         <h1 className="text-xl font-semibold">Catalogue curation</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">
+        <p className="text-zinc-600">
           Sign in with a curator account to review places.
         </p>
         <SignIn />
@@ -29,7 +29,7 @@ export default async function CuratePage() {
     return (
       <Centered>
         <h1 className="text-xl font-semibold">Not a curator</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">
+        <p className="text-zinc-600">
           {session.user.email} isn&apos;t in <code>CURATOR_EMAILS</code>.
         </p>
       </Centered>
