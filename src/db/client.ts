@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
-import * as schema from "./schema";
+import * as schema from "./schema/index.ts";
 
 // Neon's HTTP driver, not a pooled TCP connection: right fit for the short,
 // one-shot queries route handlers and cron jobs make (see context/architecture.md's

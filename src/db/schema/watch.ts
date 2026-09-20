@@ -9,8 +9,8 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
-import { geography, id, tstz } from "./columns";
-import { trip, tripNode, tripPatch } from "./trip";
+import { geography, id, tstz } from "./columns.ts";
+import { trip, tripNode, tripPatch } from "./trip.ts";
 
 export const deliveryChannel = pgEnum("delivery_channel", [
   "push",
