@@ -308,3 +308,13 @@ export function detectWeather(
       a.kind.localeCompare(b.kind),
   );
 }
+
+/**
+ * The port. `src/infra/open-meteo.ts` is the only implementation, and the only
+ * file in the codebase that knows a provider's name — which is what lets the
+ * detector above be tested without a network.
+ */
+export type Forecaster = (
+  point: readonly [lon: number, lat: number],
+  hours: number,
+) => Promise<HourlySeries>;
