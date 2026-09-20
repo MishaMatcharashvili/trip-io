@@ -9,8 +9,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { geography, id, tstz } from "./columns";
+import { user } from "./auth.ts";
+import { geography, id, tstz } from "./columns.ts";
 
 export const placeTier = pgEnum("place_tier", ["curated", "verified", "raw"]);
 

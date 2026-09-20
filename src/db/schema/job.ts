@@ -7,7 +7,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-import { id, tstz } from "./columns";
+import { id, tstz } from "./columns.ts";
 
 export const job = pgTable(
   "job",

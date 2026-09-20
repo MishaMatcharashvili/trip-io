@@ -113,6 +113,38 @@ export function isOpenAt(hours: OpeningHours, at: LocalTime): boolean {
   );
 }
 
+function addMinutes(t: LocalTime, minutes: number): LocalTime {
+  const total = t.minutes + minutes;
+  const days = Math.floor(total / 1440);
+  return {
+    weekday: weekdays[(weekdays.indexOf(t.weekday) + days) % 7],
+    minutes: total - days * 1440,
+    month: t.month,
+  };
+}
+
+/**
+ * Whether the place stays open for the whole of [start, end): a visit that runs
+ * past closing time, or into a lunch break, fails. Checked every five minutes
+ * and at the last minute, which catches any closure long enough to matter to a
+ * visit. Month is held at the start's, as `isOpenAt` does across midnight.
+ */
+export function isOpenThroughout(
+  hours: OpeningHours,
+  start: Date,
+  end: Date,
+): boolean {
+  const from = tbilisiTime(start);
+  const span = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / 60_000),
+  );
+  for (let m = 0; m < span; m += 5) {
+    if (!isOpenAt(hours, addMinutes(from, m))) return false;
+  }
+  return isOpenAt(hours, addMinutes(from, span - 1));
+}
+
 /**
  * Parses the curation form's per-day text: "09:00-18:00", "10-14, 15:30-22",
  * "closed" or "" (closed). Returns an error string rather than throwing so the
@@ -153,4 +185,27 @@ export function formatDay(intervals: Interval[]): string {
   return intervals.length === 0
     ? "closed"
     : intervals.map((i) => `${i.open}-${i.close}`).join(", ");
+}
+
+/**
+ * One line a person (or a model) can read: "mon-fri 10:00-18:00; sat-sun
+ * closed". Consecutive days with the same hours are collapsed.
+ */
+export function summariseHours(hours: OpeningHours): string {
+  const season =
+    hours.months === undefined ? "" : ` (months ${hours.months.join(", ")})`;
+  if (hours.kind === "always") return `always open${season}`;
+
+  const runs: { from: Weekday; to: Weekday; text: string }[] = [];
+  for (const day of weekdays) {
+    const text = formatDay(hours.days[day]);
+    const last = runs.at(-1);
+    if (last && last.text === text) last.to = day;
+    else runs.push({ from: day, to: day, text });
+  }
+  return (
+    runs
+      .map((r) => `${r.from === r.to ? r.from : `${r.from}-${r.to}`} ${r.text}`)
+      .join("; ") + season
+  );
 }

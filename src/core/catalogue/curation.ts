@@ -1,12 +1,9 @@
-import { type SQL, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { place, placeReview } from "@/db/schema";
+import { areaBySlug, areaPredicate, list } from "./area-query.ts";
 import { type CategoryGroup, categoryGroups } from "./categories.ts";
-import {
-  type AreaMatch,
-  type FocusAreaSlug,
-  focusAreas,
-} from "./focus-areas.ts";
+import { type FocusAreaSlug, focusAreas } from "./focus-areas.ts";
 import type { PlaceInput, ReviewInput } from "./review-input.ts";
 
 // The hand-verification queue behind /curate. A place is in an area's queue while
@@ -22,32 +19,6 @@ const groupOrder: CategoryGroup[] = [
   "transport",
   "lodging",
 ];
-
-const list = (values: readonly (string | number)[]) =>
-  sql.join(
-    values.map((v) => sql`${v}`),
-    sql`, `,
-  );
-
-function areaPredicate(match: AreaMatch): SQL {
-  switch (match.kind) {
-    case "bbox":
-      return sql`ST_Intersects(p.geom, ST_MakeEnvelope(${match.west}, ${match.south}, ${match.east}, ${match.north}, 4326)::geography)`;
-    case "isoRegion":
-      return sql`EXISTS (SELECT 1 FROM region r WHERE r.iso_region = ${match.code} AND ST_Intersects(r.geom, p.geom))`;
-    case "regions": {
-      const inRegions = sql`EXISTS (SELECT 1 FROM region r WHERE r.slug IN (${list(match.slugs)}) AND ST_Intersects(r.geom, p.geom))`;
-      if (!match.nearCorridor) return inRegions;
-      return sql`${inRegions} AND EXISTS (SELECT 1 FROM corridor c WHERE c.slug = ${match.nearCorridor.slug} AND ST_DWithin(c.geom, p.geom, ${match.nearCorridor.withinM}))`;
-    }
-  }
-}
-
-function areaBySlug(slug: FocusAreaSlug) {
-  const area = focusAreas.find((a) => a.slug === slug);
-  if (!area) throw new Error(`unknown focus area ${slug}`);
-  return area;
-}
 
 const latestReview = sql`
   SELECT DISTINCT ON (place_id) place_id, decision, note

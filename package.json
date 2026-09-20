@@ -12,12 +12,14 @@
     "db:generate": "drizzle-kit generate && node src/db/unquote-geography.ts",
     "db:migrate": "node --env-file=.env src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "smoke:trip": "node --env-file=.env scripts/dev/smoke-trip.ts",
     "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
     "catalogue:extract": "node scripts/catalogue/extract.ts",
     "catalogue:corridors": "node scripts/catalogue/build-corridors.ts",
     "catalogue:load": "node --env-file=.env scripts/catalogue/load.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.23.0",
     "@hono/zod-validator": "^0.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "better-auth": "^1.7.4",

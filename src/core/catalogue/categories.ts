@@ -78,3 +78,21 @@ export const allowedCategories = Object.keys(categoryGroup) as Category[];
 export function isAllowedCategory(value: string): value is Category {
   return Object.hasOwn(categoryGroup, value);
 }
+
+// Visited in the open, so bound by daylight in the coherent-day validator. The
+// rest — churches, museums, restaurants — are weatherproof and only bound by
+// their opening hours.
+export const outdoorCategories = new Set<string>([
+  ...categoryGroups.nature,
+  "historic_site",
+  "monument",
+  "castle",
+  "fort",
+  "sculpture_statue",
+  "public_plaza",
+  "zoo",
+  "amusement_park",
+  "campground",
+]);
+
+export const isOutdoor = (category: string) => outdoorCategories.has(category);

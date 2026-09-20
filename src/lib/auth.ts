@@ -1,8 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins/anonymous";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { account, session, user, verification } from "@/db/schema";
+import { account, session, trip, user, verification } from "@/db/schema";
 
 let instance: ReturnType<typeof build> | undefined;
 
@@ -55,12 +56,19 @@ function build() {
       minPasswordLength: 8,
     },
     plugins: [
-      // Better Auth deletes the anonymous user when it links to a real account.
-      // With `trip.userId` set null on delete, that would silently orphan the
-      // trip the visitor just built — the opposite of the "anonymous trip ->
-      // account at save -> trip claimed" flow. Keep the row until Phase 2 adds an
-      // `onLinkAccount` handler that reassigns the trip, then drop this.
-      anonymous({ disableDeleteAnonymousUser: true }),
+      anonymous({
+        // "No accounts until save": the visitor plans a trip anonymously, and
+        // signing up hands it over. Better Auth then deletes the anonymous
+        // user, and `trip.user_id` is set null on delete — so the trips have to
+        // be reassigned here, before that happens, or the visitor loses the
+        // trip they just built.
+        onLinkAccount: async ({ anonymousUser, newUser }) => {
+          await db
+            .update(trip)
+            .set({ userId: newUser.user.id })
+            .where(eq(trip.userId, anonymousUser.user.id));
+        },
+      }),
     ],
   });
 }

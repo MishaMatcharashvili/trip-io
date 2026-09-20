@@ -1,5 +1,5 @@
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { timestamps } from "./columns";
+import { timestamps } from "./columns.ts";
 
 // Better Auth's core schema (user/session/account/verification) plus the
 // `isAnonymous` field the anonymous-session plugin expects on `user`.

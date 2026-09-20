@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   isOpenAt,
+  isOpenThroughout,
   type OpeningHours,
   openingHours,
   parseDayText,
@@ -163,5 +164,56 @@ describe("parseDayText", () => {
     assert.equal(result.ok, false);
     assert.match((result as { error: string }).error, /lunch/);
     assert.equal(parseDayText("25:00-26:00").ok, false);
+  });
+});
+
+describe("isOpenThroughout", () => {
+  // 2026-09-15 is a Tuesday; instants are Tbilisi wall-clock (UTC+4).
+  const t = (hhmm: string, day = "2026-09-15") =>
+    new Date(`${day}T${hhmm}:00+04:00`);
+  const museum = week([{ open: "10:00", close: "18:00" }], { mon: closed });
+
+  test("a visit inside opening hours", () => {
+    assert.equal(isOpenThroughout(museum, t("10:00"), t("18:00")), true);
+  });
+
+  test("a visit that runs past closing", () => {
+    assert.equal(isOpenThroughout(museum, t("17:00"), t("18:05")), false);
+  });
+
+  test("a visit that starts before opening", () => {
+    assert.equal(isOpenThroughout(museum, t("09:55"), t("11:00")), false);
+  });
+
+  test("a lunch break in the middle", () => {
+    const split = week([
+      { open: "10:00", close: "13:00" },
+      { open: "14:00", close: "18:00" },
+    ]);
+    assert.equal(isOpenThroughout(split, t("12:00"), t("15:00")), false);
+    assert.equal(isOpenThroughout(split, t("14:00"), t("15:00")), true);
+  });
+
+  test("an overnight interval carries across midnight", () => {
+    const bar = week([{ open: "20:00", close: "02:00" }]);
+    assert.equal(
+      isOpenThroughout(bar, t("23:00"), t("01:30", "2026-09-16")),
+      true,
+    );
+    assert.equal(
+      isOpenThroughout(bar, t("23:00"), t("02:30", "2026-09-16")),
+      false,
+    );
+  });
+
+  test("closed day", () => {
+    assert.equal(
+      isOpenThroughout(
+        museum,
+        t("12:00", "2026-09-14"),
+        t("13:00", "2026-09-14"),
+      ),
+      false,
+    );
   });
 });
