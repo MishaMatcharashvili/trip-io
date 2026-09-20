@@ -1,9 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 import {
   type AppendFailure,
   type AppendSuccess,
+  accessTrip,
   appendPatch,
   createTrip,
   docAt,
@@ -17,12 +18,18 @@ import { generateTrip } from "@/bll/trip-generation.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
-import { requireSession, type SessionEnv, tripAccess } from "../auth.ts";
+import { requireSession, type SessionEnv } from "../auth.ts";
 
 // The trip document over HTTP. The work is done in src/bll/*; these handlers do
 // validation, status codes and nothing else.
 
 const params = z.object({ id: z.uuid() });
+
+/** Why a trip is off limits, as the status code the client acts on. */
+const denied = (c: Context, reason: "not-found" | "forbidden") =>
+  reason === "not-found"
+    ? c.json({ error: "not found" as const }, 404)
+    : c.json({ error: "forbidden" as const }, 403);
 
 /** Failures from the store, as the status codes the client acts on. */
 const failure = (result: AppendFailure) => {
@@ -109,8 +116,8 @@ export const trips = new Hono<SessionEnv>()
 
   .get("/:id", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");
-    const access = await tripAccess(id, c.get("userId"));
-    if (!access.ok) return c.json(access.body, access.status);
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
 
     const view = await tripView(id);
     return view ? c.json(view) : c.json({ error: "not found" }, 404);
@@ -131,8 +138,8 @@ export const trips = new Hono<SessionEnv>()
     async (c) => {
       const { id } = c.req.valid("param");
       const body = c.req.valid("json");
-      const access = await tripAccess(id, c.get("userId"));
-      if (!access.ok) return c.json(access.body, access.status);
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
 
       const result = await appendPatch({
         tripId: id,
@@ -159,8 +166,8 @@ export const trips = new Hono<SessionEnv>()
     zValidator("json", z.object({ ops: patchOps })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const access = await tripAccess(id, c.get("userId"));
-      if (!access.ok) return c.json(access.body, access.status);
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
 
       const result = await previewPatch(id, c.req.valid("json").ops);
       if (!result) return c.json({ error: "not found" }, 404);
@@ -178,8 +185,8 @@ export const trips = new Hono<SessionEnv>()
 
   .get("/:id/patches", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");
-    const access = await tripAccess(id, c.get("userId"));
-    if (!access.ok) return c.json(access.body, access.status);
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
     return c.json({
       head: access.trip.headPatchId,
       patches: await history(id),
@@ -191,8 +198,8 @@ export const trips = new Hono<SessionEnv>()
     zValidator("param", params.extend({ patchId: z.uuid() })),
     async (c) => {
       const { id, patchId } = c.req.valid("param");
-      const access = await tripAccess(id, c.get("userId"));
-      if (!access.ok) return c.json(access.body, access.status);
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
       const doc = await docAt(id, patchId);
       return doc ? c.json({ doc }) : c.json({ error: "not found" }, 404);
     },
@@ -200,8 +207,8 @@ export const trips = new Hono<SessionEnv>()
 
   .post("/:id/undo", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");
-    const access = await tripAccess(id, c.get("userId"));
-    if (!access.ok) return c.json(access.body, access.status);
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
 
     const result = await undoLast(id, c.get("userId"));
     if (!result.ok) {
@@ -220,8 +227,8 @@ export const trips = new Hono<SessionEnv>()
     zValidator("json", z.object({ patchId: z.uuid() })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const access = await tripAccess(id, c.get("userId"));
-      if (!access.ok) return c.json(access.body, access.status);
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
 
       const result = await restoreTo(
         id,

@@ -7,12 +7,14 @@ import {
   insertTrip,
   loadHeadPatch,
   loadTrip,
+  loadTripRef,
   lockTrip,
   opsBetween,
   type PatchRecord,
   patchHistory,
   patchSeq,
   setHead,
+  type TripRef,
   upsertNode,
 } from "@/dal/trips.ts";
 import { withTransaction } from "@/dal/tx.ts";
@@ -310,4 +312,24 @@ export async function previewPatch(
 /** The patch log, newest first. */
 export function history(tripId: string): Promise<PatchRecord[]> {
   return patchHistory(tripId);
+}
+
+export type TripAccess =
+  | { ok: true; trip: TripRef }
+  | { ok: false; reason: "not-found" | "forbidden" };
+
+/**
+ * May this user act on this trip? The check every trip handler starts with. It
+ * reads one row — owner and head — rather than projecting the whole document:
+ * most callers only need to know whether to go on, and the ones that need the
+ * document ask for it afterwards.
+ */
+export async function accessTrip(
+  tripId: string,
+  userId: string,
+): Promise<TripAccess> {
+  const trip = await loadTripRef(tripId);
+  if (!trip) return { ok: false, reason: "not-found" };
+  if (trip.userId !== userId) return { ok: false, reason: "forbidden" };
+  return { ok: true, trip };
 }
