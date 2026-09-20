@@ -7,18 +7,17 @@
 
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { db } from "../../src/dal/client.ts";
-import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import {
   addAllOps,
   appendPatch,
   createTrip,
   docAt,
-  loadTrip,
-  patchHistory,
   restoreTo,
   undoLast,
-} from "../../src/domain/trip/store.ts";
+} from "../../src/bll/trip-document.ts";
+import { db } from "../../src/dal/client.ts";
+import { loadTrip, patchHistory } from "../../src/dal/trips.ts";
+import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 
 const at = (day: string, hhmm: string) =>
   new Date(`${day}T${hhmm}:00+04:00`).toISOString();
@@ -139,7 +138,7 @@ step(
 );
 step(
   "document at the first patch",
-  Object.keys((await docAt(db, tripId, created.patchId))?.nodes ?? {}).length,
+  Object.keys((await docAt(tripId, created.patchId))?.nodes ?? {}).length,
 );
 
 // The projection must match the document exactly — that's the invariant the

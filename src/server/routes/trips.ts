@@ -2,9 +2,21 @@ import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import {
+  type AppendFailure,
+  type AppendSuccess,
+  addAllOps,
+  appendPatch,
+  createTrip,
+  docAt,
+  restoreTo,
+  undoLast,
+} from "@/bll/trip-document.ts";
 import { loadCandidates } from "@/bll/trip-generation.ts";
 import { db } from "@/dal/client";
+import { placeFacts } from "@/dal/places.ts";
 import { planCache, recordGeneration } from "@/dal/plans.ts";
+import { loadTrip, patchHistory } from "@/dal/trips.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import {
   CANDIDATE_LIMIT,
@@ -17,19 +29,6 @@ import {
   tripHeader as headerFor,
 } from "@/domain/trip/generate/pipeline.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
-import {
-  type AppendFailure,
-  type AppendSuccess,
-  addAllOps,
-  appendPatch,
-  createTrip,
-  docAt,
-  loadPlaces,
-  loadTrip,
-  patchHistory,
-  restoreTo,
-  undoLast,
-} from "@/domain/trip/store.ts";
 import { straightLineTravel } from "@/domain/trip/travel.ts";
 import { validateDoc, validateProposal } from "@/domain/trip/validate.ts";
 import { getAuth } from "@/lib/auth";
@@ -173,7 +172,7 @@ export const trips = new Hono<Env>()
     if (trip.userId !== c.get("userId"))
       return c.json({ error: "forbidden" }, 403);
 
-    const places = await loadPlaces(
+    const places = await placeFacts(
       db,
       Object.values(trip.doc.nodes)
         .map((n) => n.placeId)
@@ -241,7 +240,7 @@ export const trips = new Hono<Env>()
       if (trip.userId !== c.get("userId"))
         return c.json({ error: "forbidden" }, 403);
 
-      const places = await loadPlaces(db, [
+      const places = await placeFacts(db, [
         ...Object.values(trip.doc.nodes)
           .map((n) => n.placeId)
           .filter((v): v is string => v !== null),
@@ -291,7 +290,7 @@ export const trips = new Hono<Env>()
       if (!trip) return c.json({ error: "not found" }, 404);
       if (trip.userId !== c.get("userId"))
         return c.json({ error: "forbidden" }, 403);
-      const doc = await docAt(db, id, patchId);
+      const doc = await docAt(id, patchId);
       return doc ? c.json({ doc }) : c.json({ error: "not found" }, 404);
     },
   )

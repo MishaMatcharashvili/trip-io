@@ -156,3 +156,14 @@ export function jsonEqual(a: unknown, b: unknown): boolean {
     )
   );
 }
+
+/** Every catalogue place the document refers to, without repeats. */
+export function placeIdsOf(doc: TripDoc): string[] {
+  return [
+    ...new Set(
+      Object.values(doc.nodes)
+        .map((n) => n.placeId)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+}

@@ -9,8 +9,9 @@ import { openingHours } from "@/domain/catalogue/opening-hours.ts";
 import type { PlaceInput } from "@/domain/catalogue/review-input.ts";
 import type { LonLat } from "@/domain/geo.ts";
 import type { Candidate } from "@/domain/trip/generate/plan.ts";
+import type { PlaceInfo } from "@/domain/trip/validate.ts";
 import { areaPredicate, list } from "./area-predicate.ts";
-import { db } from "./client.ts";
+import { db, type Queryable } from "./client.ts";
 import { place, placeReview } from "./schema/index.ts";
 
 // The `place` table and its append-only review log. Every query that reads or
@@ -239,4 +240,32 @@ export async function curatedInArea(
       area: slug,
     } satisfies Candidate;
   });
+}
+
+/** Catalogue facts the validator needs, for every place a document mentions. */
+export async function placeFacts(
+  conn: Queryable,
+  ids: readonly string[],
+): Promise<Map<string, PlaceInfo>> {
+  if (ids.length === 0) return new Map();
+  const rows = await conn.execute(sql`
+    SELECT id, tier, opening_hours,
+           ST_X(geom::geometry) AS lon, ST_Y(geom::geometry) AS lat
+    FROM place WHERE id IN (${list(ids)})
+  `);
+  return new Map(
+    rows.rows.map((r) => {
+      const hours = r.opening_hours
+        ? openingHours.safeParse(r.opening_hours)
+        : null;
+      return [
+        r.id as string,
+        {
+          tier: r.tier as PlaceInfo["tier"],
+          openingHours: hours?.success ? hours.data : null,
+          lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+        },
+      ];
+    }),
+  );
 }
