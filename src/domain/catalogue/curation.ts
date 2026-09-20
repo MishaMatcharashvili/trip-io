@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
+import { areaPredicate, list } from "@/dal/area-predicate.ts";
 import { db } from "@/dal/client";
 import { place, placeReview } from "@/dal/schema";
-import { areaBySlug, areaPredicate, list } from "./area-query.ts";
 import { type CategoryGroup, categoryGroups } from "./categories.ts";
-import { type FocusAreaSlug, focusAreas } from "./focus-areas.ts";
+import { areaBySlug, type FocusAreaSlug, focusAreas } from "./focus-areas.ts";
 import type { PlaceInput, ReviewInput } from "./review-input.ts";
 
 // The hand-verification queue behind /curate. A place is in an area's queue while

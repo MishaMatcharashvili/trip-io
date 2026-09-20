@@ -1,13 +1,10 @@
 import { type SQL, sql } from "drizzle-orm";
-import {
-  type AreaMatch,
-  type FocusAreaSlug,
-  focusAreas,
-} from "./focus-areas.ts";
+import type { AreaMatch } from "@/domain/catalogue/focus-areas.ts";
 
-// How a focus area becomes a predicate over `place p`. Shared by the curation
-// queue and by trip generation's candidate retrieval, so the two always agree
-// on what "the Kazbegi corridor" means.
+// How a focus area becomes a predicate over `place p`. The area itself is a
+// domain concept (focus-areas.ts); turning one into SQL is this layer's job, and
+// keeping the translation in one place is what makes the curation queue and trip
+// generation agree on what "the Kazbegi corridor" means.
 
 /** A SQL value list for an IN (...) clause. */
 export const list = (values: readonly (string | number)[]) =>
@@ -28,10 +25,4 @@ export function areaPredicate(match: AreaMatch): SQL {
       return sql`${inRegions} AND EXISTS (SELECT 1 FROM corridor c WHERE c.slug = ${match.nearCorridor.slug} AND ST_DWithin(c.geom, p.geom, ${match.nearCorridor.withinM}))`;
     }
   }
-}
-
-export function areaBySlug(slug: FocusAreaSlug) {
-  const area = focusAreas.find((a) => a.slug === slug);
-  if (!area) throw new Error(`unknown focus area ${slug}`);
-  return area;
 }
