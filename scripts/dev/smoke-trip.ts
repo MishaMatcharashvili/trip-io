@@ -128,8 +128,8 @@ step(
 const restored = await restoreTo(tripId, created.patchId, null);
 step("restore", restored.ok ? { seq: restored.seq } : { code: restored.code });
 
-step("history", await patchHistory(db, tripId));
-const head = await loadTrip(db, tripId);
+step("history", await patchHistory(tripId));
+const head = await loadTrip(tripId);
 step(
   "head document",
   Object.values(head?.doc.nodes ?? {}).map(

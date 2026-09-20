@@ -11,7 +11,6 @@ import {
   undoLast,
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
-import { db } from "@/dal/client";
 import { placeFacts } from "@/dal/places.ts";
 import { loadTrip, patchHistory } from "@/dal/trips.ts";
 import { placeIdsOf, tripHeader } from "@/domain/trip/document.ts";
@@ -114,10 +113,10 @@ export const trips = new Hono<SessionEnv>()
     const access = await tripAccess(id, c.get("userId"));
     if (!access.ok) return c.json(access.body, access.status);
 
-    const trip = await loadTrip(db, id);
+    const trip = await loadTrip(id);
     if (!trip) return c.json({ error: "not found" }, 404);
 
-    const places = await placeFacts(db, placeIdsOf(trip.doc));
+    const places = await placeFacts(placeIdsOf(trip.doc));
     return c.json({
       doc: trip.doc,
       head: trip.headPatchId,
@@ -177,10 +176,10 @@ export const trips = new Hono<SessionEnv>()
       const access = await tripAccess(id, c.get("userId"));
       if (!access.ok) return c.json(access.body, access.status);
 
-      const trip = await loadTrip(db, id);
+      const trip = await loadTrip(id);
       if (!trip) return c.json({ error: "not found" }, 404);
 
-      const places = await placeFacts(db, [
+      const places = await placeFacts([
         ...placeIdsOf(trip.doc),
         ...placeIdsInOps(ops),
       ]);
@@ -207,7 +206,7 @@ export const trips = new Hono<SessionEnv>()
     if (!access.ok) return c.json(access.body, access.status);
     return c.json({
       head: access.trip.headPatchId,
-      patches: await patchHistory(db, id),
+      patches: await patchHistory(id),
     });
   })
 

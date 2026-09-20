@@ -16,6 +16,9 @@ import type { Tx } from "./tx.ts";
 // joins against them, so they can never drift from the log. Keeping them in step
 // is the use case's job (src/bll/trip-document.ts); this module only reads and
 // writes.
+//
+// Reads take the connection last and default it to the HTTP client, so only the
+// write path — which must run inside one transaction — has to name one.
 
 type Row = Record<string, unknown>;
 
@@ -55,8 +58,8 @@ const rowsToDoc = (trip: Row, nodes: Row[]): TripDoc => ({
 });
 
 export async function loadTrip(
-  conn: Queryable,
   tripId: string,
+  conn: Queryable = db,
 ): Promise<LoadedTrip | null> {
   const trips = await conn.execute(sql`
     SELECT t.*, COALESCE((SELECT MAX(seq) FROM trip_patch p WHERE p.trip_id = t.id), 0) AS seq
@@ -220,8 +223,8 @@ export type PatchRecord = {
 };
 
 export async function patchHistory(
-  conn: Queryable,
   tripId: string,
+  conn: Queryable = db,
 ): Promise<PatchRecord[]> {
   const rows = await conn.execute(sql`
     SELECT id, seq, intent, author, applied_at FROM trip_patch
@@ -255,9 +258,9 @@ export async function loadHeadPatch(tripId: string): Promise<HeadPatch | null> {
 }
 
 export async function patchSeq(
-  conn: Queryable,
   tripId: string,
   patchId: string,
+  conn: Queryable = db,
 ): Promise<number | null> {
   const rows = await conn.execute(
     sql`SELECT seq FROM trip_patch WHERE id = ${patchId} AND trip_id = ${tripId}`,
@@ -267,9 +270,9 @@ export async function patchSeq(
 
 /** The latest checkpoint at or before a sequence number. */
 export async function checkpointAtOrBefore(
-  conn: Queryable,
   tripId: string,
   seq: number,
+  conn: Queryable = db,
 ): Promise<{ doc: TripDoc; seq: number } | null> {
   const rows = await conn.execute(sql`
     SELECT c.snapshot, p.seq FROM checkpoint_log c
@@ -286,10 +289,10 @@ export async function checkpointAtOrBefore(
 
 /** The ops of every patch in (after, through], oldest first, for replay. */
 export async function opsBetween(
-  conn: Queryable,
   tripId: string,
   after: number,
   through: number,
+  conn: Queryable = db,
 ): Promise<unknown[]> {
   const rows = await conn.execute(sql`
     SELECT ops FROM trip_patch

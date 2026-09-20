@@ -244,8 +244,8 @@ export async function curatedInArea(
 
 /** Catalogue facts the validator needs, for every place a document mentions. */
 export async function placeFacts(
-  conn: Queryable,
   ids: readonly string[],
+  conn: Queryable = db,
 ): Promise<Map<string, PlaceInfo>> {
   if (ids.length === 0) return new Map();
   const rows = await conn.execute(sql`

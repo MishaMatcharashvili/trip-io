@@ -1,4 +1,3 @@
-import { db } from "@/dal/client.ts";
 import { placeFacts } from "@/dal/places.ts";
 import {
   checkpointAtOrBefore,
@@ -95,13 +94,13 @@ export async function appendPatch(
       return { ok: false, code: "stale", headPatchId: locked.headPatchId };
     }
 
-    const current = await loadTrip(tx, input.tripId);
+    const current = await loadTrip(input.tripId, tx);
     if (!current) return { ok: false, code: "not-found" };
 
     // Places the document mentions now, plus any the ops introduce.
     const proposed = patchOps.safeParse(input.ops);
     const added = proposed.success ? placeIdsInOps(proposed.data) : [];
-    const places = await placeFacts(tx, [...placeIdsOf(current.doc), ...added]);
+    const places = await placeFacts([...placeIdsOf(current.doc), ...added], tx);
 
     const result = validateProposal(current.doc, input.ops, {
       places,
@@ -169,14 +168,14 @@ export async function docAt(
   tripId: string,
   patchId: string,
 ): Promise<TripDoc | null> {
-  const seq = await patchSeq(db, tripId, patchId);
+  const seq = await patchSeq(tripId, patchId);
   if (seq === null) return null;
 
-  const checkpoint = await checkpointAtOrBefore(db, tripId, seq);
+  const checkpoint = await checkpointAtOrBefore(tripId, seq);
   if (!checkpoint) return null;
 
   let doc = checkpoint.doc;
-  for (const ops of await opsBetween(db, tripId, checkpoint.seq, seq)) {
+  for (const ops of await opsBetween(tripId, checkpoint.seq, seq)) {
     doc = applyOps(doc, patchOps.parse(ops)).doc;
   }
   return doc;
@@ -218,7 +217,7 @@ export async function restoreTo(
   // The document already matches that patch (restoring right after an undo).
   | { ok: false; code: "no-change"; headPatchId: string | null }
 > {
-  const current = await loadTrip(db, tripId);
+  const current = await loadTrip(tripId);
   if (!current) return { ok: false, code: "not-found" };
   const past = await docAt(tripId, patchId);
   if (!past) return { ok: false, code: "no-such-patch" };
