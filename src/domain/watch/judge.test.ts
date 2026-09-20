@@ -32,13 +32,15 @@ const verdict = (over: Partial<Verdict> = {}): Verdict => ({
   horizonHrs: 3,
   oneLine: "Rain at the Gergeti trailhead all afternoon.",
   evidence: "open-meteo forecast, taken 2026-10-04 06:00",
-  ops: [],
+  proposals: [],
   confidence: 0.82,
   ...over,
 });
 
+const NODE = "55555555-5555-4555-8555-555555555555";
+
 const moveTo = (placeId: string) => [
-  { op: "replace" as const, path: "/nodes/n1/placeId", value: placeId },
+  { move: "swap" as const, nodeId: NODE, placeId, indoor: true },
 ];
 
 const reasons = (v: Verdict, c = ctx()) =>
@@ -58,18 +60,20 @@ describe("the judge's guards", () => {
   });
 
   test("reject a place that is not in the catalogue", () => {
-    assert.deepEqual(reasons(verdict({ ops: moveTo(INVENTED) })), [
+    assert.deepEqual(reasons(verdict({ proposals: moveTo(INVENTED) })), [
       "unknown-place",
     ]);
   });
 
   test("reject a raw place: an intervention may name curated or verified", () => {
-    assert.deepEqual(reasons(verdict({ ops: moveTo(RAW) })), ["place-tier"]);
+    assert.deepEqual(reasons(verdict({ proposals: moveTo(RAW) })), [
+      "place-tier",
+    ]);
   });
 
   test("a verified place is proposable — that is what the tier is for", () => {
-    assert.deepEqual(reasons(verdict({ ops: moveTo(VERIFIED) })), []);
-    assert.deepEqual(reasons(verdict({ ops: moveTo(CURATED) })), []);
+    assert.deepEqual(reasons(verdict({ proposals: moveTo(VERIFIED) })), []);
+    assert.deepEqual(reasons(verdict({ proposals: moveTo(CURATED) })), []);
   });
 
   test("reject empty evidence", () => {
@@ -103,7 +107,7 @@ describe("the judge's guards", () => {
     // A prompt edit that breaks two things at once must not hide one of them.
     assert.deepEqual(
       reasons(
-        verdict({ impact: "none", ops: moveTo(INVENTED), evidence: "" }),
+        verdict({ impact: "none", proposals: moveTo(INVENTED), evidence: "" }),
       ).sort(),
       ["empty-helpful", "evidence-missing", "unknown-place"],
     );

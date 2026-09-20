@@ -21,7 +21,7 @@ const verdict = (over: Partial<Verdict> = {}): Verdict => ({
   horizonHrs: 1,
   oneLine: "The Gergeti trail will be washed out by mid-morning.",
   evidence: "open-meteo, taken 2026-10-04 06:00",
-  ops: [],
+  proposals: [],
   confidence: 0.9,
   ...over,
 });

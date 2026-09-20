@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { PlaceTier } from "../catalogue/tier.ts";
 import type { NodeKind, Pace } from "../trip/document.ts";
-import { type PatchOp, patchOps, placeIdsInOps } from "../trip/patch.ts";
 import type { EventKind, Severity } from "./event.ts";
+import { type Proposal, placeIdsInProposals, proposal } from "./proposal.ts";
 
 // Stage 4: the only model call in the pipeline, and the only one that runs per
 // matched pair rather than per region. Everything expensive about the product
@@ -39,7 +39,7 @@ export const verdict = z.object({
   /** Source and timestamp, always shown beside the one-liner. */
   evidence: z.string().min(1).max(240),
   /** The coherent-day proposal, accepted or rejected as a unit. May be empty. */
-  ops: z.array(patchOps.element).max(500),
+  proposals: z.array(proposal).max(20),
   confidence: z.number().min(0).max(1),
 });
 export type Verdict = z.infer<typeof verdict>;
@@ -136,7 +136,7 @@ export function checkVerdict(value: Verdict, ctx: VerdictContext): Rejection[] {
     });
   }
 
-  for (const placeId of placeIdsInOps(value.ops as PatchOp[])) {
+  for (const placeId of placeIdsInProposals(value.proposals as Proposal[])) {
     const tier = ctx.tiers.get(placeId);
     if (!tier) {
       rejections.push({
