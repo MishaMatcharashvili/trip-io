@@ -2,21 +2,20 @@ import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { loadCandidates } from "@/bll/trip-generation.ts";
 import { db } from "@/dal/client";
+import { planCache, recordGeneration } from "@/dal/plans.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
-import { planCache } from "@/domain/trip/generate/cache.ts";
 import {
   CANDIDATE_LIMIT,
   describeHours,
-  loadCandidates,
 } from "@/domain/trip/generate/candidates.ts";
 import { composeWithGemini } from "@/domain/trip/generate/compose.ts";
-import { constraints } from "@/domain/trip/generate/constraints.ts";
+import { cacheKey, constraints } from "@/domain/trip/generate/constraints.ts";
 import {
   generate,
   tripHeader as headerFor,
 } from "@/domain/trip/generate/pipeline.ts";
-import { recordGeneration } from "@/domain/trip/generate/record.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import {
   type AppendFailure,
@@ -120,7 +119,7 @@ export const trips = new Hono<Env>()
     });
 
     if (!result.ok) {
-      await recordGeneration(null, wanted, "failed", result.attempts);
+      await recordGeneration(null, cacheKey(wanted), "failed", result.attempts);
       return c.json(
         {
           error: "insufficient-coverage" as const,
@@ -134,7 +133,12 @@ export const trips = new Hono<Env>()
 
     const userId = c.get("userId");
     const tripId = await createTrip(headerFor(wanted), userId);
-    await recordGeneration(tripId, wanted, result.source, result.attempts);
+    await recordGeneration(
+      tripId,
+      cacheKey(wanted),
+      result.source,
+      result.attempts,
+    );
 
     // The generated plan enters the log as its own patch, and is validated once
     // more on the way in — the store trusts nothing it didn't check itself.

@@ -1,6 +1,14 @@
 import { sql } from "drizzle-orm";
-import type { AreaMatch } from "@/domain/catalogue/focus-areas.ts";
+import { categoryGroup, isOutdoor } from "@/domain/catalogue/categories.ts";
+import {
+  type AreaMatch,
+  areaBySlug,
+  type FocusAreaSlug,
+} from "@/domain/catalogue/focus-areas.ts";
+import { openingHours } from "@/domain/catalogue/opening-hours.ts";
 import type { PlaceInput } from "@/domain/catalogue/review-input.ts";
+import type { LonLat } from "@/domain/geo.ts";
+import type { Candidate } from "@/domain/trip/generate/plan.ts";
 import { areaPredicate, list } from "./area-predicate.ts";
 import { db } from "./client.ts";
 import { place, placeReview } from "./schema/index.ts";
@@ -194,4 +202,41 @@ export async function insertCurated(
     }),
   ]);
   return id;
+}
+
+/**
+ * Curated places in one focus area — what trip generation may compose from. The
+ * tier filter is what makes "the model cannot name a place it wasn't given" mean
+ * something; the validator enforces it again when the plan is written
+ * (context/architecture.md, place.tier).
+ */
+export async function curatedInArea(
+  slug: FocusAreaSlug,
+  limit: number,
+): Promise<Candidate[]> {
+  const rows = await db.execute(sql`
+    SELECT p.id, p.name, p.category, p.opening_hours,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
+    FROM place p
+    WHERE p.tier = 'curated' AND ${areaPredicate(areaBySlug(slug).match)}
+    ORDER BY p.name
+    LIMIT ${limit}
+  `);
+  return rows.rows.map((r) => {
+    const parsed = r.opening_hours
+      ? openingHours.safeParse(r.opening_hours)
+      : null;
+    const category = r.category as string;
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      category,
+      group: categoryGroup[category as keyof typeof categoryGroup],
+      tier: "curated" as const,
+      lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+      openingHours: parsed?.success ? parsed.data : null,
+      outdoor: isOutdoor(category),
+      area: slug,
+    } satisfies Candidate;
+  });
 }
