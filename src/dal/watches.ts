@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { QuietHours, WatchSettings } from "../domain/watch/route.ts";
+import type { WatchDefaults } from "../domain/watch/settings.ts";
 import { db, type Queryable } from "./client.ts";
 
 // `trip_watch`: which trips the sense loop is awake for, and on what terms.
@@ -10,12 +11,6 @@ import { db, type Queryable } from "./client.ts";
 
 /** Slop around the trip's footprint: weather a valley away still reaches it. */
 const FOOTPRINT_BUFFER_M = 15_000;
-
-export type WatchDefaults = {
-  channels: readonly string[];
-  quietHours: QuietHours;
-  cap: number;
-};
 
 /**
  * Write, or rewrite, the watch for a trip from the nodes it currently has.

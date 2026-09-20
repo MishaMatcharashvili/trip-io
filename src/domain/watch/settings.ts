@@ -35,3 +35,19 @@ export const tripDays = (startsAt: string, endsAt: string): number =>
     1,
     Math.ceil((Date.parse(endsAt) - Date.parse(startsAt)) / 86_400_000),
   );
+
+export type WatchDefaults = {
+  channels: readonly string[];
+  quietHours: QuietHours;
+  cap: number;
+};
+
+/** What a trip's watch is set to the first time it is written. */
+export const watchDefaults = (header: {
+  startsAt: string;
+  endsAt: string;
+}): WatchDefaults => ({
+  channels: DEFAULT_CHANNELS,
+  quietHours: DEFAULT_QUIET_HOURS,
+  cap: capForDays(tripDays(header.startsAt, header.endsAt)),
+});
