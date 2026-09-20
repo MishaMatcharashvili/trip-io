@@ -47,6 +47,12 @@ export type DrainOptions = {
   batch?: number;
   worker?: string;
   now?: () => number;
+  /**
+   * Overrides the registry above. The queue's mechanics — claiming, the time
+   * budget, backoff, giving up — are worth exercising without paying a model,
+   * and `npm run smoke:watch` does exactly that.
+   */
+  handlers?: Record<string, Handler>;
 };
 
 export async function drain(options: DrainOptions = {}): Promise<DrainReport> {
@@ -54,6 +60,7 @@ export async function drain(options: DrainOptions = {}): Promise<DrainReport> {
   const batch = options.batch ?? DRAIN_BATCH;
   const worker = options.worker ?? randomUUID();
   const now = options.now ?? Date.now;
+  const registry = options.handlers ?? handlers;
 
   const started = now();
   const elapsed = () => now() - started;
@@ -69,7 +76,7 @@ export async function drain(options: DrainOptions = {}): Promise<DrainReport> {
     claimed += jobs.length;
 
     for (const job of jobs) {
-      const ok = await run(job);
+      const ok = await run(job, registry);
       if (ok) completed++;
       else failed++;
 
@@ -87,8 +94,11 @@ export async function drain(options: DrainOptions = {}): Promise<DrainReport> {
   return { claimed, completed, failed, outOfTime, ms: elapsed() };
 }
 
-async function run(job: Job): Promise<boolean> {
-  const handler = handlers[job.kind];
+async function run(
+  job: Job,
+  registry: Record<string, Handler>,
+): Promise<boolean> {
+  const handler = registry[job.kind];
   if (!handler) {
     await fail(job.id, `no handler for job kind "${job.kind}"`);
     return false;
