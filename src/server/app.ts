@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cron } from "./routes/cron";
 import { curation } from "./routes/curation";
 import { trips } from "./routes/trips";
 
@@ -9,6 +10,7 @@ const app = new Hono()
   .get("/health", (c) =>
     c.json({ status: "ok", time: new Date().toISOString() }),
   )
+  .route("/cron", cron)
   .route("/curation", curation)
   .route("/trips", trips);
 
