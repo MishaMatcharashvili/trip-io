@@ -1,0 +1,2 @@
+ALTER TABLE "event_match" ADD COLUMN "queued_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "event_match_unqueued_idx" ON "event_match" USING btree ("matched_at") WHERE "event_match"."queued_at" is null;

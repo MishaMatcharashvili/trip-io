@@ -88,6 +88,10 @@ export const eventMatch = pgTable(
       .notNull()
       .references(() => tripNode.id, { onDelete: "cascade" }),
     matchedAt: tstz("matched_at"),
+    // Set when the pair is handed to the judge queue. Claiming it in one
+    // UPDATE is what stops a matcher run five minutes later from paying for
+    // the same model call twice.
+    queuedAt: timestamp("queued_at", { withTimezone: true }),
     verdict: jsonb("verdict"),
     score: real("score").notNull(),
     judgedAt: timestamp("judged_at", { withTimezone: true }),
@@ -111,6 +115,10 @@ export const eventMatch = pgTable(
     index("event_match_unjudged_idx")
       .on(t.score)
       .where(sql`${t.judgedAt} is null`),
+    // The sweep that finds pairs nothing ever picked up.
+    index("event_match_unqueued_idx")
+      .on(t.matchedAt)
+      .where(sql`${t.queuedAt} is null`),
   ],
 );
 
