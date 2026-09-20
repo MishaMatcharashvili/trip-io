@@ -166,15 +166,40 @@ button; `ignored` is produced by a cron sweep, not left to the client.
 
 ## Hard invariants (validator rules, not guidelines)
 
+An invariant is only real where it is enforced in code and held by a test. Each one below says where
+that is, or says plainly that it is not built yet — an aspiration listed as a guarantee is worse than
+no list.
+
 - **Never auto-apply.** `trip_patch.author = 'intervention'` requires a non-null `accepted_by`.
+  *Enforced twice:* the `trip_patch_intervention_accepted` CHECK constraint (migration `0002`) and a
+  guard at the top of `appendPatch`, before the transaction opens. *Tested:*
+  `src/bll/trip-document.test.ts`.
+- **No hallucinated places.** Every `place_id` a patch introduces is checked against the tiers its
+  author may use — `system` composes only from `curated`, `intervention` may also use `verified`.
+  *Enforced:* `allowedTiers` in `src/domain/trip/validate.ts`, run over every affected day on every
+  write; candidate retrieval filters to `curated` again in `src/dal/places.ts`. *Tested:*
+  `src/domain/trip/validate.test.ts`.
 - **Always show evidence and source.** A verdict with empty `evidence`, or evidence missing a
-  timestamp, is rejected before rendering.
-- **No hallucinated places.** Every `place_id` in a patch's `ops` is validated against
-  `curated`/`verified` tiers server-side.
+  timestamp, is rejected before rendering. *Not built* — arrives with the judge in Phase 3.
 - **No empty-helpful verdicts.** `relevant: true` + `impact: "none"` is rejected by the validator.
+  *Not built* — Phase 3, same place.
 - **New detectors enter briefing-only.** A detector may not route to `interrupt` until it has run one
   week on briefing-only and been hand-audited. This applies hardest to LLM-extraction detectors
-  (news/protests).
+  (news/protests). *Not built, and a process rule rather than a code one* — Phase 3 onwards.
+
+### Structural invariants
+
+- **The dependency rule.** No layer imports one to its right; only `src/dal` writes SQL; the domain
+  imports no runtime dependency but Zod. *Enforced and tested:* `src/layers.test.ts`, which fails on
+  a deliberate violation.
+- **Node ids are minted once and never reused.** A JSON Patch path into an array would point at a
+  different stop as soon as anything were inserted before it, so nodes are keyed by id and order
+  comes from `startsAt`. *Enforced:* the path grammar in `src/domain/trip/patch.ts`, where `add`
+  refuses to overwrite. *Tested:* `src/domain/trip/patch.test.ts`.
+- **The node projection never drifts from the log.** `trip_node` rows are the document at head; the
+  patch, the nodes it touched and the new head are written in one transaction under a row lock.
+  *Enforced:* `appendPatch`. *Not covered by an automated test* — it needs a database; the write path
+  is exercised by `npm run smoke:trip`.
 
 ## Known constraints that shaped the above
 
