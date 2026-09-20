@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AuthForm } from "@/features/auth-form";
 import { AuthShell } from "@/features/auth-shell";
-import { isGoogleConfigured } from "@/lib/auth";
+import { isGoogleConfigured } from "@/infra/auth.ts";
 
 export const metadata: Metadata = { title: "Create an account" };
 

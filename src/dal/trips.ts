@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   type TripDoc,
   type TripNode,
@@ -8,6 +8,7 @@ import {
 import type { PatchOp } from "@/domain/trip/patch.ts";
 import type { Author } from "@/domain/trip/validate.ts";
 import { db, type Queryable } from "./client.ts";
+import { trip } from "./schema/index.ts";
 import type { Tx } from "./tx.ts";
 
 // The patch log and the node projection that hangs off it, as rows.
@@ -300,4 +301,20 @@ export async function opsBetween(
     ORDER BY seq ASC
   `);
   return rows.rows.map((r) => r.ops);
+}
+
+/**
+ * Hands every trip from one user to another. Better Auth calls this when an
+ * anonymous visitor signs up, before it deletes the anonymous user — and
+ * `trip.user_id` is set null on delete, so it has to happen first or the
+ * visitor loses the trip they just built.
+ */
+export async function reassignTrips(
+  fromUserId: string,
+  toUserId: string,
+): Promise<void> {
+  await db
+    .update(trip)
+    .set({ userId: toUserId })
+    .where(eq(trip.userId, fromUserId));
 }

@@ -1,9 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins/anonymous";
-import { eq } from "drizzle-orm";
 import { db } from "@/dal/client";
-import { account, session, trip, user, verification } from "@/dal/schema";
+import { account, session, user, verification } from "@/dal/schema";
+import { reassignTrips } from "@/dal/trips.ts";
 
 let instance: ReturnType<typeof build> | undefined;
 
@@ -58,16 +58,9 @@ function build() {
     plugins: [
       anonymous({
         // "No accounts until save": the visitor plans a trip anonymously, and
-        // signing up hands it over. Better Auth then deletes the anonymous
-        // user, and `trip.user_id` is set null on delete — so the trips have to
-        // be reassigned here, before that happens, or the visitor loses the
-        // trip they just built.
-        onLinkAccount: async ({ anonymousUser, newUser }) => {
-          await db
-            .update(trip)
-            .set({ userId: newUser.user.id })
-            .where(eq(trip.userId, anonymousUser.user.id));
-        },
+        // signing up hands it over (src/dal/trips.ts).
+        onLinkAccount: ({ anonymousUser, newUser }) =>
+          reassignTrips(anonymousUser.user.id, newUser.user.id),
       }),
     ],
   });

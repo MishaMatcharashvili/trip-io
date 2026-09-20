@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { loadTripRef, type TripRef } from "@/dal/trips.ts";
-import { getAuth } from "@/lib/auth";
+import { getAuth } from "@/infra/auth.ts";
 import { isCurator } from "@/lib/curator";
 
 // Who is asking, and whether the thing they asked for is theirs. Both checks

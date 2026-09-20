@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { getAuth } from "@/lib/auth";
+import { getAuth } from "@/infra/auth.ts";
 import { isCurator } from "@/lib/curator";
 import { CurationQueue } from "./curation-queue";
 import { SignIn } from "./sign-in";
