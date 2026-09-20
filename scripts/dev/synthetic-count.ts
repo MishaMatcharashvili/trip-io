@@ -22,7 +22,7 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { judgeMatch } from "../../src/bll/judge.ts";
-import { runMatch } from "../../src/bll/match.ts";
+import { JUDGE_JOB, runMatch } from "../../src/bll/match.ts";
 import {
   addAllOps,
   appendPatch,
@@ -345,6 +345,16 @@ async function judgeTrip(tripId: string): Promise<number> {
 }
 
 async function cleanUp(tripId: string): Promise<void> {
+  // Jobs first: `event_match` cascades from the trip, so once the trip is gone
+  // there is nothing left to find the queued jobs by, and they sit in the queue
+  // until something drains them.
+  await db.execute(sql`
+    DELETE FROM job
+    WHERE kind = ${JUDGE_JOB}
+      AND payload->>'matchId' IN (
+        SELECT id::text FROM event_match WHERE trip_id = ${tripId}
+      )
+  `);
   // Interventions restrict event deletion, and this phase writes none — but
   // order the deletes as though it did, so this stays correct in Phase 5.
   await db.execute(sql`DELETE FROM trip WHERE id = ${tripId}`);
