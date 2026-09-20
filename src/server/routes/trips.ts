@@ -2,21 +2,22 @@ import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { tripHeader } from "@/core/trip/document.ts";
-import { planCache } from "@/core/trip/generate/cache.ts";
+import { db } from "@/db/client";
+import { tripHeader } from "@/domain/trip/document.ts";
+import { planCache } from "@/domain/trip/generate/cache.ts";
 import {
   CANDIDATE_LIMIT,
   describeHours,
   loadCandidates,
-} from "@/core/trip/generate/candidates.ts";
-import { composeWithGemini } from "@/core/trip/generate/compose.ts";
-import { constraints } from "@/core/trip/generate/constraints.ts";
+} from "@/domain/trip/generate/candidates.ts";
+import { composeWithGemini } from "@/domain/trip/generate/compose.ts";
+import { constraints } from "@/domain/trip/generate/constraints.ts";
 import {
   generate,
   tripHeader as headerFor,
-} from "@/core/trip/generate/pipeline.ts";
-import { recordGeneration } from "@/core/trip/generate/record.ts";
-import { patchOps } from "@/core/trip/patch.ts";
+} from "@/domain/trip/generate/pipeline.ts";
+import { recordGeneration } from "@/domain/trip/generate/record.ts";
+import { patchOps } from "@/domain/trip/patch.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -29,13 +30,12 @@ import {
   patchHistory,
   restoreTo,
   undoLast,
-} from "@/core/trip/store.ts";
-import { straightLineTravel } from "@/core/trip/travel.ts";
-import { validateDoc, validateProposal } from "@/core/trip/validate.ts";
-import { db } from "@/db/client";
+} from "@/domain/trip/store.ts";
+import { straightLineTravel } from "@/domain/trip/travel.ts";
+import { validateDoc, validateProposal } from "@/domain/trip/validate.ts";
 import { getAuth } from "@/lib/auth";
 
-// The trip document over HTTP. Business logic lives in src/core/trip/*; these
+// The trip document over HTTP. Business logic lives in src/domain/trip/*; these
 // handlers do auth, ownership and status codes.
 //
 // Anonymous sessions count: a visitor plans a trip before there is an account

@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
-import { corridors, seasonRisk } from "../../src/core/catalogue/corridors.ts";
-import { simplifyLine } from "../../src/core/geo.ts";
+import { corridors, seasonRisk } from "../../src/domain/catalogue/corridors.ts";
+import { simplifyLine } from "../../src/domain/geo.ts";
 
 // Routes each corridor's waypoints through OSRM and writes the simplified road
 // geometry to corridors.geo.json, which is checked in so seeding never depends on
@@ -11,7 +11,7 @@ import { simplifyLine } from "../../src/core/geo.ts";
 // exposing the same /routed-<profile>/ paths if that ever changes.
 
 const OSRM_URL = process.env.OSRM_URL ?? "https://routing.openstreetmap.de";
-const OUT = "src/core/catalogue/corridors.geo.json";
+const OUT = "src/domain/catalogue/corridors.geo.json";
 // A waypoint further than this from any routable road is a typo in its
 // coordinates, not a road OSRM should quietly snap to.
 const MAX_SNAP_M = 750;

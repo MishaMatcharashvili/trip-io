@@ -1,4 +1,4 @@
-import type { QueuePlace } from "@/core/catalogue/curation";
+import type { QueuePlace } from "@/domain/catalogue/curation";
 
 // Overture contact fields are third-party strings; only real http(s) URLs
 // become links.

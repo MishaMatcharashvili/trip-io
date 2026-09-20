@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   type CategoryGroup,
   categoryGroups,
-} from "@/core/catalogue/categories";
-import type { AreaProgress, QueuePlace } from "@/core/catalogue/curation";
+} from "@/domain/catalogue/categories";
+import type { AreaProgress, QueuePlace } from "@/domain/catalogue/curation";
 import {
   curatedTarget,
   type FocusAreaSlug,
   focusAreas,
-} from "@/core/catalogue/focus-areas";
-import type { PlaceInput } from "@/core/catalogue/review-input";
+} from "@/domain/catalogue/focus-areas";
+import type { PlaceInput } from "@/domain/catalogue/review-input";
 import { apiClient } from "@/lib/hono-client";
 import { draftFromPlace, emptyDraft } from "./draft";
 import { Evidence, humanise } from "./evidence";

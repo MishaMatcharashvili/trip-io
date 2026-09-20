@@ -3,7 +3,7 @@ import { curation } from "./routes/curation";
 import { trips } from "./routes/trips";
 
 // Mounted at app/api/[[...route]]/route.ts via hono/vercel. Business logic
-// stays in src/core/*; this file only wires routes.
+// stays in src/domain/*; this file only wires routes.
 const app = new Hono()
   .basePath("/api")
   .get("/health", (c) =>

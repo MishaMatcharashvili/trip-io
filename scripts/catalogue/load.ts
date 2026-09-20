@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { neon } from "@neondatabase/serverless";
-import { corridors } from "../../src/core/catalogue/corridors.ts";
+import { corridors } from "../../src/domain/catalogue/corridors.ts";
 
 // Loads a `catalogue:extract` output into Postgres: regions, the 12 corridors,
 // then gated places. Idempotent; rerun after every extract.
@@ -86,7 +86,7 @@ if (wants("regions")) {
 
 if (wants("corridors")) {
   const geo = JSON.parse(
-    readFileSync("src/core/catalogue/corridors.geo.json", "utf8"),
+    readFileSync("src/domain/catalogue/corridors.geo.json", "utf8"),
   ) as {
     features: {
       properties: { slug: string };

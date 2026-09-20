@@ -59,7 +59,7 @@ const rowsToDoc = (trip: Row, nodes: Row[]): TripDoc => ({
         kind: n.kind,
         placeId: n.place_id,
         // Geometry is the place's for a placed node; only a placeless node
-        // carries its own point (src/core/trip/document.ts).
+        // carries its own point (src/domain/trip/document.ts).
         lonLat: n.place_id ? null : [Number(n.lon), Number(n.lat)],
         startsAt: new Date(n.starts_at as string).toISOString(),
         durationMin: n.duration_min,

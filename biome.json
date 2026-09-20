@@ -14,7 +14,7 @@
       "!dist",
       "!build",
       "!src/db/migrations",
-      "!src/core/catalogue/corridors.geo.json"
+      "!src/domain/catalogue/corridors.geo.json"
     ]
   },
   "formatter": {

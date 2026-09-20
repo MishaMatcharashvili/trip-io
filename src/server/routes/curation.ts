@@ -1,15 +1,15 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { categoryGroups } from "@/core/catalogue/categories";
+import { categoryGroups } from "@/domain/catalogue/categories";
 import {
   addPlace,
   getProgress,
   getQueue,
   reviewPlace,
-} from "@/core/catalogue/curation";
-import { focusAreaSlugs } from "@/core/catalogue/focus-areas";
-import { placeInput, reviewInput } from "@/core/catalogue/review-input";
+} from "@/domain/catalogue/curation";
+import { focusAreaSlugs } from "@/domain/catalogue/focus-areas";
+import { placeInput, reviewInput } from "@/domain/catalogue/review-input";
 import { getAuth } from "@/lib/auth";
 import { isCurator } from "@/lib/curator";
 

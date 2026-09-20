@@ -7,7 +7,8 @@
 
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import type { TripDoc, TripNode } from "../../src/core/trip/document.ts";
+import { db } from "../../src/db/client.ts";
+import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import {
   addAllOps,
   appendPatch,
@@ -17,8 +18,7 @@ import {
   patchHistory,
   restoreTo,
   undoLast,
-} from "../../src/core/trip/store.ts";
-import { db } from "../../src/db/client.ts";
+} from "../../src/domain/trip/store.ts";
 
 const at = (day: string, hhmm: string) =>
   new Date(`${day}T${hhmm}:00+04:00`).toISOString();
