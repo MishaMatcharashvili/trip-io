@@ -1,4 +1,5 @@
 import {
+  purgeExpiredEvents,
   regionsToSense,
   reopenMatches,
   type SenseRegion,
@@ -36,9 +37,18 @@ export type SenseReport = {
   events: number;
   escalated: number;
   failed: number;
+  /** Expired events forgotten on the way past. */
+  purged: number;
   byRegion: RegionReport[];
   ms: number;
 };
+
+/**
+ * How long an event outlives its own window. Long enough to explain an
+ * intervention someone is still looking at, short enough that the table stays
+ * the size of the weather rather than the size of the year.
+ */
+export const EVENT_RETENTION_DAYS = 30;
 
 export type SenseDeps = {
   forecast?: Forecaster;
@@ -111,8 +121,13 @@ export async function senseWeather(deps: SenseDeps = {}): Promise<SenseReport> {
     }
   }
 
+  // Housekeeping belongs to the loop that creates the rows. Events an
+  // intervention cites are kept whatever their age (src/dal/events.ts).
+  const purged = await purgeExpiredEvents(EVENT_RETENTION_DAYS);
+
   return {
     regions: regions.length,
+    purged,
     events: byRegion.reduce((n, r) => n + r.events, 0),
     escalated: byRegion.reduce((n, r) => n + r.escalated, 0),
     failed: byRegion.filter((r) => r.error).length,
