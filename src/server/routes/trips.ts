@@ -22,7 +22,6 @@ import {
   CANDIDATE_LIMIT,
   describeHours,
 } from "@/domain/trip/generate/candidates.ts";
-import { composeWithGemini } from "@/domain/trip/generate/compose.ts";
 import { cacheKey, constraints } from "@/domain/trip/generate/constraints.ts";
 import {
   generate,
@@ -31,6 +30,7 @@ import {
 import { patchOps } from "@/domain/trip/patch.ts";
 import { straightLineTravel } from "@/domain/trip/travel.ts";
 import { validateDoc, validateProposal } from "@/domain/trip/validate.ts";
+import { composeWithGemini } from "@/infra/gemini-composer.ts";
 import { getAuth } from "@/lib/auth";
 
 // The trip document over HTTP. Business logic lives in src/domain/trip/*; these

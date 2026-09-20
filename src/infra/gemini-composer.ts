@@ -1,10 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import type { ComposeFeedback, ComposeInput, Composer } from "./pipeline.ts";
-import { planSchema, type RefPlan } from "./plan.ts";
+import type {
+  ComposeFeedback,
+  ComposeInput,
+  Composer,
+} from "@/domain/trip/generate/pipeline.ts";
+import { planSchema, type RefPlan } from "@/domain/trip/generate/plan.ts";
 
 // The only model call in trip generation, and the only file that knows which
-// provider we use. Everything else takes a `Composer`.
+// provider we use: it implements the domain's `Composer` port, and everything
+// else — the pipeline, the tests, the fallback — is written against that port.
 //
 // The model chooses places and their order; it never sets clock times —
 // `schedule.ts` does that, because models are weak at time arithmetic and the
