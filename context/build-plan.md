@@ -9,7 +9,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 0 — foundations + procurement with latency
 
-- [ ] Neon project with PostGIS extension enabled
+- [x] Neon project with PostGIS extension enabled (eu-central-1, PostGIS 3.6)
 - [ ] Drizzle schema, first migration (core tables from `context/architecture.md`)
 - [ ] Hono mounted at `app/api/[[...route]]/route.ts`, one typed route proving the RPC client end to end
 - [ ] Better Auth wired: anonymous trip in local state → account at save → trip claimed
@@ -23,7 +23,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 ## Phase 1 — catalogue and corridors
 
 - [x] Overture Places pulled via DuckDB from S3, filtered to Georgia bbox, written to Parquet
-- [ ] …loaded into PostGIS — `npm run catalogue:load` is written, blocked on Neon (Phase 0 procurement)
+- [x] …loaded into PostGIS — 64 regions, 12 corridors, 13,338 places (11,590 verified, 1,748 raw)
 - [x] Programmatic gate implemented: require name, category in ~40-entry allowlist (45), trigram dedupe within 100m, drop no-website-and-no-phone-and-no-address
 - [x] `place.tier` assignment (`raw` / `verified`) per the gate — OSM-counterpart signal not implemented (no OSM extract)
 - [ ] 600 hand-verified `curated` places: Tbilisi core, Kazbegi corridor, Kakheti, Svaneti — capture `opening_hours` while verifying (queue built at `/curate`; 0/600)
@@ -32,12 +32,12 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 2 — trip document and patch log
 
-- [ ] `trip`, `trip_node`, `trip_patch`, `checkpoint_log` tables + JSON Patch application
-- [ ] Append-only patch log, checkpoint every 20 patches
-- [ ] Coherent-day validator (test-first): no overlapping nodes, travel time respected, nothing scheduled into darkness, opening hours honoured — re-validates the **whole day** after any patch
-- [ ] Trip generation pipeline: constraints → candidate retrieval from `curated` → LLM composition → validator → patch set
-- [ ] Warm-start cache on coarse constraint hash
-- [ ] Invented-place-id handling: reject → retry once with rejection as feedback → template fallback; never render an unvalidated plan
+- [x] `trip`, `trip_node`, `trip_patch`, `checkpoint_log` tables + JSON Patch application (migration 0002; restricted path grammar, inverse stored per patch)
+- [x] Append-only patch log, checkpoint every 20 patches (and at patch 1). Undo and restore both append
+- [x] Coherent-day validator (test-first): no overlapping nodes, travel time respected, nothing scheduled into darkness, opening hours honoured — re-validates the **whole day** after any patch
+- [x] Trip generation pipeline: constraints → candidate retrieval from `curated` → LLM composition → validator → patch set. **Cannot produce a trip until the 600 exist** — 0 curated places means candidate retrieval returns nothing
+- [x] Warm-start cache on coarse constraint hash (`plan_cache`, untimed plans, re-validated per date)
+- [x] Invented-place-id handling: reject → retry once with rejection as feedback → template fallback; never render an unvalidated plan
 
 ## Phase 3 — the pipeline, weather only
 

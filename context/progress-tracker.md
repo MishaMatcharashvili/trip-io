@@ -1,28 +1,30 @@
 # Progress tracker
 
-Last updated: 2026-09-16.
+Last updated: 2026-09-20.
 
-## Current status: Phase 1 code done; blocked on Neon for the load, on you for the 600
+## Current status: Phase 2 built and on a live database; blocked on you for the 600
 
-Phase 0's code is merged; its procurement items are still outstanding (checklist below). Phase 1's
-pipeline is built and has run against real Overture data locally. Nothing is in Postgres yet: the load
-waits on Neon, and the curation queue at `/curate` waits on Neon + Google OAuth + `CURATOR_EMAILS`.
+Neon is live (eu-central-1, PostGIS 3.6) and the catalogue is loaded, which unblocked Phase 1's last
+code item. Phase 2 is built end to end — patch log, coherent-day validator, generation pipeline,
+`/api/trips` — and the write path has been exercised against the real database. Trip generation
+cannot yet produce a trip: it composes only from `curated` places and there are none, so it returns
+`insufficient-coverage` by design. `/curate` still waits on Google OAuth + `CURATOR_EMAILS`.
 
 | Area | State |
 |---|---|
 | Repo | Hono mounted at `app/api/[[...route]]/route.ts` (`GET /api/health` proven end-to-end via `hc<AppType>()`), Better Auth wired at `app/api/auth/[...all]/route.ts` (Google OAuth + anonymous sessions — `GOOGLE_CLIENT_ID`/`SECRET` not yet supplied) |
 | Catalogue pipeline | `npm run catalogue:extract` (Overture 2026-08-19.0 → gated Parquet, ~2 min cold), `catalogue:corridors` (OSRM → checked-in GeoJSON), `catalogue:load` (→ Postgres, idempotent). `/curate` review queue + add-missing-place form. 60 tests (`npm test`) |
-| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`. Phase 1: + `@duckdb/node-api` (dev). Still not installed: MapLibre (Phase 6), Resend (Phase 4), Expo (Phase 7) |
+| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`, `@google/genai`. Phase 1: + `@duckdb/node-api` (dev). Still not installed: MapLibre (Phase 6), Resend (Phase 4), Expo (Phase 7) |
 | Design system | `src/ui/` — Mist tokens in `app/globals.css` (`@theme`), primitives (button, card, chip, dot, controls, nav, bars, sheet, 28-glyph icon set) and composites in `src/features/`. Reference page at `/design` |
 | Screens | 17 fixture-backed screens under `src/app` (see `/design`). Layout and states are final; no API, no MapLibre — maps are the canvas's schematic charts in `src/ui/map/` |
-| Database | 11 domain tables + Better Auth's in `src/db/schema/`, plus Phase 1's `region` and `place_review` (migration `0001`). `npm run db:migrate` creates PostGIS, then applies both. **Not yet applied** — no live Neon project; `.env` holds a placeholder `DATABASE_URL` |
+| Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0002` applied. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
 | Detectors | None built |
-| Catalogue | Extracted, not loaded: 64 sense regions; 65,705 Overture places in bbox → 13,337 kept (11,590 `verified`, 1,747 `raw`; 103 merged as duplicates). 12 corridors routed. **0 / 600 curated** |
+| Catalogue | **Loaded**: 64 sense regions, 12 corridors, 13,338 places (11,590 `verified`, 1,748 `raw`). Per focus area: Tbilisi core 4,008, Kakheti 830, Kazbegi corridor 730, Svaneti 301. **0 / 600 curated** |
 | Recruiting | Not started |
 
 ### Phase 0 procurement checklist (blocks on you, not on code)
 
-- [ ] Neon project + PostGIS enabled → give me the pooled `DATABASE_URL`, I'll run the migration and `catalogue:load`
+- [x] Neon project + PostGIS enabled; migrations applied and the catalogue loaded
 - [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — also gates `/curate`; set `CURATOR_EMAILS` to your Google address
 - [ ] Vercel Pro enabled, preview deploys working, `CRON_SECRET` set
 - [ ] Apple Developer enrolment started (APNs key)
@@ -40,7 +42,7 @@ be updated as phases close, not item-by-item.
 |---|---|---|
 | 0 | Foundations + procurement | Code done; procurement 0/8 |
 | 1 | Catalogue + corridors | Code done; load blocked on Neon; curation 0/600 |
-| 2 | Trip document + patch log | Not started |
+| 2 | Trip document + patch log | Built and running against Neon. Generation is untestable end to end until curated places exist; the Gemini call has never run (`GEMINI_API_KEY` not set) |
 | 3 | Pipeline, weather only | Not started |
 | 4 | Daily briefing | Not started |
 | 5 | Interrupts, budget, road form | Not started |
@@ -119,3 +121,21 @@ above gets resolved. Keep entries short — this is a log, not a report.
   corridors + grid), excluding Abkhazia and South Ossetia; corridor geometry is OSRM-routed, with the
   Zagari Pass on the bike profile because the car profile won't cross it; curated places require
   opening hours (skip instead of guessing). Load, and all 600 curated places, still to do.
+- **2026-09-18** — Phase 2 pure core built on `phase-2-trip-document`, test-first against the
+  Kazbegi day (`context/phase-2-design.md`). Decisions: user edits that break a day are applied
+  with warnings, system/intervention patches may not introduce errors; generation uses Gemini 2.0
+  Flash behind `compose.ts`; no dev curated seed. Next: migration 0002, transaction client,
+  store, routes — waiting on the Neon `DATABASE_URL` in `.env`.
+- **2026-09-20** — Phase 2 database layer written: migration `0002_trip_patch_log` (patch `seq`,
+  `inverse_ops`, the intervention-needs-an-accepter CHECK, `plan_cache`, `trip_generation`), a
+  WebSocket pool client because Neon's HTTP driver can't do transactions, the store (append, undo,
+  restore, checkpoints, node projection) and the `/api/trips` routes. Anonymous trips are now
+  reassigned on sign-up, so `disableDeleteAnonymousUser` is gone. None of it has touched a live
+  database: `.env` still holds the placeholder `DATABASE_URL`.
+- **2026-09-20** — Neon live; migrations `0000`–`0002` applied and `catalogue:load` run (64 regions,
+  12 corridors, 13,338 places). Phase 2 finished in code: patch log with stored inverses, the
+  coherent-day validator, generation (candidates → Gemini → schedule → validate → retry → template
+  fallback), `plan_cache`, `trip_generation`, and the `/api/trips` routes. `npm run smoke:trip`
+  exercises create → patch → stale write → undo → restore → projection against the real database.
+  Two things still cannot run: trip generation (needs curated places) and the Gemini call itself
+  (needs `GEMINI_API_KEY`).
