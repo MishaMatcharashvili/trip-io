@@ -94,7 +94,9 @@ describe("layers", () => {
         const to = layerOf(resolve(SRC, specifier));
         if (!to || to === from) continue;
         if (!mayImport[from].includes(to)) {
-          broken.push(`${relative(SRC, file)} → ${specifier} (${from} → ${to})`);
+          broken.push(
+            `${relative(SRC, file)} → ${specifier} (${from} → ${to})`,
+          );
         }
       }
     }

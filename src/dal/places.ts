@@ -6,7 +6,10 @@ import {
   type FocusAreaSlug,
 } from "@/domain/catalogue/focus-areas.ts";
 import { openingHours } from "@/domain/catalogue/opening-hours.ts";
-import type { PlaceInput } from "@/domain/catalogue/review-input.ts";
+import type {
+  PlaceInput,
+  ReviewInput,
+} from "@/domain/catalogue/review-input.ts";
 import type { LonLat } from "@/domain/geo.ts";
 import type { Candidate } from "@/domain/trip/generate/plan.ts";
 import type { PlaceInfo } from "@/domain/trip/validate.ts";
@@ -146,12 +149,10 @@ const curatedColumns = (input: PlaceInput, reviewerId: string) => ({
   verifiedBy: reviewerId,
 });
 
-export type Decision = "curate" | "reject" | "skip";
-
 /** A reject or a skip: the log row alone, the place untouched. */
 export async function recordDecision(
   placeId: string,
-  decision: Exclude<Decision, "curate">,
+  decision: Exclude<ReviewInput["decision"], "curate">,
   reviewerId: string,
   note: string | undefined,
 ): Promise<void> {
