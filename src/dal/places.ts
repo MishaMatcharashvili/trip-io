@@ -1,18 +1,18 @@
 import { sql } from "drizzle-orm";
-import { categoryGroup, isOutdoor } from "@/domain/catalogue/categories.ts";
+import { categoryGroup, isOutdoor } from "../domain/catalogue/categories.ts";
 import {
   type AreaMatch,
   areaBySlug,
   type FocusAreaSlug,
-} from "@/domain/catalogue/focus-areas.ts";
-import { openingHours } from "@/domain/catalogue/opening-hours.ts";
+} from "../domain/catalogue/focus-areas.ts";
+import { openingHours } from "../domain/catalogue/opening-hours.ts";
 import type {
   PlaceInput,
   ReviewInput,
-} from "@/domain/catalogue/review-input.ts";
-import type { LonLat } from "@/domain/geo.ts";
-import type { Candidate } from "@/domain/trip/generate/plan.ts";
-import type { PlaceInfo } from "@/domain/trip/validate.ts";
+} from "../domain/catalogue/review-input.ts";
+import type { LonLat } from "../domain/geo.ts";
+import type { Candidate } from "../domain/trip/generate/plan.ts";
+import type { PlaceInfo } from "../domain/trip/validate.ts";
 import { areaPredicate, list } from "./area-predicate.ts";
 import { db, type Queryable } from "./client.ts";
 import { place, placeReview } from "./schema/index.ts";

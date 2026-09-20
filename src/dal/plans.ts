@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
-import { PROMPT_VERSION } from "@/domain/trip/generate/constraints.ts";
+import { PROMPT_VERSION } from "../domain/trip/generate/constraints.ts";
 import type {
   Attempt,
   PlanCache,
   Source,
-} from "@/domain/trip/generate/pipeline.ts";
-import type { Plan } from "@/domain/trip/generate/plan.ts";
+} from "../domain/trip/generate/pipeline.ts";
+import type { Plan } from "../domain/trip/generate/plan.ts";
 import { db } from "./client.ts";
 
 // Trip generation's two side tables: the warm-start cache and the generation

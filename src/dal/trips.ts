@@ -4,9 +4,9 @@ import {
   type TripNode,
   tripHeader,
   tripNode,
-} from "@/domain/trip/document.ts";
-import type { PatchOp } from "@/domain/trip/patch.ts";
-import type { Author } from "@/domain/trip/validate.ts";
+} from "../domain/trip/document.ts";
+import type { PatchOp } from "../domain/trip/patch.ts";
+import type { Author } from "../domain/trip/validate.ts";
 import { db, type Queryable } from "./client.ts";
 import { trip } from "./schema/index.ts";
 import type { Tx } from "./tx.ts";

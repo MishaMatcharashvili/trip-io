@@ -1,4 +1,4 @@
-import { placeFacts } from "@/dal/places.ts";
+import { placeFacts } from "../dal/places.ts";
 import {
   checkpointAtOrBefore,
   deleteNode,
@@ -16,24 +16,24 @@ import {
   setHead,
   type TripRef,
   upsertNode,
-} from "@/dal/trips.ts";
-import { withTransaction } from "@/dal/tx.ts";
-import { diffDocs } from "@/domain/trip/diff.ts";
-import { placeIdsOf, type TripDoc } from "@/domain/trip/document.ts";
+} from "../dal/trips.ts";
+import { withTransaction } from "../dal/tx.ts";
+import { diffDocs } from "../domain/trip/diff.ts";
+import { placeIdsOf, type TripDoc } from "../domain/trip/document.ts";
 import {
   applyOps,
   type PatchOp,
   patchOps,
   placeIdsInOps,
-} from "@/domain/trip/patch.ts";
-import { straightLineTravel } from "@/domain/trip/travel.ts";
+} from "../domain/trip/patch.ts";
+import { straightLineTravel } from "../domain/trip/travel.ts";
 import {
   type Author,
   type ProposalResult,
   type Violation,
   validateDoc,
   validateProposal,
-} from "@/domain/trip/validate.ts";
+} from "../domain/trip/validate.ts";
 
 // Writing to a trip. Every change is a patch: validated against the whole of
 // every day it touches, appended to the log, and projected onto `trip_node` in

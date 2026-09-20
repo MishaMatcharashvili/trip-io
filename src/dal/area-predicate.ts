@@ -1,5 +1,5 @@
 import { type SQL, sql } from "drizzle-orm";
-import type { AreaMatch } from "@/domain/catalogue/focus-areas.ts";
+import type { AreaMatch } from "../domain/catalogue/focus-areas.ts";
 
 // How a focus area becomes a predicate over `place p`. The area itself is a
 // domain concept (focus-areas.ts); turning one into SQL is this layer's job, and

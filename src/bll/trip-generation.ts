@@ -1,33 +1,33 @@
 import { randomUUID } from "node:crypto";
-import {
-  type AppendFailure,
-  addAllOps,
-  appendPatch,
-  createTrip,
-} from "@/bll/trip-document.ts";
-import { curatedInArea } from "@/dal/places.ts";
-import { planCache, recordGeneration } from "@/dal/plans.ts";
-import type { FocusAreaSlug } from "@/domain/catalogue/focus-areas.ts";
-import type { TripDoc } from "@/domain/trip/document.ts";
+import { curatedInArea } from "../dal/places.ts";
+import { planCache, recordGeneration } from "../dal/plans.ts";
+import type { FocusAreaSlug } from "../domain/catalogue/focus-areas.ts";
+import type { TripDoc } from "../domain/trip/document.ts";
 import {
   CANDIDATE_LIMIT,
   CANDIDATES_PER_AREA_MIN,
   describeHours,
-} from "@/domain/trip/generate/candidates.ts";
+} from "../domain/trip/generate/candidates.ts";
 import {
   type Constraints,
   cacheKey,
-} from "@/domain/trip/generate/constraints.ts";
+} from "../domain/trip/generate/constraints.ts";
 import {
   type Attempt,
   generate,
   type Source,
   tripHeader as tripHeaderFor,
-} from "@/domain/trip/generate/pipeline.ts";
-import type { Candidate } from "@/domain/trip/generate/plan.ts";
-import { straightLineTravel } from "@/domain/trip/travel.ts";
-import type { Violation } from "@/domain/trip/validate.ts";
-import { composeWithGemini } from "@/infra/gemini-composer.ts";
+} from "../domain/trip/generate/pipeline.ts";
+import type { Candidate } from "../domain/trip/generate/plan.ts";
+import { straightLineTravel } from "../domain/trip/travel.ts";
+import type { Violation } from "../domain/trip/validate.ts";
+import { composeWithGemini } from "../infra/gemini-composer.ts";
+import {
+  type AppendFailure,
+  addAllOps,
+  appendPatch,
+  createTrip,
+} from "./trip-document.ts";
 
 // Generating a trip: gather what the planner may choose from, run the pipeline,
 // write the result. The pipeline itself is pure and lives in the domain; this is

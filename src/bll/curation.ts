@@ -6,20 +6,20 @@ import {
   recordDecision,
   reviewCounts,
   reviewQueue,
-} from "@/dal/places.ts";
+} from "../dal/places.ts";
 import {
   type CategoryGroup,
   categoryGroups,
-} from "@/domain/catalogue/categories.ts";
+} from "../domain/catalogue/categories.ts";
 import {
   areaBySlug,
   type FocusAreaSlug,
   focusAreas,
-} from "@/domain/catalogue/focus-areas.ts";
+} from "../domain/catalogue/focus-areas.ts";
 import type {
   PlaceInput,
   ReviewInput,
-} from "@/domain/catalogue/review-input.ts";
+} from "../domain/catalogue/review-input.ts";
 
 // The hand-verification queue behind /curate: which place a curator is shown
 // next, and what a decision does. The SQL is in src/dal/places.ts; what is

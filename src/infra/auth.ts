@@ -1,9 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins/anonymous";
-import { db } from "@/dal/client";
-import { account, session, user, verification } from "@/dal/schema";
-import { reassignTrips } from "@/dal/trips.ts";
+import { db } from "../dal/client.ts";
+import { account, session, user, verification } from "../dal/schema/index.ts";
+import { reassignTrips } from "../dal/trips.ts";
 
 let instance: ReturnType<typeof build> | undefined;
 

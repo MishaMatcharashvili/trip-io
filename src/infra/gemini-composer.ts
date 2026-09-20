@@ -4,8 +4,8 @@ import type {
   ComposeFeedback,
   ComposeInput,
   Composer,
-} from "@/domain/trip/generate/pipeline.ts";
-import { planSchema, type RefPlan } from "@/domain/trip/generate/plan.ts";
+} from "../domain/trip/generate/pipeline.ts";
+import { planSchema, type RefPlan } from "../domain/trip/generate/plan.ts";
 
 // The only model call in trip generation, and the only file that knows which
 // provider we use: it implements the domain's `Composer` port, and everything
