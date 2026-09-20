@@ -9,6 +9,8 @@ import {
   loadTrip,
   lockTrip,
   opsBetween,
+  type PatchRecord,
+  patchHistory,
   patchSeq,
   setHead,
   upsertNode,
@@ -25,7 +27,9 @@ import {
 import { straightLineTravel } from "@/domain/trip/travel.ts";
 import {
   type Author,
+  type ProposalResult,
   type Violation,
+  validateDoc,
   validateProposal,
 } from "@/domain/trip/validate.ts";
 
@@ -252,4 +256,58 @@ export function addAllOps(doc: TripDoc): PatchOp[] {
     path: `/nodes/${id}`,
     value: node,
   }));
+}
+
+export type TripView = {
+  doc: TripDoc;
+  head: string | null;
+  seq: number;
+  /** Everything wrong with the document as it stands, for the whole trip. */
+  violations: Violation[];
+};
+
+/** The trip screen's read: the document at head, checked. */
+export async function tripView(tripId: string): Promise<TripView | null> {
+  const trip = await loadTrip(tripId);
+  if (!trip) return null;
+
+  const places = await placeFacts(placeIdsOf(trip.doc));
+  return {
+    doc: trip.doc,
+    head: trip.headPatchId,
+    seq: trip.seq,
+    violations: validateDoc(trip.doc, {
+      places,
+      travel: straightLineTravel,
+      author: "user",
+    }),
+  };
+}
+
+/**
+ * Would these ops leave the trip coherent? A dry run of what `appendPatch`
+ * checks, changing nothing: the replan preview now, the intervention diff in
+ * Phase 5.
+ */
+export async function previewPatch(
+  tripId: string,
+  ops: readonly PatchOp[],
+): Promise<ProposalResult | null> {
+  const trip = await loadTrip(tripId);
+  if (!trip) return null;
+
+  const places = await placeFacts([
+    ...placeIdsOf(trip.doc),
+    ...placeIdsInOps(ops),
+  ]);
+  return validateProposal(trip.doc, ops, {
+    places,
+    travel: straightLineTravel,
+    author: "user",
+  });
+}
+
+/** The patch log, newest first. */
+export function history(tripId: string): Promise<PatchRecord[]> {
+  return patchHistory(tripId);
 }

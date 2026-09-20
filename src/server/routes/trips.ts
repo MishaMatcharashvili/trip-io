@@ -7,17 +7,16 @@ import {
   appendPatch,
   createTrip,
   docAt,
+  history,
+  previewPatch,
   restoreTo,
+  tripView,
   undoLast,
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
-import { placeFacts } from "@/dal/places.ts";
-import { loadTrip, patchHistory } from "@/dal/trips.ts";
-import { placeIdsOf, tripHeader } from "@/domain/trip/document.ts";
+import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
-import { patchOps, placeIdsInOps } from "@/domain/trip/patch.ts";
-import { straightLineTravel } from "@/domain/trip/travel.ts";
-import { validateDoc, validateProposal } from "@/domain/trip/validate.ts";
+import { patchOps } from "@/domain/trip/patch.ts";
 import { requireSession, type SessionEnv, tripAccess } from "../auth.ts";
 
 // The trip document over HTTP. The work is done in src/bll/*; these handlers do
@@ -113,20 +112,8 @@ export const trips = new Hono<SessionEnv>()
     const access = await tripAccess(id, c.get("userId"));
     if (!access.ok) return c.json(access.body, access.status);
 
-    const trip = await loadTrip(id);
-    if (!trip) return c.json({ error: "not found" }, 404);
-
-    const places = await placeFacts(placeIdsOf(trip.doc));
-    return c.json({
-      doc: trip.doc,
-      head: trip.headPatchId,
-      seq: trip.seq,
-      violations: validateDoc(trip.doc, {
-        places,
-        travel: straightLineTravel,
-        author: "user",
-      }),
-    });
+    const view = await tripView(id);
+    return view ? c.json(view) : c.json({ error: "not found" }, 404);
   })
 
   .post(
@@ -172,22 +159,11 @@ export const trips = new Hono<SessionEnv>()
     zValidator("json", z.object({ ops: patchOps })),
     async (c) => {
       const { id } = c.req.valid("param");
-      const { ops } = c.req.valid("json");
       const access = await tripAccess(id, c.get("userId"));
       if (!access.ok) return c.json(access.body, access.status);
 
-      const trip = await loadTrip(id);
-      if (!trip) return c.json({ error: "not found" }, 404);
-
-      const places = await placeFacts([
-        ...placeIdsOf(trip.doc),
-        ...placeIdsInOps(ops),
-      ]);
-      const result = validateProposal(trip.doc, ops, {
-        places,
-        travel: straightLineTravel,
-        author: "user",
-      });
+      const result = await previewPatch(id, c.req.valid("json").ops);
+      if (!result) return c.json({ error: "not found" }, 404);
       return c.json(
         result.ok
           ? {
@@ -206,7 +182,7 @@ export const trips = new Hono<SessionEnv>()
     if (!access.ok) return c.json(access.body, access.status);
     return c.json({
       head: access.trip.headPatchId,
-      patches: await patchHistory(id),
+      patches: await history(id),
     });
   })
 
