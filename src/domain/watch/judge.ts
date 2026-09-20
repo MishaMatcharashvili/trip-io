@@ -91,8 +91,12 @@ export type JudgeInput = {
   sent: { countSoFar: number; cap: number; lastSentAt: string | null };
 };
 
-/** The port. `src/infra/gemini-judge.ts` is the only implementation. */
-export type Judge = (input: JudgeInput) => Promise<Verdict>;
+/**
+ * The port. `src/infra/gemini-judge.ts` is the only implementation, and it
+ * returns whatever the model said: the guards below are what turn that into a
+ * verdict, so a rejection is recorded with its reason rather than thrown.
+ */
+export type Judge = (input: JudgeInput) => Promise<unknown>;
 
 export const rejectionReasons = [
   "malformed",
