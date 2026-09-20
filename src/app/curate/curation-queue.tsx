@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { AreaProgress, QueuePlace } from "@/bll/curation";
 import {
   type CategoryGroup,
   categoryGroups,
 } from "@/domain/catalogue/categories";
-import type { AreaProgress, QueuePlace } from "@/domain/catalogue/curation";
 import {
   curatedTarget,
   type FocusAreaSlug,

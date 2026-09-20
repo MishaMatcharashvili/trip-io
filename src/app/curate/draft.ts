@@ -1,8 +1,8 @@
+import type { QueuePlace } from "@/bll/curation.ts";
 import {
   type Category,
   isAllowedCategory,
 } from "../../domain/catalogue/categories.ts";
-import type { QueuePlace } from "../../domain/catalogue/curation.ts";
 import {
   type OpeningHours,
   parseDayText,

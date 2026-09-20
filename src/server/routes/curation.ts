@@ -1,13 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { addPlace, getProgress, getQueue, reviewPlace } from "@/bll/curation";
 import { categoryGroups } from "@/domain/catalogue/categories";
-import {
-  addPlace,
-  getProgress,
-  getQueue,
-  reviewPlace,
-} from "@/domain/catalogue/curation";
 import { focusAreaSlugs } from "@/domain/catalogue/focus-areas";
 import { placeInput, reviewInput } from "@/domain/catalogue/review-input";
 import { getAuth } from "@/lib/auth";
