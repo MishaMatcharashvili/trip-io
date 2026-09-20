@@ -27,7 +27,7 @@ import {
   generate,
   tripHeader as headerFor,
 } from "@/domain/trip/generate/pipeline.ts";
-import { patchOps } from "@/domain/trip/patch.ts";
+import { patchOps, placeIdsInOps } from "@/domain/trip/patch.ts";
 import { straightLineTravel } from "@/domain/trip/travel.ts";
 import { validateDoc, validateProposal } from "@/domain/trip/validate.ts";
 import { composeWithGemini } from "@/infra/gemini-composer.ts";
@@ -226,11 +226,7 @@ export const trips = new Hono<SessionEnv>()
 
       const places = await placeFacts(db, [
         ...placeIdsOf(trip.doc),
-        ...ops.flatMap((op) =>
-          op.op === "add" && typeof op.value.placeId === "string"
-            ? [op.value.placeId]
-            : [],
-        ),
+        ...placeIdsInOps(ops),
       ]);
       const result = validateProposal(trip.doc, ops, {
         places,
