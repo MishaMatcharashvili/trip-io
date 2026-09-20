@@ -10,6 +10,9 @@
     "includes": [
       "**",
       "!node_modules",
+      "!.agents",
+      "!data",
+      "!.agents",
       "!.next",
       "!dist",
       "!build",
