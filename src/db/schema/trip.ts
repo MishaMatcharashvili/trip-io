@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -8,11 +10,12 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { place } from "./catalogue";
-import { geography, id, tstz } from "./columns";
+import { user } from "./auth.ts";
+import { place } from "./catalogue.ts";
+import { geography, id, tstz } from "./columns.ts";
 
 export const patchAuthor = pgEnum("patch_author", [
   "user",
@@ -82,14 +85,35 @@ export const tripPatch = pgTable(
     }),
     intent: text("intent").notNull(),
     ops: jsonb("ops").notNull(),
+    // What undoes this patch, computed when it was applied (src/core/trip/patch.ts).
+    inverseOps: jsonb("inverse_ops").notNull(),
     author: patchAuthor("author").notNull(),
     acceptedBy: text("accepted_by").references(() => user.id, {
       onDelete: "set null",
     }),
-    appliedAt: timestamp("applied_at", { withTimezone: true }),
-    clientSeq: integer("client_seq").notNull(),
+    appliedAt: tstz("applied_at"),
+    // Server-assigned, 1 upwards per trip: patch order and the checkpoint cadence.
+    seq: integer("seq").notNull(),
+    // Client-supplied idempotency key for a user's own edits; null for
+    // system and intervention patches.
+    clientSeq: integer("client_seq"),
+    // Generation id, source, warnings accepted at write time.
+    meta: jsonb("meta").notNull().default({}),
   },
-  (t) => [index("trip_patch_trip_id_idx").on(t.tripId)],
+  (t) => [
+    index("trip_patch_trip_id_idx").on(t.tripId),
+    uniqueIndex("trip_patch_seq_idx").on(t.tripId, t.seq),
+    // A retried request must not apply the same edit twice.
+    uniqueIndex("trip_patch_client_seq_idx")
+      .on(t.tripId, t.clientSeq)
+      .where(sql`${t.clientSeq} is not null`),
+    // The hard invariant: nothing the system proposes is ever auto-applied
+    // (context/architecture.md). Enforced here as well as in the store.
+    check(
+      "trip_patch_intervention_accepted",
+      sql`${t.author} <> 'intervention' OR ${t.acceptedBy} IS NOT NULL`,
+    ),
+  ],
 );
 
 export const checkpointLog = pgTable(
@@ -105,5 +129,8 @@ export const checkpointLog = pgTable(
     snapshot: jsonb("snapshot").notNull(),
     createdAt: tstz("created_at"),
   },
-  (t) => [index("checkpoint_log_trip_id_idx").on(t.tripId)],
+  (t) => [
+    index("checkpoint_log_trip_id_idx").on(t.tripId),
+    uniqueIndex("checkpoint_log_patch_idx").on(t.tripId, t.patchId),
+  ],
 );
