@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { db } from "../../../db/client.ts";
+import { db } from "../../../dal/client.ts";
 import { areaBySlug, areaPredicate } from "../../catalogue/area-query.ts";
 import { categoryGroup, isOutdoor } from "../../catalogue/categories.ts";
 import type { FocusAreaSlug } from "../../catalogue/focus-areas.ts";

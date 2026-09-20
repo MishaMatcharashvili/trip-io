@@ -13,4 +13,4 @@ if (!process.env.DATABASE_URL) {
 const sql = neon(process.env.DATABASE_URL);
 
 await sql`CREATE EXTENSION IF NOT EXISTS postgis`;
-await migrate(drizzle(sql), { migrationsFolder: "./src/db/migrations" });
+await migrate(drizzle(sql), { migrationsFolder: "./src/dal/migrations" });

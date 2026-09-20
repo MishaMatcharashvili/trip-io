@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { db } from "../../../db/client.ts";
+import { db } from "../../../dal/client.ts";
 import { type Constraints, cacheKey } from "./constraints.ts";
 import type { Attempt, Source } from "./pipeline.ts";
 

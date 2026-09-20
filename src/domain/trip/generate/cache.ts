@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { db } from "../../../db/client.ts";
+import { db } from "../../../dal/client.ts";
 import { PROMPT_VERSION } from "./constraints.ts";
 import type { PlanCache } from "./pipeline.ts";
 import type { Plan } from "./plan.ts";

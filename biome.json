@@ -16,7 +16,7 @@
       "!.next",
       "!dist",
       "!build",
-      "!src/db/migrations",
+      "!src/dal/migrations",
       "!src/domain/catalogue/corridors.geo.json"
     ]
   },

@@ -2,7 +2,7 @@ import { neonConfig, Pool } from "@neondatabase/serverless";
 import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
 import * as schema from "./schema/index.ts";
 
-// The write path's client. `src/db/client.ts` uses Neon's HTTP driver, which is
+// The write path's client. `src/dal/client.ts` uses Neon's HTTP driver, which is
 // the right fit for short one-shot queries but throws on `transaction()`.
 // Appending a patch has to lock the trip, check it's still head, write the
 // patch, sync the node projection and move head as one unit — so it needs a

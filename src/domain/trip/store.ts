@@ -1,6 +1,6 @@
 import { type SQL, sql } from "drizzle-orm";
-import { db } from "../../db/client.ts";
-import { type Tx, withTransaction } from "../../db/tx.ts";
+import { db } from "../../dal/client.ts";
+import { type Tx, withTransaction } from "../../dal/tx.ts";
 import { openingHours } from "../catalogue/opening-hours.ts";
 import type { LonLat } from "../geo.ts";
 import { diffDocs } from "./diff.ts";

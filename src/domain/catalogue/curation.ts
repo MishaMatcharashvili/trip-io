@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { place, placeReview } from "@/db/schema";
+import { db } from "@/dal/client";
+import { place, placeReview } from "@/dal/schema";
 import { areaBySlug, areaPredicate, list } from "./area-query.ts";
 import { type CategoryGroup, categoryGroups } from "./categories.ts";
 import { type FocusAreaSlug, focusAreas } from "./focus-areas.ts";

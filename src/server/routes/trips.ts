@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { db } from "@/db/client";
+import { db } from "@/dal/client";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { planCache } from "@/domain/trip/generate/cache.ts";
 import {

@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { db } from "../../src/db/client.ts";
+import { db } from "../../src/dal/client.ts";
 import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import {
   addAllOps,

@@ -2,8 +2,8 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins/anonymous";
 import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { account, session, trip, user, verification } from "@/db/schema";
+import { db } from "@/dal/client";
+import { account, session, trip, user, verification } from "@/dal/schema";
 
 let instance: ReturnType<typeof build> | undefined;
 
