@@ -10,11 +10,14 @@
     "includes": [
       "**",
       "!node_modules",
+      "!.agents",
+      "!data",
+      "!.agents",
       "!.next",
       "!dist",
       "!build",
-      "!src/db/migrations",
-      "!src/core/catalogue/corridors.geo.json"
+      "!src/dal/migrations",
+      "!src/domain/catalogue/corridors.geo.json"
     ]
   },
   "formatter": {

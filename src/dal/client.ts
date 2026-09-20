@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import type { SQL } from "drizzle-orm";
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
 import * as schema from "./schema/index.ts";
 
@@ -23,3 +24,11 @@ function connect(): NeonHttpDatabase<typeof schema> {
 export const db = new Proxy({} as NeonHttpDatabase<typeof schema>, {
   get: (_target, prop, receiver) => Reflect.get(connect(), prop, receiver),
 });
+
+/**
+ * Either connection: the HTTP client above for reads, a transaction for the
+ * write path (src/dal/tx.ts). Only `execute` is used, so this stays structural.
+ */
+export type Queryable = {
+  execute(query: SQL): Promise<{ rows: Record<string, unknown>[] }>;
+};

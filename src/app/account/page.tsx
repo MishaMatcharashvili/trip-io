@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TopBar } from "@/features/chrome";
 import { SignOutButton } from "@/features/sign-out-button";
-import { getAuth } from "@/lib/auth";
+import { getAuth } from "@/infra/auth.ts";
 import { ButtonLink } from "@/ui/button";
 import { Card, Divider, SectionRule } from "@/ui/card";
 import { Chip } from "@/ui/chip";

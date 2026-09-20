@@ -1,19 +1,19 @@
+import type { QueuePlace } from "@/bll/curation.ts";
 import {
   type Category,
   isAllowedCategory,
-} from "../../core/catalogue/categories.ts";
-import type { QueuePlace } from "../../core/catalogue/curation.ts";
+} from "../../domain/catalogue/categories.ts";
 import {
   type OpeningHours,
   parseDayText,
   type Weekday,
   weekdays,
-} from "../../core/catalogue/opening-hours.ts";
+} from "../../domain/catalogue/opening-hours.ts";
 import {
   type PlaceInput,
   placeInput,
-} from "../../core/catalogue/review-input.ts";
-import { parseLatLon } from "../../core/geo.ts";
+} from "../../domain/catalogue/review-input.ts";
+import { parseLatLon } from "../../domain/geo.ts";
 
 // The curation form's editable state and its conversion to an API payload.
 // Everything is a string while editing; nothing is guessed on submit — a blank

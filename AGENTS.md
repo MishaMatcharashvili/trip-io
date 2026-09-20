@@ -21,3 +21,20 @@ commit spanning dozens of files, however coherent the work feels as a whole.
 - Docs are their own commit unless inseparable from the change they describe.
 - Many commits on a branch is right; one enormous commit in a PR is not. If work has piled up,
   `git reset --soft` and split it before pushing.
+
+# Layers
+
+```
+domain  ←  dal  ←  bll  ←  server  ←  app          (infra sits beside dal)
+```
+
+Before adding a file, decide which layer it belongs to. `context/architecture.md` has the table;
+`src/layers.test.ts` enforces it. The short version:
+
+- `src/domain` is pure — no IO, no environment, no dependency but Zod. New rules go here.
+- `src/dal` is the only place that writes SQL or imports Drizzle. One repository per aggregate.
+- `src/bll` holds use cases: the order things happen in, and the transaction they happen in.
+- `src/infra` holds outbound adapters, and is the only place an external provider is named.
+- `src/server` route handlers do validation and status codes. They call use cases, never repositories.
+
+When the layers test fails, move the code left rather than adding an exception.

@@ -7,18 +7,17 @@
 
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import type { TripDoc, TripNode } from "../../src/core/trip/document.ts";
 import {
   addAllOps,
   appendPatch,
   createTrip,
   docAt,
-  loadTrip,
-  patchHistory,
   restoreTo,
   undoLast,
-} from "../../src/core/trip/store.ts";
-import { db } from "../../src/db/client.ts";
+} from "../../src/bll/trip-document.ts";
+import { db } from "../../src/dal/client.ts";
+import { loadTrip, patchHistory } from "../../src/dal/trips.ts";
+import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 
 const at = (day: string, hhmm: string) =>
   new Date(`${day}T${hhmm}:00+04:00`).toISOString();
@@ -129,8 +128,8 @@ step(
 const restored = await restoreTo(tripId, created.patchId, null);
 step("restore", restored.ok ? { seq: restored.seq } : { code: restored.code });
 
-step("history", await patchHistory(db, tripId));
-const head = await loadTrip(db, tripId);
+step("history", await patchHistory(tripId));
+const head = await loadTrip(tripId);
 step(
   "head document",
   Object.values(head?.doc.nodes ?? {}).map(
@@ -139,7 +138,7 @@ step(
 );
 step(
   "document at the first patch",
-  Object.keys((await docAt(db, tripId, created.patchId))?.nodes ?? {}).length,
+  Object.keys((await docAt(tripId, created.patchId))?.nodes ?? {}).length,
 );
 
 // The projection must match the document exactly — that's the invariant the

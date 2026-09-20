@@ -2,11 +2,11 @@ import type { DuckDBConnection } from "@duckdb/node-api";
 import {
   allowedCategories,
   categoryGroup,
-} from "../../src/core/catalogue/categories.ts";
+} from "../../src/domain/catalogue/categories.ts";
 import {
   georgianScript,
   splitName,
-} from "../../src/core/catalogue/georgian.ts";
+} from "../../src/domain/catalogue/georgian.ts";
 
 // The programmatic gate (docs/implementation-plan.md §6), run entirely in DuckDB
 // so it is testable and inspectable without a database:

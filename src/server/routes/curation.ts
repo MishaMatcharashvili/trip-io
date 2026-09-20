@@ -1,35 +1,19 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { categoryGroups } from "@/core/catalogue/categories";
-import {
-  addPlace,
-  getProgress,
-  getQueue,
-  reviewPlace,
-} from "@/core/catalogue/curation";
-import { focusAreaSlugs } from "@/core/catalogue/focus-areas";
-import { placeInput, reviewInput } from "@/core/catalogue/review-input";
-import { getAuth } from "@/lib/auth";
-import { isCurator } from "@/lib/curator";
-
-type Env = { Variables: { userId: string } };
+import { addPlace, getProgress, getQueue, reviewPlace } from "@/bll/curation";
+import { categoryGroups } from "@/domain/catalogue/categories";
+import { focusAreaSlugs } from "@/domain/catalogue/focus-areas";
+import { placeInput, reviewInput } from "@/domain/catalogue/review-input";
+import { requireCurator, type SessionEnv } from "../auth.ts";
 
 const groups = Object.keys(categoryGroups) as [
   keyof typeof categoryGroups,
   ...(keyof typeof categoryGroups)[],
 ];
 
-export const curation = new Hono<Env>()
-  .use(async (c, next) => {
-    const session = await getAuth().api.getSession({
-      headers: c.req.raw.headers,
-    });
-    if (!session) return c.json({ error: "unauthenticated" }, 401);
-    if (!isCurator(session.user)) return c.json({ error: "forbidden" }, 403);
-    c.set("userId", session.user.id);
-    await next();
-  })
+export const curation = new Hono<SessionEnv>()
+  .use(requireCurator)
   .get("/progress", async (c) => c.json({ areas: await getProgress() }))
   .get(
     "/queue",

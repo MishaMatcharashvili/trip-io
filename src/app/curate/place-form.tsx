@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { categoryGroups } from "@/core/catalogue/categories";
-import type { PlaceInput } from "@/core/catalogue/review-input";
+import { categoryGroups } from "@/domain/catalogue/categories";
+import type { PlaceInput } from "@/domain/catalogue/review-input";
 import { buildPlaceInput, type DraftErrors, type PlaceDraft } from "./draft";
 import { humanise } from "./evidence";
 import { HoursEditor } from "./hours-editor";

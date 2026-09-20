@@ -214,3 +214,23 @@ export function applyOps(doc: TripDoc, ops: readonly PatchOp[]): Applied {
 
   return { doc: next, inverse: inverse.reverse(), change };
 }
+
+/**
+ * Places these ops would bring in, so the validator has them to hand. Read from
+ * the path, never from the value alone: every op value is a JSON value, and a
+ * timestamp is as much a string as a place id is.
+ */
+export function placeIdsInOps(ops: readonly PatchOp[]): string[] {
+  return [...new Set(ops.flatMap(placeIdsInOp))];
+}
+
+function placeIdsInOp(op: PatchOp): string[] {
+  if (op.op !== "add" && op.op !== "replace") return [];
+  if (op.path.endsWith("/placeId")) {
+    return typeof op.value === "string" ? [op.value] : [];
+  }
+  // A whole node: /nodes/{uuid}
+  if (op.path.split("/").length !== 3) return [];
+  const id = (op.value as { placeId?: unknown } | null)?.placeId;
+  return typeof id === "string" ? [id] : [];
+}

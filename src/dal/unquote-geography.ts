@@ -7,7 +7,7 @@ import { join } from "node:path";
 // which Postgres reads as a literal type name and rejects. Unquoting them after
 // generation keeps the fix reproducible instead of hand-edited.
 
-const dir = "./src/db/migrations";
+const dir = "./src/dal/migrations";
 
 for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql"))) {
   const path = join(dir, file);

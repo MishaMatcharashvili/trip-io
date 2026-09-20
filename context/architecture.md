@@ -1,8 +1,8 @@
 # Architecture
 
-Status: pre-build. Reflects the decisions of record in `docs/implementation-plan.md`. This file is
-the living reference for "what we're actually building" — update it when an architectural decision
-changes; don't let it drift from the code.
+Status: Phases 0–2 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+`docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
+update it when an architectural decision changes; don't let it drift from the code.
 
 ## System shape
 
@@ -37,9 +37,39 @@ schema and cron design this section summarizes.
 | Telegram | grammY, webhook | manual road-corridor report form (detector #2) |
 | Native | Expo, sharing the Hono client via `hc<AppType>()` | thin shell — trip list, intervention card, push registration, settings; heavy UI (map, editing) stays on web |
 
-Business logic lives in `src/core/*` as plain functions imported by both HTTP route handlers and cron
-handlers. Route handlers stay thin. This also means Hono runs unchanged on Bun or Node if the project
-ever outgrows Vercel — only the entry file changes.
+## Layers
+
+```
+domain  ←  dal  ←  bll  ←  server  ←  app
+                    ↑
+                  infra
+```
+
+Each layer may use the ones to its left and must not know the ones to its right. `src/layers.test.ts`
+enforces this with the rest of the test suite; when it fails, the fix is almost never an exception, it
+is moving the code one layer further left.
+
+| Directory | What lives there | Rule |
+|---|---|---|
+| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
+| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
+| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
+| `src/infra` | Outbound adapters: the Gemini composer, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/server` | The Hono app, its routers and the session middleware | Validation, status codes, nothing else. Imports use cases, never a repository |
+| `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
+
+Two consequences worth stating, because they are what the layering buys:
+
+- **The domain is the part worth testing, and it is testable.** The validator, the patch grammar, the
+  scheduler and the pipeline are pure; the pipeline takes its model, its cache and its travel estimate
+  as injected ports, so every branch — cache hit, model retry, fallback, insufficient coverage — runs
+  against fakes in `pipeline.test.ts`.
+- **Swapping an implementation is a one-file change.** `Composer`, `PlanCache` and `TravelEstimator`
+  are declared in the domain and implemented outside it: moving off Gemini, or replacing
+  straight-line travel with an OSRM matrix, touches `src/infra` or `src/dal` and nothing else.
+
+This also means Hono runs unchanged on Bun or Node if the project ever outgrows Vercel — only the
+entry file changes.
 
 ## Cron topology
 
@@ -120,7 +150,7 @@ searchable but never proposable. Enforced server-side in the validator, never ju
 ```
 npm run catalogue:extract   Overture S3 → data/overture/<release>/*.parquet (bbox cache)
                             → regions + gate + tier → data/catalogue/<release>/*.parquet
-npm run catalogue:corridors OSRM → src/core/catalogue/corridors.geo.json (checked in)
+npm run catalogue:corridors OSRM → src/domain/catalogue/corridors.geo.json (checked in)
 npm run catalogue:load      regions, corridors, places → Postgres (idempotent upsert)
 /curate                     hand-verification queue → `curated` tier + opening_hours
 ```
@@ -136,15 +166,40 @@ button; `ignored` is produced by a cron sweep, not left to the client.
 
 ## Hard invariants (validator rules, not guidelines)
 
+An invariant is only real where it is enforced in code and held by a test. Each one below says where
+that is, or says plainly that it is not built yet — an aspiration listed as a guarantee is worse than
+no list.
+
 - **Never auto-apply.** `trip_patch.author = 'intervention'` requires a non-null `accepted_by`.
+  *Enforced twice:* the `trip_patch_intervention_accepted` CHECK constraint (migration `0002`) and a
+  guard at the top of `appendPatch`, before the transaction opens. *Tested:*
+  `src/bll/trip-document.test.ts`.
+- **No hallucinated places.** Every `place_id` a patch introduces is checked against the tiers its
+  author may use — `system` composes only from `curated`, `intervention` may also use `verified`.
+  *Enforced:* `allowedTiers` in `src/domain/trip/validate.ts`, run over every affected day on every
+  write; candidate retrieval filters to `curated` again in `src/dal/places.ts`. *Tested:*
+  `src/domain/trip/validate.test.ts`.
 - **Always show evidence and source.** A verdict with empty `evidence`, or evidence missing a
-  timestamp, is rejected before rendering.
-- **No hallucinated places.** Every `place_id` in a patch's `ops` is validated against
-  `curated`/`verified` tiers server-side.
+  timestamp, is rejected before rendering. *Not built* — arrives with the judge in Phase 3.
 - **No empty-helpful verdicts.** `relevant: true` + `impact: "none"` is rejected by the validator.
+  *Not built* — Phase 3, same place.
 - **New detectors enter briefing-only.** A detector may not route to `interrupt` until it has run one
   week on briefing-only and been hand-audited. This applies hardest to LLM-extraction detectors
-  (news/protests).
+  (news/protests). *Not built, and a process rule rather than a code one* — Phase 3 onwards.
+
+### Structural invariants
+
+- **The dependency rule.** No layer imports one to its right; only `src/dal` writes SQL; the domain
+  imports no runtime dependency but Zod. *Enforced and tested:* `src/layers.test.ts`, which fails on
+  a deliberate violation.
+- **Node ids are minted once and never reused.** A JSON Patch path into an array would point at a
+  different stop as soon as anything were inserted before it, so nodes are keyed by id and order
+  comes from `startsAt`. *Enforced:* the path grammar in `src/domain/trip/patch.ts`, where `add`
+  refuses to overwrite. *Tested:* `src/domain/trip/patch.test.ts`.
+- **The node projection never drifts from the log.** `trip_node` rows are the document at head; the
+  patch, the nodes it touched and the new head are written in one transaction under a row lock.
+  *Enforced:* `appendPatch`. *Not covered by an automated test* — it needs a database; the write path
+  is exercised by `npm run smoke:trip`.
 
 ## Known constraints that shaped the above
 

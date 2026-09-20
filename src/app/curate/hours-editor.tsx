@@ -1,6 +1,6 @@
 "use client";
 
-import { weekdays } from "@/core/catalogue/opening-hours";
+import { weekdays } from "@/domain/catalogue/opening-hours";
 import type { DraftErrors, HoursDraft } from "./draft";
 
 const dayLabel = {

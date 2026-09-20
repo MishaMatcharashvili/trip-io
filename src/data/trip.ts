@@ -1,7 +1,7 @@
 /**
  * Fixtures for the screens.
  *
- * Shapes here deliberately echo `src/db/schema/trip.ts` and `watch.ts` — a
+ * Shapes here deliberately echo `src/dal/schema/trip.ts` and `watch.ts` — a
  * checkpoint is a `trip_node`, an advisory is an `intervention` citing a
  * `world_event`, an outcome is `intervention.outcome` — so that wiring these
  * screens to the real API in Phase 2–5 is a swap of the loader, not a rewrite

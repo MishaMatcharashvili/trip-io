@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { diffDays, diffDocs } from "./diff.ts";
-import { applyOps, PatchError, type PatchOp, patchOps } from "./patch.ts";
+import {
+  applyOps,
+  PatchError,
+  type PatchOp,
+  patchOps,
+  placeIdsInOps,
+} from "./patch.ts";
 import { at, DAY, kazbegiDoc, N, nodeId, P } from "./test-fixtures.ts";
 
 const parse = (ops: unknown) => patchOps.parse(ops);
@@ -206,6 +212,45 @@ describe("diffDays", () => {
         [DAY, [`moved:${N.hike}`, `changed:${N.lunch}`, `removed:${N.dinner}`]],
         ["2026-09-17", [`moved:${N.dinner}`]],
       ],
+    );
+  });
+});
+
+describe("places an op introduces", () => {
+  test("a whole added node, and a placeId swapped on an existing one", () => {
+    const added = kazbegiDoc().nodes[N.lunch];
+    assert.deepEqual(
+      placeIdsInOps(
+        parse([
+          {
+            op: "add",
+            path: `/nodes/${nodeId(99)}`,
+            value: { ...added, placeId: P.verifiedCafe },
+          },
+          {
+            op: "replace",
+            path: `/nodes/${N.hike}/placeId`,
+            value: P.gergeti,
+          },
+        ]),
+      ).sort(),
+      [P.gergeti, P.verifiedCafe].sort(),
+    );
+  });
+
+  test("a string that isn't at a placeId path is not a place", () => {
+    assert.deepEqual(
+      placeIdsInOps(
+        parse([
+          {
+            op: "replace",
+            path: `/nodes/${N.hike}/startsAt`,
+            value: at(DAY, "09:00"),
+          },
+          { op: "remove", path: `/nodes/${N.dinner}` },
+        ]),
+      ),
+      [],
     );
   });
 });

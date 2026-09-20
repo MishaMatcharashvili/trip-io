@@ -68,3 +68,9 @@ export const focusAreaSlugs = focusAreas.map((a) => a.slug) as [
 ];
 
 export const curatedTarget = focusAreas.reduce((sum, a) => sum + a.target, 0);
+
+export function areaBySlug(slug: FocusAreaSlug): FocusArea {
+  const area = focusAreas.find((a) => a.slug === slug);
+  if (!area) throw new Error(`unknown focus area ${slug}`);
+  return area;
+}

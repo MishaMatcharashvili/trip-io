@@ -3,7 +3,7 @@
  *
  * The canvas leaves both screens undesigned, so these follow the catalogue the
  * pipeline actually produces: regions are the curation focus areas
- * (`src/core/catalogue/focus-areas.ts`), groups are the gate's category groups
+ * (`src/domain/catalogue/focus-areas.ts`), groups are the gate's category groups
  * (`categories.ts`), and road notes come from the corridor season-risk table
  * (`corridors.ts`). A place here is a `curated` catalogue row, which is why
  * each one says what was last verified.

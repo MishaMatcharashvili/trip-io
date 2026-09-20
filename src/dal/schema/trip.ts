@@ -85,7 +85,7 @@ export const tripPatch = pgTable(
     }),
     intent: text("intent").notNull(),
     ops: jsonb("ops").notNull(),
-    // What undoes this patch, computed when it was applied (src/core/trip/patch.ts).
+    // What undoes this patch, computed when it was applied (src/domain/trip/patch.ts).
     inverseOps: jsonb("inverse_ops").notNull(),
     author: patchAuthor("author").notNull(),
     acceptedBy: text("accepted_by").references(() => user.id, {
