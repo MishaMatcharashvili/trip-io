@@ -136,6 +136,26 @@ export type BrieferInput = {
 /** The port. `src/infra/gemini-briefing.ts` is the only implementation. */
 export type Briefer = (input: BrieferInput) => Promise<unknown>;
 
+/** One email, as the delivery layer needs it and no provider's shape. */
+export type Message = {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+};
+
+export type Delivery =
+  | { sent: true; id: string }
+  | { sent: false; error: string };
+
+/**
+ * The second port. `src/infra/resend.ts` is the only implementation, and it
+ * reports a refusal rather than throwing: a provider that is down must cost the
+ * traveller their email, never their briefing — the in-app one is already
+ * written by the time this is called.
+ */
+export type Mailer = (message: Message) => Promise<Delivery>;
+
 export const briefingRejectionReasons = [
   "malformed",
   "unknown-ref",
