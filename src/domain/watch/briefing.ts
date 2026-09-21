@@ -342,6 +342,65 @@ export function dayShape(day: BriefingDay): string {
     : `${count} today, ${first} to ${last}.`;
 }
 
+/**
+ * The change, as the before-and-after the traveller actually reads. Two short
+ * phrases per move, because "1 change recommended" is only believable if you
+ * can see what it would do without opening anything.
+ *
+ * A proposal naming a stop that is not on this day is skipped rather than
+ * guessed at: the lookahead reaches 48 hours, so a briefing may carry an item
+ * about Thursday while showing Tuesday's stops, and inventing a time for a stop
+ * we are not holding would be the one lie the diff cannot afford.
+ */
+export type ChangeRow = { from: string; to: string };
+
+export function changePreview(
+  change: BriefingChange,
+  stops: readonly BriefingStop[],
+  placeNames: ReadonlyMap<string, string> = new Map(),
+): ChangeRow[] {
+  const byId = new Map(stops.map((s) => [s.id, s]));
+  const rows: ChangeRow[] = [];
+
+  for (const move of change.proposals) {
+    const stop = byId.get(move.nodeId);
+    if (!stop) continue;
+
+    switch (move.move) {
+      case "shift":
+        rows.push({
+          from: `${at(stop.startsAt)} · ${stop.title}`,
+          to: `${at(new Date(Date.parse(stop.startsAt) + move.byMinutes * 60_000).toISOString())} · ${stop.title}`,
+        });
+        break;
+      case "shorten":
+        rows.push({
+          from: `${stop.title} · ${stop.durationMin} min`,
+          to: `${stop.title} · ${move.toMinutes} min`,
+        });
+        break;
+      case "drop":
+        rows.push({
+          from: `${at(stop.startsAt)} · ${stop.title}`,
+          to: "Not today",
+        });
+        break;
+      case "swap":
+        rows.push({
+          from: stop.title,
+          to: placeNames.get(move.placeId) ?? "somewhere indoors nearby",
+        });
+        break;
+    }
+  }
+
+  return rows;
+}
+
+/** Every catalogue place the change would introduce, so its name can be shown. */
+export const changePlaceIds = (change: BriefingChange): string[] =>
+  change.proposals.flatMap((p) => (p.move === "swap" ? [p.placeId] : []));
+
 export type ComposeInput = {
   tripId: string;
   day: BriefingDay;

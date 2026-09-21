@@ -5,6 +5,7 @@ import {
   type BriefingItem,
   bundle,
   type ComposeInput,
+  changePreview,
   checkDraft,
   composeBriefing,
   dayIndexOf,
@@ -337,5 +338,89 @@ describe("small pure helpers", () => {
 
   test("kindLabel names the detector, not its namespace", () => {
     assert.equal(kindLabel("weather.thunderstorm"), "Weather");
+  });
+});
+
+describe("changePreview", () => {
+  const stops = [
+    {
+      id: "n1",
+      title: "Gergeti Trinity hike",
+      startsAt: "2026-10-04T12:00:00Z",
+      durationMin: 180,
+      indoor: false,
+    },
+  ];
+  const change = (proposals: Verdict["proposals"]) => ({
+    matchId: "m",
+    eventId: "e",
+    nodeId: "n1",
+    sentence: "s",
+    evidence: "open-meteo, taken 2026-10-04 06:00",
+    proposals,
+  });
+
+  test("reads a shift as a before and an after", () => {
+    assert.deepEqual(
+      changePreview(
+        change([{ move: "shift", nodeId: "n1", byMinutes: -270 }]),
+        stops,
+      ),
+      [
+        {
+          from: "16:00 · Gergeti Trinity hike",
+          to: "11:30 · Gergeti Trinity hike",
+        },
+      ],
+    );
+  });
+
+  test("names the place a swap would move to", () => {
+    assert.deepEqual(
+      changePreview(
+        change([
+          {
+            move: "swap",
+            nodeId: "n1",
+            placeId: "1b3f0a2e-0000-4000-8000-000000000009",
+            indoor: true,
+          },
+        ]),
+        stops,
+        new Map([["1b3f0a2e-0000-4000-8000-000000000009", "Kazbegi Museum"]]),
+      ),
+      [{ from: "Gergeti Trinity hike", to: "Kazbegi Museum" }],
+    );
+  });
+
+  test("reads a drop and a shorten plainly", () => {
+    assert.deepEqual(
+      changePreview(
+        change([
+          { move: "drop", nodeId: "n1" },
+          { move: "shorten", nodeId: "n1", toMinutes: 90 },
+        ]),
+        stops,
+      ),
+      [
+        { from: "16:00 · Gergeti Trinity hike", to: "Not today" },
+        {
+          from: "Gergeti Trinity hike · 180 min",
+          to: "Gergeti Trinity hike · 90 min",
+        },
+      ],
+    );
+  });
+
+  test("skips a stop it is not holding rather than guessing a time for it", () => {
+    // The lookahead reaches 48 hours, so an item may be about Thursday while
+    // the briefing shows Tuesday's stops.
+    assert.deepEqual(
+      changePreview(
+        change([{ move: "shift", nodeId: "elsewhere", byMinutes: -60 }]),
+        stops,
+      ),
+      [],
+    );
   });
 });
