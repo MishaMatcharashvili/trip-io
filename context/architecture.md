@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 0–3 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+Status: Phases 0–4 built (see `context/progress-tracker.md`). Reflects the decisions of record in
 `docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
 update it when an architectural decision changes; don't let it drift from the code.
 
@@ -51,10 +51,10 @@ is moving the code one layer further left.
 
 | Directory | What lives there | Rule |
 |---|---|---|
-| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards and router | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
-| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
-| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
-| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, Open-Meteo, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router and the briefing document | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
+| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
+| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
+| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, the Gemini briefer, Open-Meteo, Resend, Better Auth | Implements a port the domain declares. The only files that name an external provider |
 | `src/server` | The Hono app, its routers and the session middleware | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 
@@ -77,20 +77,25 @@ entry file changes.
 0 * * * *    /api/cron/sense-weather   poll regions w/ live trips → world_event   built
 */5 * * * *  /api/cron/match           PostGIS join → event_match → enqueue judge  built
 * * * * *    /api/cron/drain           claim N jobs SKIP LOCKED, stop at 240s      built
+0 3 * * *    /api/cron/briefing        07:30 Tbilisi; one job per live trip-day    built
 */30 * * * * /api/cron/sense-news      RSS + extraction                            Phase 8
 POST         /api/telegram/webhook     road reports → world_event                  Phase 5
 0 6 * * 1    /api/cron/sense-rail      weekly manual-check reminder                Phase 8
-0 3 * * *    /api/cron/briefing        07:30 Tbilisi = 03:30 UTC; one call/trip-day Phase 4
 0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     Phase 5
 ```
 
-The three built handlers are written and behind `CRON_SECRET`. They are **not on Vercel cron**:
+The four built handlers are written and behind `CRON_SECRET`. They are **not on Vercel cron**:
 Hobby runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying
 these schedules fails the build outright, which is what happened when Phase 3 first tried to ship
 one. The clock is Trigger.dev instead (`src/trigger/watch-pipeline.ts`), one hourly task calling the
-three handlers in order over HTTP: free at that cadence against $20/mo for Vercel Pro, and hourly is
-what the design calls for while the finer schedules below are throughput settings for scale.
-Trigger.dev is the clock only — the work, the queue and the drain stay here.
+three sense/match/drain handlers in order over HTTP: free at that cadence against $20/mo for Vercel
+Pro, and hourly is what the design calls for while the finer schedules below are throughput settings
+for scale. Trigger.dev is the clock only — the work, the queue and the drain stay here.
+
+A second scheduled task, `morning-briefing`, runs `briefing` then `drain` at 07:30 Asia/Tbilisi. It
+is written in Tbilisi's clock rather than as 03:30 UTC — Georgia keeps no daylight saving, so the
+two agree today, and naming the zone is what keeps them agreeing if that changes. It ends in a
+drain of its own so a briefing posted at 07:30 is sent at 07:30 and not at 08:07.
 
 Should Vercel Pro ever be bought for other reasons, this file is the whole change back:
 
@@ -153,14 +158,22 @@ trip_watch     trip_id, active_from, active_to, regions geography,
                channels[], quiet_hours, cap
 
 event_match    id, event_id, trip_id, node_id, matched_at, score,
-               queued_at, judged_at, verdict jsonb,
+               queued_at, judged_at, delivered_at, verdict jsonb,
                route(interrupt|briefing|drop), route_reason, rejections jsonb
                -- (event_id, node_id) is unique: the matcher runs every five
-               -- minutes and its invocations overlap
+               -- minutes and its invocations overlap. The four stamps are the
+               -- pipeline: matched, queued, judged, delivered
 
 intervention   id, trip_id, event_id, channel(push|email|briefing),
                sent_at, patch_id,
                outcome(accepted|dismissed|ignored|muted), outcome_at
+               -- one row per event per delivery, not per matched pair: the
+               -- same rain over two stops is one thing the traveller was told
+
+briefing       id, trip_id, day date, day_index, quiet, document jsonb,
+               composed_at, email_to, email_sent_at, email_error, opened_at
+               -- (trip_id, day) is unique: one briefing per trip-day, so a
+               -- cron re-run costs nothing and re-delivers nothing
 
 -- infrastructure
 job            id, kind, payload jsonb, run_after, attempts,
@@ -197,12 +210,34 @@ queue    src/dal/jobs.ts         SKIP LOCKED; cron never calls a model
 judge    src/bll/judge.ts        the only model call, on matched pairs only
 guard    src/domain/watch/judge.ts     four validators; a refusal is logged
 route    src/domain/watch/route.ts     interrupt / briefing / drop, with a reason
+brief    src/bll/briefing.ts           one trip-day's bundle, once, at 07:30
+deliver  src/infra/resend.ts           email; the in-app copy is already stored
 ```
 
-Nothing is delivered. Verdicts land in `event_match` with their route, their reason and, where they
-were refused, the reasons why. `npm run smoke:watch` exercises the whole of it against the real
-database with the judge stubbed; `npm run kill:count` runs it over synthetic trips and archived
-weather; `npm run judge:eval` scores the model against the thirty fixtures.
+Interrupts are not delivered — `INTERRUPT_ELIGIBLE` is empty, so nothing can wake anyone up. The
+briefing is the one channel that does deliver, and it ships first on purpose: it costs the traveller
+nothing to receive, so the system gets watched for a week before it is allowed to interrupt.
+
+`npm run smoke:watch` exercises stages 1–5 against the real database with the judge stubbed;
+`npm run smoke:briefing` does the same for stage 6 with the composer and the mailer stubbed;
+`npm run kill:count` runs the matcher over synthetic trips and archived weather; `npm run judge:eval`
+scores the model against the thirty fixtures.
+
+### The briefing, as built
+
+One model call per trip-day **with something to say**. A quiet day is a template, not a call: at 0.8
+matched pairs per trip-day most mornings are quiet, and pointing a model at an empty bundle and
+asking it to be interesting is how invented reassurance gets written.
+
+The composer is given a numbered bundle and may only reorder it, merge items into one line, headline
+them, and nominate at most one change the judge already proposed. Evidence, source, timestamp and
+the proposed ops are attached from the verdict afterwards — so a bad answer can only be a poor
+sentence about a real event, never a fabricated one. `src/domain/watch/briefing.ts` holds the guards
+and the two briefings written without a model: the quiet one and the fallback.
+
+The bundle looks 48 hours ahead rather than only at today. Rain on Thursday is worth knowing on
+Tuesday, when the traveller can still move something; beyond two days the forecast churns, so the
+item stays undelivered and is offered again as its day approaches.
 
 `intervention.outcome` is the product's only defensibility claim — a record of which world-changes
 actually moved a traveller's plan. The write path ships in the same commit as the accept/dismiss
@@ -237,6 +272,14 @@ no list.
   `min(verdict.confidence, event.confidence)`, so a model that sounds certain about a forecast two
   days out cannot talk past its own lead time. *Enforced:* `route`. *Tested:* as an invariant over
   the input space in `route.test.ts`.
+- **A briefing may not quietly lose an item.** A composer may merge two items into one line; it may
+  not omit one. A briefing that drops the thing that mattered is worse than none, because the
+  traveller has been told they are covered. *Enforced:* `checkDraft` in
+  `src/domain/watch/briefing.ts`, which falls back to a briefing written from the verdicts rather
+  than sending a refused draft. *Tested:* `briefing.test.ts`.
+- **A recommended change has something to apply.** "1 change recommended" citing an item that
+  proposes no moves is the briefing's own empty-helpful verdict — a button that does nothing.
+  *Enforced:* `checkDraft`. *Tested:* `briefing.test.ts`.
 - **New detectors enter briefing-only.** A detector may not route to `interrupt` until it has run one
   week on briefing-only and been hand-audited. *Enforced:* `INTERRUPT_ELIGIBLE` in
   `src/domain/watch/route.ts`, which is empty — nothing built so far can wake anyone up. A detector

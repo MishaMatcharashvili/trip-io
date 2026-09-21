@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–3 built; Phase 4 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–4 built; Phase 5 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -55,10 +55,15 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 4 — the daily briefing
 
-- [ ] 07:30 Tbilisi cron (03:30 UTC), one model call per live trip-day
-- [ ] Bundles everything routed to `briefing` + tomorrow's plan shape
-- [ ] Email delivery via Resend
-- [ ] In-app briefing view
+- [x] 07:30 Tbilisi cron — `/api/cron/briefing`, on the clock as the `morning-briefing` Trigger.dev schedule (written in Tbilisi's zone, not as 03:30 UTC). It posts one job per live trip-day and calls no model; the drain does, like every other model call
+- [x] One model call per trip-day **with something to say**. A quiet day is a deterministic briefing — most mornings are quiet at 0.8 pairs per trip-day, and asking a model to be interesting about an empty bundle is how invented reassurance gets written
+- [x] Bundles everything routed to `briefing` plus the day's plan shape, looking 48 hours ahead rather than only at today: rain on Thursday is worth knowing on Tuesday, while the traveller can still move something
+- [x] The composer may only reorder, merge and headline a numbered bundle, and nominate one change the judge already proposed. Evidence, source, timestamp and ops are attached from the verdict — a bad answer can be a poor sentence about a real event, never a fabricated one. Guards: no unknown ref, no item written about twice, no item lost, no change without moves; a refused draft falls back to a briefing written from the verdicts
+- [x] Email delivery via Resend (`RESEND_API_KEY`, `BRIEFING_FROM`) — HTML and plain text, evidence beside every claim. A failed send is recorded in `briefing.email_error` and never costs the briefing, which is stored before the email is attempted
+- [x] In-app briefing view — the first screen reading the database rather than the fixtures, with the change rendered as a before-and-after
+- [x] `briefing` table (migration 0005) and `event_match.delivered_at` (0006); open tracking from both the email pixel and the app, because "briefing opened per trip-day" is a kill criterion
+- [x] `npm run smoke:briefing` — the whole path against the real database, composer and mailer stubbed
+- [ ] **Never run against the model.** `GEMINI_API_KEY` is set but no briefing has been composed by Gemini; every briefing so far came from a stub or from the deterministic paths
 - [ ] Get it in front of 3 real travellers this phase (people you know travelling in Georgia in October), ahead of the Phase 10 cohort
 
 ## Phase 5 — interrupts, budget enforcer, road form

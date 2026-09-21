@@ -270,3 +270,15 @@ export async function placeFacts(
     }),
   );
 }
+
+/** Names for a handful of catalogue ids. What the briefing shows a swap as. */
+export async function placeNames(
+  ids: readonly string[],
+  conn: Queryable = db,
+): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = await conn.execute(sql`
+    SELECT id, name FROM place WHERE id IN (${list(ids)})
+  `);
+  return new Map(rows.rows.map((r) => [r.id as string, r.name as string]));
+}

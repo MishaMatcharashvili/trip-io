@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -103,6 +105,17 @@ export const eventMatch = pgTable(
     // Why a verdict was refused, when it was. Rejection-reason frequency is the
     // earliest signal that a prompt edit went wrong.
     rejections: jsonb("rejections"),
+    // Set when a briefing has written about this pair. The last of the four
+    // stamps a match collects on its way through the pipeline — matched,
+    // queued, judged, delivered — and the one that stops the same rain over
+    // the same stop being reported again tomorrow.
+    //
+    // It belongs here and not on `intervention` because the two count
+    // different things: one event can match two stops on the same day, which
+    // is two pairs to write about but one delivery, and folding them would
+    // either lose a stop or double-count the outcome that the kill criteria
+    // read.
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   },
   (t) => [
     // Unique, not just indexed: the matcher runs every five minutes and its
@@ -119,6 +132,11 @@ export const eventMatch = pgTable(
     index("event_match_unqueued_idx")
       .on(t.matchedAt)
       .where(sql`${t.queuedAt} is null`),
+    // What the briefing gathers each morning: this trip's judged, undelivered
+    // pairs. Partial, because delivered rows are the ones that accumulate.
+    index("event_match_undelivered_idx")
+      .on(t.tripId)
+      .where(sql`${t.deliveredAt} is null`),
   ],
 );
 
@@ -148,5 +166,47 @@ export const intervention = pgTable(
     index("intervention_event_id_idx").on(t.eventId),
     // The hourly sweep marks un-actioned interventions `ignored`.
     index("intervention_outcome_idx").on(t.outcome, t.sentAt),
+  ],
+);
+
+// The daily briefing, stored as what was actually said.
+//
+// It is a row rather than a render-on-read because it is a record, not a view:
+// the email and the in-app page must show the same words, and
+// `intervention.outcome` is only evidence of anything if what the traveller was
+// shown is still recoverable months later. The document is the domain's
+// `Briefing` (src/domain/watch/briefing.ts) exactly as it was composed.
+export const briefing = pgTable(
+  "briefing",
+  {
+    id: id(),
+    tripId: uuid("trip_id")
+      .notNull()
+      .references(() => trip.id, { onDelete: "cascade" }),
+    // The Tbilisi calendar date the briefing covers — the trip's clock, not the
+    // server's, and a date rather than an instant because "one per trip-day" is
+    // the unit the cost model and the kill criteria both count in.
+    day: date("day").notNull(),
+    dayIndex: integer("day_index").notNull(),
+    quiet: boolean("quiet").notNull(),
+    document: jsonb("document").notNull(),
+    composedAt: tstz("composed_at"),
+    emailTo: text("email_to"),
+    emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+    // Kept, not thrown: a briefing that composed and failed to send is a
+    // different problem from one that was never composed, and only this column
+    // tells them apart the next morning.
+    emailError: text("email_error"),
+    // "Briefing opened per trip-day" is a kill criterion (>= 50% continue,
+    // < 20% stop), so the open is a column from the first briefing sent rather
+    // than instrumentation retrofitted in Phase 9.
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+  },
+  (t) => [
+    // One per trip-day, enforced rather than assumed: the cron can be re-run by
+    // hand, and a second briefing for the same morning would both double the
+    // model bill and re-deliver items the traveller has already read.
+    uniqueIndex("briefing_trip_day_idx").on(t.tripId, t.day),
+    index("briefing_day_idx").on(t.day),
   ],
 );

@@ -19,6 +19,13 @@ import { logger, schedules, task } from "@trigger.dev/sdk";
 const STAGES = ["sense-weather", "match", "drain"] as const;
 
 /**
+ * The morning pass. `briefing` finds the trip-days that have one and posts a
+ * job each; `drain` is what actually writes and sends them, because the
+ * briefing is a model call and model calls live behind the queue.
+ */
+const MORNING = ["briefing", "drain"] as const;
+
+/**
  * Hourly, which is the cadence the design actually calls for: the weather is
  * re-forecast hourly, and the finer schedules in `context/architecture.md`
  * (match every five minutes, drain every minute) are throughput settings that
@@ -26,6 +33,14 @@ const STAGES = ["sense-weather", "match", "drain"] as const;
  * Trigger.dev free tier allows, so the two agree for now.
  */
 const CRON = "7 * * * *";
+
+/**
+ * 07:30 in Tbilisi, written in Tbilisi's own clock rather than as 03:30 UTC.
+ * Georgia does not observe daylight saving, so the two agree today; naming the
+ * zone is what keeps them agreeing if that ever changes, and the whole point of
+ * this schedule is the hour the traveller reads it at.
+ */
+const MORNING_CRON = { pattern: "30 7 * * *", timezone: "Asia/Tbilisi" };
 
 const required = (name: string): string => {
   const value = process.env[name];
@@ -43,13 +58,15 @@ export type StageReports = Record<string, unknown>;
  * — so they go in one task rather than three schedules. It also costs one of
  * the free tier's ten schedules instead of three.
  */
-async function runStages(): Promise<StageReports> {
+async function runStages(
+  stages: readonly string[] = STAGES,
+): Promise<StageReports> {
   const base = required("APP_URL").replace(/\/$/, "");
   const secret = required("CRON_SECRET");
 
   const reports: StageReports = {};
 
-  for (const stage of STAGES) {
+  for (const stage of stages) {
     const response = await fetch(`${base}/api/cron/${stage}`, {
       headers: { authorization: `Bearer ${secret}` },
     });
@@ -91,4 +108,27 @@ export const watchPipeline = schedules.task({
   // ceiling for a hung request, not a budget anything plans against.
   maxDuration: 600,
   run: async () => runStages(),
+});
+
+/**
+ * The briefing's clock, and the only delivery this product does. It is separate
+ * from the hourly pass because it is a different question: the hourly one asks
+ * what changed, this one asks what is worth saying, once, at the hour someone
+ * is awake to read it.
+ *
+ * It ends in a drain of its own rather than waiting for the next hourly pass,
+ * so a briefing posted at 07:30 is sent at 07:30 and not at 08:07.
+ */
+export const morningBriefing = schedules.task({
+  id: "morning-briefing",
+  cron: MORNING_CRON,
+  maxDuration: 600,
+  run: async () => runStages(MORNING),
+});
+
+/** The same pass on demand, for the mornings you want to read before they happen. */
+export const runMorningBriefing = task({
+  id: "run-morning-briefing",
+  maxDuration: 600,
+  run: async () => runStages(MORNING),
 });

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { scheduleBriefings } from "@/bll/briefing.ts";
 import { drain } from "@/bll/drain.ts";
 import { runMatch } from "@/bll/match.ts";
 import { senseWeather } from "@/bll/sense.ts";
@@ -27,4 +28,8 @@ export const cron = new Hono()
   .get("/match", async (c) => c.json(await runMatch()))
 
   // * * * * * — claim, judge, stop at 240s, let the next minute continue.
-  .get("/drain", async (c) => c.json(await drain()));
+  .get("/drain", async (c) => c.json(await drain()))
+
+  // 30 3 * * * — 07:30 in Tbilisi. One job per live trip-day; the model call
+  // itself happens in the drain, like every other one.
+  .get("/briefing", async (c) => c.json(await scheduleBriefings()));
