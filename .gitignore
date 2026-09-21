@@ -49,3 +49,6 @@ next-env.d.ts
 
 # catalogue pipeline downloads and outputs (npm run catalogue:extract)
 /data
+
+# trigger.dev
+.trigger
