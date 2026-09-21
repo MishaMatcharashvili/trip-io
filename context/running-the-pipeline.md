@@ -46,28 +46,48 @@ nice-to-have and becomes the thesis. Above 8 and the judge is too talkative to l
 
 It also gates trip generation, which is separately blocked on the 600 curated places.
 
-### 2. Vercel Pro — nothing runs on a timer
+### 2. A Trigger.dev account — nothing runs on a timer
 
-The three handlers exist, are secured by `CRON_SECRET`, and are invoked by hand. Enabling Pro makes
-this file the whole change:
+The clock is `trigger/watch-pipeline.ts`: one hourly scheduled task that calls the three
+`/api/cron/*` handlers in order over HTTP. **Trigger.dev is the clock and nothing else** — the work
+stays on Vercel, and the Postgres queue and its drain are untouched.
 
-```json
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    { "path": "/api/cron/sense-weather", "schedule": "0 * * * *" },
-    { "path": "/api/cron/match", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/drain", "schedule": "* * * * *" }
-  ]
-}
-```
+To switch it on:
 
-Set `CRON_SECRET` in the same sitting. Without it the routes return 503 rather than running — an
-unset secret in production is the configuration mistake the guard exists to survive, so it refuses
-instead of waving requests through.
+1. Create a Trigger.dev project; copy the project ref into `TRIGGER_PROJECT_REF` and a secret key
+   into `TRIGGER_SECRET_KEY` locally (both are CLI-only — the Next app never reads them).
+2. On the Trigger.dev environment, set **`APP_URL`** (the deployed origin, no trailing slash) and
+   **`CRON_SECRET`** — the task reads those, not the local `.env`.
+3. Set the same `CRON_SECRET` on Vercel. Without it the routes return 503 rather than running: an
+   unset secret in production is the configuration mistake the guard exists to survive, so it
+   refuses instead of waving requests through.
+4. `npm run trigger:deploy`. `npm run trigger:dev` runs it against a local server first.
 
-Pro also lifts the function ceiling to 800s, which the drain does not need (it stops at 240s by
-design) but trip generation does.
+**None of this has been verified** — there is no account yet, so the task has never executed. The
+config and task typecheck and the Next build is unaffected, and that is all that is known.
+
+#### Why not Vercel cron
+
+It was tried and it failed the deployment (see above). Vercel Pro is $20/mo; Trigger.dev is free at
+hourly and $10/mo for finer, and brings a run history, logs and retries that Vercel cron does not.
+
+Hourly is not a compromise: the weather is re-forecast hourly, so that is the cadence the design
+actually calls for. The finer schedules in `context/architecture.md` — match every five minutes,
+drain every minute — are throughput settings for a scale this project does not have at 0.8 pairs per
+trip-day. Buy the $10 tier when that stops being true, or go back to Vercel cron if Pro is bought
+for other reasons; `context/architecture.md` still holds the `vercel.json` for that.
+
+One honest cost: this puts a third party in the watch loop and adds a second place secrets live and
+a second deploy step. Vercel cron would have been zero extra infrastructure.
+
+#### The bigger version, deliberately not taken
+
+Trigger.dev could run the pipeline rather than just trigger it — tasks on their infrastructure have
+no Vercel function ceiling and bring their own retries and concurrency control, which would make the
+`job` table and the drain largely redundant. That is a real option and it is a Phase 5 decision to
+make on evidence, not in passing: the queue is built, tested and exercised, and the drain's 240s
+budget fits Vercel's 300s ceiling comfortably. If it is ever taken, `judgeMatch(matchId)` is already
+a plain function a task could call directly — which is what the layering was for.
 
 ### 3. `OPEN_METEO_API_KEY` — the detector is on a licence it should not be on
 

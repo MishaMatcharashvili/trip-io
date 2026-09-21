@@ -49,7 +49,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [x] Judge with all four validators — the first three in `checkVerdict`, the confidence gate in the router and tested as an invariant
 - [x] Router as a pure, unit-tested function (`interrupt` / `briefing` / `drop`), every path returning its reason
 - [x] No delivery yet — verdicts land in `event_match` with their route, reason and rejections
-- [ ] Cron *scheduled* — the three handlers exist and are secured, but Hobby rejects a sub-daily schedule at deploy time. Needs Vercel Pro (Phase 0 procurement)
+- [ ] Cron *scheduled* — the three handlers exist and are secured; the clock is `trigger/watch-pipeline.ts` (hourly, Trigger.dev, free at that cadence) rather than Vercel cron, which Hobby rejects at deploy time. Unverified: needs a Trigger.dev account
 - [x] Eval harness: 30 `(event, node, trip) → expected verdict` fixtures (10 fire / 10 don't / 10 ambiguous). **Never run against the model** — `GEMINI_API_KEY` is not set
 - [~] **Kill-criteria check**: `npm run kill:count`. The match half is measured — **0.8 pairs per trip-day** over 24 synthetic trips (4 areas x 6 weather weeks), worst case 3.4 in Svaneti in January, well inside the dozen-per-trip-day budget. The half that decides Phase 8 — interventions per trip — needs the judge, and so needs `GEMINI_API_KEY`.
 
