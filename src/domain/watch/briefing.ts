@@ -96,13 +96,17 @@ export const briefingDraft = z.object({
    * At most one change worth making. One, because a briefing offering three
    * rearrangements is asking the traveller to plan, which is the job they
    * delegated.
+   *
+   * `nullish` rather than `nullable`: "no change today" is the common answer,
+   * and a model may express it by sending null or by leaving the key out. Both
+   * mean the same thing and neither is worth losing a morning's briefing over.
    */
   change: z
     .object({
       ref: z.number().int().min(0),
       sentence: z.string().min(1).max(240),
     })
-    .nullable(),
+    .nullish(),
 });
 export type BriefingDraft = z.infer<typeof briefingDraft>;
 
