@@ -4,10 +4,14 @@ import { runMatch } from "@/bll/match.ts";
 import { senseWeather } from "@/bll/sense.ts";
 import { requireCronSecret } from "../cron.ts";
 
-// The pipeline's clock. Every handler here is invoked by Vercel Cron (see
-// vercel.json) and returns what it did, because in Phase 3 the logs are the
-// product: nothing is delivered, so reading these responses is how the system
-// gets watched before it is allowed to speak.
+// The pipeline's clock — once there is one. Each handler returns what it did,
+// because in Phase 3 the logs are the product: nothing is delivered, so reading
+// these responses is how the system gets watched before it is allowed to speak.
+//
+// Nothing invokes them on a timer yet. Hobby cron runs once a day and rejects a
+// sub-daily schedule at deploy time, so the `vercel.json` that schedules these
+// cannot ship until Vercel Pro is enabled; `context/architecture.md` holds the
+// file to add that day. Until then they are called by hand.
 //
 // Handlers enqueue; they never call a model. That rule is what keeps a cron
 // invocation inside its ceiling whatever the backlog looks like — see

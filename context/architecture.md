@@ -84,7 +84,23 @@ POST         /api/telegram/webhook     road reports → world_event             
 0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     Phase 5
 ```
 
-The three built handlers are registered in `vercel.json`.
+The three built handlers are written and behind `CRON_SECRET`, but **not scheduled yet**. Hobby cron
+runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying these
+schedules fails the build outright, which is what happened when Phase 3 first tried to ship one. The
+day Vercel Pro is enabled, this file is the whole change:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/sense-weather", "schedule": "0 * * * *" },
+    { "path": "/api/cron/match", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/drain", "schedule": "* * * * *" }
+  ]
+}
+```
+
+Until then the handlers are invoked by hand or by `npm run smoke:watch`; nothing runs on a timer.
 
 Cron handlers never call the model directly — they enqueue jobs. The drain handler is what makes the
 system survive a spike: claim with `SKIP LOCKED LIMIT n`, track elapsed time, stop cleanly at 240s,

@@ -1,8 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    { "path": "/api/cron/sense-weather", "schedule": "0 * * * *" },
-    { "path": "/api/cron/match", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/drain", "schedule": "* * * * *" }
-  ]
-}
