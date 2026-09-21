@@ -148,5 +148,14 @@ const projected = await db.execute(
 );
 step("trip_node rows", projected.rows);
 
+// The watch is derived from that same projection, in the same transaction:
+// a trip is never watched somewhere it does not go.
+const watch = await db.execute(
+  sql`SELECT active_from, active_to, channels, quiet_hours, cap,
+             round(ST_Area(regions) / 1e6)::int AS footprint_km2
+      FROM trip_watch WHERE trip_id = ${tripId}`,
+);
+step("trip_watch row", watch.rows);
+
 await db.execute(sql`DELETE FROM trip WHERE id = ${tripId}`);
 console.log("\ncleaned up");

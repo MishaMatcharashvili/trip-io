@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -7,6 +8,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { geography, id, tstz } from "./columns.ts";
@@ -86,16 +88,37 @@ export const eventMatch = pgTable(
       .notNull()
       .references(() => tripNode.id, { onDelete: "cascade" }),
     matchedAt: tstz("matched_at"),
+    // Set when the pair is handed to the judge queue. Claiming it in one
+    // UPDATE is what stops a matcher run five minutes later from paying for
+    // the same model call twice.
+    queuedAt: timestamp("queued_at", { withTimezone: true }),
     verdict: jsonb("verdict"),
     score: real("score").notNull(),
     judgedAt: timestamp("judged_at", { withTimezone: true }),
     route: eventRoute("route"),
+    // Why the router decided what it decided, `drop` included. A dropped
+    // verdict nobody sees is how a silent ranker regression goes unnoticed for
+    // a month, so the reason is a column and gets counted.
+    routeReason: text("route_reason"),
+    // Why a verdict was refused, when it was. Rejection-reason frequency is the
+    // earliest signal that a prompt edit went wrong.
+    rejections: jsonb("rejections"),
   },
   (t) => [
-    index("event_match_event_node_idx").on(t.eventId, t.nodeId),
+    // Unique, not just indexed: the matcher runs every five minutes and its
+    // invocations can overlap, so idempotency belongs in the constraint rather
+    // than in a NOT EXISTS that another transaction can race.
+    uniqueIndex("event_match_event_node_idx").on(t.eventId, t.nodeId),
     index("event_match_trip_id_idx").on(t.tripId),
-    // The judge queue drains rows that matched but haven't been judged yet.
-    index("event_match_unjudged_idx").on(t.judgedAt),
+    // The judge queue drains rows that matched but haven't been judged yet;
+    // partial, because judged rows are the ones that accumulate.
+    index("event_match_unjudged_idx")
+      .on(t.score)
+      .where(sql`${t.judgedAt} is null`),
+    // The sweep that finds pairs nothing ever picked up.
+    index("event_match_unqueued_idx")
+      .on(t.matchedAt)
+      .where(sql`${t.queuedAt} is null`),
   ],
 );
 

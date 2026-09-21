@@ -18,6 +18,7 @@ import {
   upsertNode,
 } from "../dal/trips.ts";
 import { withTransaction } from "../dal/tx.ts";
+import { refreshWatch } from "../dal/watches.ts";
 import { diffDocs } from "../domain/trip/diff.ts";
 import { placeIdsOf, type TripDoc } from "../domain/trip/document.ts";
 import {
@@ -34,6 +35,7 @@ import {
   validateDoc,
   validateProposal,
 } from "../domain/trip/validate.ts";
+import { watchDefaults } from "../domain/watch/settings.ts";
 
 // Writing to a trip. Every change is a patch: validated against the whole of
 // every day it touches, appended to the log, and projected onto `trip_node` in
@@ -147,6 +149,13 @@ export async function appendPatch(
     }
 
     await setHead(tx, input.tripId, patchId);
+
+    // The watch is written here rather than at trip creation because it is
+    // derived from the node projection: an empty trip has no footprint to
+    // watch, and a trip that has been replanned must not stay watched in a
+    // region it no longer visits. Same transaction, same guarantee as the
+    // projection itself.
+    await refreshWatch(input.tripId, watchDefaults(result.doc.trip), tx);
 
     // Seq 1 is checkpointed too: the generated plan is the largest patch there
     // is, and no restore should have to replay it.

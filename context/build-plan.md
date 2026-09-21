@@ -1,6 +1,6 @@
 # Build plan
 
-Status: pre-build, Phase 0. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–3 built; Phase 4 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -41,16 +41,17 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 3 — the pipeline, weather only
 
-- [ ] `world_event` table, CAP-shaped, `dedupe_key = source + kind + region + bucketed valid_from`
-- [ ] `trip_watch` written on trip save
-- [ ] `job` table + drain handler (`SKIP LOCKED`, stop at 240s)
-- [ ] Weather sense handler (hourly, per region with a live trip)
-- [ ] Match query + GiST/btree indexes
-- [ ] Judge with all four validators (evidence non-empty, place_id validated, no empty-helpful verdict, confidence gate)
-- [ ] Router as a pure, unit-tested function (`interrupt` / `briefing` / `drop`)
-- [ ] No delivery yet — verdicts land in the DB, read manually
-- [ ] Eval harness: 30 `(event, node, trip) → expected verdict` fixtures (10 fire / 10 don't / 10 ambiguous)
-- [ ] **Kill-criteria check**: run the pipeline against synthetic trips over historical weather, count what the router would send. If 1–2 per trip, detector expansion becomes the whole thesis, not a later nice-to-have.
+- [x] `world_event` table, CAP-shaped, `dedupe_key = source + kind + region + bucketed valid_from` (3h bucket, so an hourly re-forecast updates one row)
+- [x] `trip_watch` written on trip save — on patch, in the same transaction as the node projection it is derived from
+- [x] `job` table + drain handler (`SKIP LOCKED`, stop at 240s, exponential backoff, gives up at 5 attempts)
+- [x] Weather sense handler (hourly, per region with a live trip); thresholds are ours, Georgia has no warning feed
+- [x] Match query + GiST/btree indexes; `(event_id, node_id)` made unique (migration 0003) and `queued_at` added to claim a pair once (0004)
+- [x] Judge with all four validators — the first three in `checkVerdict`, the confidence gate in the router and tested as an invariant
+- [x] Router as a pure, unit-tested function (`interrupt` / `briefing` / `drop`), every path returning its reason
+- [x] No delivery yet — verdicts land in `event_match` with their route, reason and rejections
+- [ ] Cron *scheduled* — the three handlers exist and are secured, but Hobby rejects a sub-daily schedule at deploy time. Needs Vercel Pro (Phase 0 procurement)
+- [x] Eval harness: 30 `(event, node, trip) → expected verdict` fixtures (10 fire / 10 don't / 10 ambiguous). **Never run against the model** — `GEMINI_API_KEY` is not set
+- [~] **Kill-criteria check**: `npm run kill:count`. The match half is measured — **0.8 pairs per trip-day** over 24 synthetic trips (4 areas x 6 weather weeks), worst case 3.4 in Svaneti in January, well inside the dozen-per-trip-day budget. The half that decides Phase 8 — interventions per trip — needs the judge, and so needs `GEMINI_API_KEY`.
 
 ## Phase 4 — the daily briefing
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 0–2 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+Status: Phases 0–3 built (see `context/progress-tracker.md`). Reflects the decisions of record in
 `docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
 update it when an architectural decision changes; don't let it drift from the code.
 
@@ -51,10 +51,10 @@ is moving the code one layer further left.
 
 | Directory | What lives there | Rule |
 |---|---|---|
-| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
-| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
-| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
-| `src/infra` | Outbound adapters: the Gemini composer, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards and router | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
+| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
+| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
+| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, Open-Meteo, Better Auth | Implements a port the domain declares. The only files that name an external provider |
 | `src/server` | The Hono app, its routers and the session middleware | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 
@@ -74,16 +74,33 @@ entry file changes.
 ## Cron topology
 
 ```
-0 * * * *    /api/cron/sense-weather   poll regions w/ live trips → world_event
-*/30 * * * * /api/cron/sense-news      RSS + extraction (week 10)
-POST         /api/telegram/webhook     road reports → world_event
-0 6 * * 1    /api/cron/sense-rail      weekly manual-check reminder
-
-*/5 * * * *  /api/cron/match           PostGIS join → event_match → enqueue judge
-* * * * *    /api/cron/drain           claim N jobs SKIP LOCKED, stop at 240s
-0 3 * * *    /api/cron/briefing        07:30 Tbilisi = 03:30 UTC; one call/trip-day
-0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`
+0 * * * *    /api/cron/sense-weather   poll regions w/ live trips → world_event   built
+*/5 * * * *  /api/cron/match           PostGIS join → event_match → enqueue judge  built
+* * * * *    /api/cron/drain           claim N jobs SKIP LOCKED, stop at 240s      built
+*/30 * * * * /api/cron/sense-news      RSS + extraction                            Phase 8
+POST         /api/telegram/webhook     road reports → world_event                  Phase 5
+0 6 * * 1    /api/cron/sense-rail      weekly manual-check reminder                Phase 8
+0 3 * * *    /api/cron/briefing        07:30 Tbilisi = 03:30 UTC; one call/trip-day Phase 4
+0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     Phase 5
 ```
+
+The three built handlers are written and behind `CRON_SECRET`, but **not scheduled yet**. Hobby cron
+runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying these
+schedules fails the build outright, which is what happened when Phase 3 first tried to ship one. The
+day Vercel Pro is enabled, this file is the whole change:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/sense-weather", "schedule": "0 * * * *" },
+    { "path": "/api/cron/match", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/drain", "schedule": "* * * * *" }
+  ]
+}
+```
+
+Until then the handlers are invoked by hand or by `npm run smoke:watch`; nothing runs on a timer.
 
 Cron handlers never call the model directly — they enqueue jobs. The drain handler is what makes the
 system survive a spike: claim with `SKIP LOCKED LIMIT n`, track elapsed time, stop cleanly at 240s,
@@ -129,8 +146,11 @@ world_event    id, source, kind, severity, confidence, geom geography,
 trip_watch     trip_id, active_from, active_to, regions geography,
                channels[], quiet_hours, cap
 
-event_match    event_id, trip_id, node_id, matched_at,
-               verdict jsonb, score, judged_at, route(interrupt|briefing|drop)
+event_match    id, event_id, trip_id, node_id, matched_at, score,
+               queued_at, judged_at, verdict jsonb,
+               route(interrupt|briefing|drop), route_reason, rejections jsonb
+               -- (event_id, node_id) is unique: the matcher runs every five
+               -- minutes and its invocations overlap
 
 intervention   id, trip_id, event_id, channel(push|email|briefing),
                sent_at, patch_id,
@@ -160,6 +180,24 @@ rows or overwrite the curator's name/category/position; non-curated rows missing
 are demoted to `raw`, never deleted (`trip_node.place_id` would null out). Sense regions are the 64
 municipalities and self-governing cities of Georgia, excluding Abkhazia and South Ossetia.
 
+### The watch pipeline, as built
+
+```
+sense    src/bll/sense.ts        one forecast per region with a live trip
+detect   src/domain/watch/weather.ts   our own thresholds; a spell is one event
+store    src/dal/events.ts       dedupe_key collapses the hourly re-forecast
+match    src/dal/matches.ts      ST_DWithin x window overlap, radiusFor(kind)
+queue    src/dal/jobs.ts         SKIP LOCKED; cron never calls a model
+judge    src/bll/judge.ts        the only model call, on matched pairs only
+guard    src/domain/watch/judge.ts     four validators; a refusal is logged
+route    src/domain/watch/route.ts     interrupt / briefing / drop, with a reason
+```
+
+Nothing is delivered. Verdicts land in `event_match` with their route, their reason and, where they
+were refused, the reasons why. `npm run smoke:watch` exercises the whole of it against the real
+database with the judge stubbed; `npm run kill:count` runs it over synthetic trips and archived
+weather; `npm run judge:eval` scores the model against the thirty fixtures.
+
 `intervention.outcome` is the product's only defensibility claim — a record of which world-changes
 actually moved a traveller's plan. The write path ships in the same commit as the accept/dismiss
 button; `ignored` is produced by a cron sweep, not left to the client.
@@ -179,13 +217,24 @@ no list.
   *Enforced:* `allowedTiers` in `src/domain/trip/validate.ts`, run over every affected day on every
   write; candidate retrieval filters to `curated` again in `src/dal/places.ts`. *Tested:*
   `src/domain/trip/validate.test.ts`.
-- **Always show evidence and source.** A verdict with empty `evidence`, or evidence missing a
-  timestamp, is rejected before rendering. *Not built* — arrives with the judge in Phase 3.
-- **No empty-helpful verdicts.** `relevant: true` + `impact: "none"` is rejected by the validator.
-  *Not built* — Phase 3, same place.
+- **Always show evidence and source.** A verdict with empty `evidence`, evidence missing a timestamp,
+  or evidence that does not name the event's source is rejected before it can be routed.
+  *Enforced:* `checkVerdict` in `src/domain/watch/judge.ts`. *Tested:* `judge.test.ts`.
+- **No empty-helpful verdicts.** `relevant: true` + `impact: "none"` is rejected by the validator,
+  and dropped again by the router if it somehow arrives there. *Enforced:* `checkVerdict` and
+  `route`. *Tested:* `judge.test.ts`, `route.test.ts`.
+- **The judge may only name places it was given.** Every place id a proposal introduces is looked up
+  in the catalogue — not in the list handed to the model, which would miss an id lifted from
+  elsewhere in its own input — and must be `curated` or `verified`. *Enforced:* `checkVerdict` plus
+  the lookup in `src/bll/judge.ts`. *Tested:* `judge.test.ts`.
+- **Nothing interrupts below the confidence floor.** The gate reads
+  `min(verdict.confidence, event.confidence)`, so a model that sounds certain about a forecast two
+  days out cannot talk past its own lead time. *Enforced:* `route`. *Tested:* as an invariant over
+  the input space in `route.test.ts`.
 - **New detectors enter briefing-only.** A detector may not route to `interrupt` until it has run one
-  week on briefing-only and been hand-audited. This applies hardest to LLM-extraction detectors
-  (news/protests). *Not built, and a process rule rather than a code one* — Phase 3 onwards.
+  week on briefing-only and been hand-audited. *Enforced:* `INTERRUPT_ELIGIBLE` in
+  `src/domain/watch/route.ts`, which is empty — nothing built so far can wake anyone up. A detector
+  graduates by being added to that set, deliberately. *Tested:* `route.test.ts`.
 
 ### Structural invariants
 
@@ -215,7 +264,7 @@ no list.
 
 | # | Detector | Source | Cadence | Build phase | Confidence |
 |---|---|---|---|---|---|
-| 1 | weather-vs-activity | Open-Meteo, commercial tier | hourly | 3 | high |
+| 1 | weather-vs-activity | Open-Meteo, commercial tier | hourly | 3 — **built** | high |
 | 2 | road-corridor | Telegram form, manual | on submit | 5 | high |
 | 3 | events & festivals | local pages + extraction | 6h | 8 | medium |
 | 4 | protests & safety | Georgian news RSS + extraction | 30 min | 8 | low → gated |
