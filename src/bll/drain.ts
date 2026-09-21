@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { claim, complete, fail, type Job } from "../dal/jobs.ts";
+import { BRIEFING_JOB, writeBriefing } from "./briefing.ts";
 import { judgeMatch } from "./judge.ts";
 import { JUDGE_JOB } from "./match.ts";
 
@@ -30,6 +31,18 @@ export const handlers: Record<string, Handler> = {
       throw new Error("judge job has no matchId");
     }
     return judgeMatch(matchId);
+  },
+
+  // Posted by the 03:30 cron, one per trip-day. It is here rather than in the
+  // cron handler for the same reason judging is: it calls a model, and a model
+  // call belongs behind the queue that already has a time budget, a backoff and
+  // a give-up. A Gemini outage at 03:30 then costs a retry, not a morning.
+  [BRIEFING_JOB]: async (payload) => {
+    const { tripId, date } = payload as { tripId?: string; date?: string };
+    if (typeof tripId !== "string" || typeof date !== "string") {
+      throw new Error("briefing job needs a tripId and a date");
+    }
+    return writeBriefing(tripId, date);
   },
 };
 
