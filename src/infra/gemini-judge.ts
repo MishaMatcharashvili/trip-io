@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Judge, JudgeInput } from "../domain/watch/judge.ts";
 import { verdict } from "../domain/watch/judge.ts";
-import { genai, MODEL } from "./gemini.ts";
+import { generate, MODEL } from "./gemini.ts";
 
 // The only model call in the watch pipeline, and the only one that runs per
 // matched pair rather than per region. Everything in the architecture upstream
@@ -84,7 +84,7 @@ const userTurn = (input: JudgeInput) =>
   });
 
 export const judgeWithGemini: Judge = async (input) => {
-  const response = await genai().models.generateContent({
+  const response = await generate({
     model: MODEL,
     contents: [{ role: "user", parts: [{ text: userTurn(input) }] }],
     config: {

@@ -5,7 +5,7 @@ import type {
   Composer,
 } from "../domain/trip/generate/pipeline.ts";
 import { planSchema, type RefPlan } from "../domain/trip/generate/plan.ts";
-import { genai, MODEL } from "./gemini.ts";
+import { generate, MODEL } from "./gemini.ts";
 
 // The only model call in trip generation, and the only file that knows which
 // provider we use: it implements the domain's `Composer` port, and everything
@@ -78,7 +78,7 @@ export const composeWithGemini: Composer = async (input, feedback) => {
   );
 
   const previous = feedback ? JSON.stringify(feedback.previous) : null;
-  const response = await genai().models.generateContent({
+  const response = await generate({
     model: MODEL,
     contents: [
       { role: "user", parts: [{ text: userTurn(input) }] },
