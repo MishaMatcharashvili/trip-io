@@ -1,8 +1,9 @@
 # Running the watch pipeline
 
-Status: written 2026-09-21, when Phase 3 landed. Phase 3 built the whole pipeline and switched none
-of it on. This file is the list of switches — what is off, why, what turning each one on unblocks,
-and in what order. Update it as each switch flips; delete it when they all have.
+Status: written 2026-09-21 when Phase 3 landed, updated the same day when Phase 4 did. Phase 3 built
+the whole pipeline and switched none of it on; Phase 4 added the one channel that delivers. This
+file is the list of switches — what is off, why, what turning each one on unblocks, and in what
+order. Update it as each switch flips; delete it when they all have.
 
 `context/architecture.md` says what the pipeline *is*. This says how to make it run.
 
@@ -25,20 +26,32 @@ checklist in `context/progress-tracker.md` for whether the account is on a plan 
 
 ## The switches, in the order they pay off
 
-### 1. `GEMINI_API_KEY` — the judge has never been called
+### 1. A Gemini plan that allows more than twenty calls a day
 
-Nothing in the watch layer has spoken to a model. This gates the most valuable unrun thing in the
-project.
+`GEMINI_API_KEY` **is now set**, and it is on the free tier: 20 `generateContent` requests per day
+per model. That is below what a single run of anything here needs — the eval harness alone is
+thirty fixtures, and one briefing for one trip-day is one more.
+
+Confirmed by running it: the briefing composer's first real call came back
+`RESOURCE_EXHAUSTED … quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, quotaValue: 20`.
+The wiring is right and the quota is not. Enable billing on the Google Cloud project behind the key,
+then run the three things below — none of which has ever met the model.
 
 ```
-npm run judge:eval              # the 30 fixtures against the real model
-npm run kill:count -- --judge   # the half of the kill-criteria check that decides Phase 8
+npm run judge:eval                  # the 30 fixtures against the real model
+npm run kill:count -- --judge       # the half of the kill-criteria check that decides Phase 8
+npm run smoke:briefing -- --model   # the briefing composer's prompt, end to end
 ```
 
 `judge:eval` prints relevance, impact accuracy and framing as three separate numbers, plus the
 false-positive rate against the kill line (continue below 15%, stop above 35%). **The first run is
 the baseline** — nothing is gated on it yet, so record the numbers somewhere before touching the
 prompt.
+
+`smoke:briefing -- --model` swaps the stubbed composer for the real one and walks the whole delivery
+path. It is the thing to run after any edit to the briefing prompt: the guards in
+`src/domain/watch/briefing.ts` are what catch a draft that has stopped covering its bundle, and a
+prompt edit is exactly what makes that happen.
 
 `kill:count -- --judge` answers the question the whole phase exists to ask: how many interventions
 per trip the router would actually send. Below 2 and detector expansion (Phase 8) stops being a
@@ -65,9 +78,11 @@ To switch it on:
 4. `npm run trigger:dev` registers the tasks against the development environment and keeps them
    running locally; `npm run trigger:deploy` publishes them.
 
-Two tasks are exported. `watch-pipeline` is the hourly schedule. `run-watch-pipeline` does the same
-pass on demand — trigger it from the dashboard when you want a cycle now rather than at seven
-minutes past, which is most of what you want while the pipeline is still being read by hand.
+Four tasks are exported. `watch-pipeline` is the hourly schedule — sense, match, drain — and
+`morning-briefing` runs `briefing` then `drain` at 07:30 Asia/Tbilisi, written in Tbilisi's zone
+rather than as 03:30 UTC. `run-watch-pipeline` and `run-morning-briefing` do the same passes on
+demand; trigger them from the dashboard when you want a cycle now rather than at seven minutes past,
+which is most of what you want while the pipeline is still being read by hand.
 
 Note that `src/trigger` is a layer in its own right (`src/layers.test.ts`): an entry point beside
 `src/server`, allowed to call a use case and not a repository. That is what keeps the option of
@@ -96,13 +111,24 @@ make on evidence, not in passing: the queue is built, tested and exercised, and 
 budget fits Vercel's 300s ceiling comfortably. If it is ever taken, `judgeMatch(matchId)` is already
 a plain function a task could call directly — which is what the layering was for.
 
-### 3. `OPEN_METEO_API_KEY` — the detector is on a licence it should not be on
+### 3. `RESEND_API_KEY` + `BRIEFING_FROM` — the briefing is written but not posted
+
+The briefing composes, stores and renders without them; only the send is skipped, and
+`briefing.email_error` says which variable was missing. Turning it on needs a verified sending
+domain at Resend — DNS records, so start it a day before you need it — and `BRIEFING_FROM` set to
+the verified identity. `APP_URL` must also be set, because a link in an email has to be absolute;
+unset, the send is refused rather than a briefing going out with broken links.
+
+Until then the in-app briefing at `/trips/{id}/briefing` is the whole product surface, which is
+enough to put in front of the three travellers Phase 4 asks for.
+
+### 4. `OPEN_METEO_API_KEY` — the detector is on a licence it should not be on
 
 The weather detector works today on Open-Meteo's free tier, which is CC BY 4.0 and **non-commercial**.
 Fine for development, not for a paid product. The key switches `src/infra/open-meteo.ts` to the
 commercial endpoint with no other code change.
 
-### 4. The 600 curated places — the judge can only swap in `verified` places
+### 5. The 600 curated places — the judge can only swap in `verified` places
 
 `nearbyAlternatives` offers the judge `curated` and `verified` places. With 0 curated and 11,590
 verified, every alternative it can propose today is a place nobody has hand-checked. The tier rule
@@ -114,9 +140,10 @@ is the quality of Overture's data until the curation queue at `/curate` has run.
 These three work today, against the live database, and none of them costs a model call:
 
 ```
-npm test              # 232 tests; the watch layer's are in src/domain/watch/
-npm run smoke:watch   # trip → watch → sense → match → queue → drain, judge stubbed
-npm run kill:count    # pairs per trip-day over synthetic trips and archived weather
+npm test                # 281 tests; the watch layer's are in src/domain/watch/
+npm run smoke:watch     # trip → watch → sense → match → queue → drain, judge stubbed
+npm run smoke:briefing  # bundle → compose → store → email → opened, composer and mailer stubbed
+npm run kill:count      # pairs per trip-day over synthetic trips and archived weather
 ```
 
 `smoke:watch` is the one to run after touching anything in the pipeline. It proves the three things
@@ -139,6 +166,13 @@ real match query:
   says once it can run, one detector will not carry a summer trip — which is an argument for
   Phase 8 that exists before the judge has said anything.
 
+`smoke:briefing` is the one to run after touching anything in the briefing. It walks three paths on
+purpose — a good draft, a draft the guards refuse, and a day with nothing on it — because the second
+and third are the ones that happen at 07:30 on a Tuesday when nobody is watching. It creates a
+throwaway account so the email path is exercised: an anonymous trip is briefed in the app and never
+emailed, which is correct and is exactly why a test that only makes anonymous trips proves nothing
+about delivery.
+
 ## Housekeeping that has no owner yet
 
 - `purgeExpiredEvents` runs inside the sense loop and drops events more than 30 days past their
@@ -149,3 +183,8 @@ real match query:
   dashboard.
 - `event_match` rows accumulate for the life of the trip. Fine at this scale; revisit when
   `pairsPerTripDay` is being read regularly.
+- A pair routed to `briefing` whose stop passes before a briefing ever covers it keeps
+  `delivered_at` NULL for ever. Harmless — it can never match the bundle filter again — and
+  deliberate: "judged, never delivered" is a truer row than one backdated to look sent.
+- `intervention.outcome` is NULL on every briefing row. The accept/dismiss path ships in Phase 5
+  with the patch it applies, and the sweep that marks the rest `ignored` ships with it.
