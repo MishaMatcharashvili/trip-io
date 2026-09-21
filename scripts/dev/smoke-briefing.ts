@@ -36,6 +36,14 @@ import type { Briefer, Mailer } from "../../src/domain/watch/briefing.ts";
 import { dedupeKey } from "../../src/domain/watch/event.ts";
 import type { Verdict } from "../../src/domain/watch/judge.ts";
 import { renderBriefingEmail } from "../../src/infra/briefing-email.ts";
+import { briefWithGemini } from "../../src/infra/gemini-briefing.ts";
+
+/**
+ * `--model` swaps the stubbed composer for the real one. Worth running whenever
+ * the prompt changes: the guards below are what catch a draft that has stopped
+ * covering its bundle, and a prompt edit is exactly what makes that happen.
+ */
+const USE_MODEL = process.argv.includes("--model");
 
 const step = (label: string, value: unknown) =>
   console.log(`\n── ${label}\n`, JSON.stringify(value, null, 1));
@@ -103,22 +111,24 @@ const verdict = (oneLine: string, outdoorId: string): Verdict => ({
   confidence: 0.8,
 });
 
-const goodDraft: Briefer = async (input) => ({
-  greeting: "Dry until mid-afternoon, and one thing worth moving.",
-  lines: [
-    {
-      refs: input.items.map((i) => i.ref),
-      title: "Rain over the old town from three",
-      detail: "Heaviest between three and five, easing by seven",
-    },
-  ],
-  change: input.items.some((i) => i.hasProposal)
-    ? {
-        ref: input.items.findIndex((i) => i.hasProposal),
-        sentence: "Take the fortress at one instead.",
-      }
-    : null,
-});
+const goodDraft: Briefer = USE_MODEL
+  ? briefWithGemini
+  : async (input) => ({
+      greeting: "Dry until mid-afternoon, and one thing worth moving.",
+      lines: [
+        {
+          refs: input.items.map((i) => i.ref),
+          title: "Rain over the old town from three",
+          detail: "Heaviest between three and five, easing by seven",
+        },
+      ],
+      change: input.items.some((i) => i.hasProposal)
+        ? {
+            ref: input.items.findIndex((i) => i.hasProposal),
+            sentence: "Take the fortress at one instead.",
+          }
+        : null,
+    });
 
 /**
  * The shape the guards exist for: a well-formed draft that quietly writes about
