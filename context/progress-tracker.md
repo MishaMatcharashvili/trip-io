@@ -2,6 +2,9 @@
 
 Last updated: 2026-09-21.
 
+`context/running-the-pipeline.md` is the switch list: what Phase 3 left switched off, why, and what
+turning each one on unblocks.
+
 ## Current status: Phase 3 built and exercised on the live database; blocked on you for the 600 and for `GEMINI_API_KEY`
 
 Phase 3 is built end to end and has run against the real database: sense → match → queue → drain,

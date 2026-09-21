@@ -101,6 +101,7 @@ day Vercel Pro is enabled, this file is the whole change:
 ```
 
 Until then the handlers are invoked by hand or by `npm run smoke:watch`; nothing runs on a timer.
+`context/running-the-pipeline.md` has the rest of the switch list.
 
 Cron handlers never call the model directly — they enqueue jobs. The drain handler is what makes the
 system survive a spike: claim with `SKIP LOCKED LIMIT n`, track elapsed time, stop cleanly at 240s,
