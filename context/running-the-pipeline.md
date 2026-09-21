@@ -140,7 +140,7 @@ is the quality of Overture's data until the curation queue at `/curate` has run.
 These three work today, against the live database, and none of them costs a model call:
 
 ```
-npm test                # 281 tests; the watch layer's are in src/domain/watch/
+npm test                # 269 tests; the watch layer's are in src/domain/watch/
 npm run smoke:watch     # trip → watch → sense → match → queue → drain, judge stubbed
 npm run smoke:briefing  # bundle → compose → store → email → opened, composer and mailer stubbed
 npm run kill:count      # pairs per trip-day over synthetic trips and archived weather
