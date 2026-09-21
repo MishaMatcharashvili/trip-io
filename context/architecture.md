@@ -87,7 +87,7 @@ POST         /api/telegram/webhook     road reports → world_event             
 The three built handlers are written and behind `CRON_SECRET`. They are **not on Vercel cron**:
 Hobby runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying
 these schedules fails the build outright, which is what happened when Phase 3 first tried to ship
-one. The clock is Trigger.dev instead (`trigger/watch-pipeline.ts`), one hourly task calling the
+one. The clock is Trigger.dev instead (`src/trigger/watch-pipeline.ts`), one hourly task calling the
 three handlers in order over HTTP: free at that cadence against $20/mo for Vercel Pro, and hourly is
 what the design calls for while the finer schedules below are throughput settings for scale.
 Trigger.dev is the clock only — the work, the queue and the drain stay here.

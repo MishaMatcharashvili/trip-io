@@ -25,7 +25,7 @@ curated places. `/curate` still waits on Google OAuth + `CURATOR_EMAILS`.
 | Screens | 17 fixture-backed screens under `src/app` (see `/design`). Layout and states are final; no API, no MapLibre — maps are the canvas's schematic charts in `src/ui/map/` |
 | Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0004` applied; `0003` adds `event_match.route_reason`/`rejections` and makes the event/node pair unique, `0004` adds `queued_at`. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
 | Detectors | **1 of 7 built**: weather-vs-activity, hourly, thresholds derived here (no Georgian warning feed exists). Open-Meteo on the free tier — commercial key still to buy. No detector has graduated out of briefing-only: `INTERRUPT_ELIGIBLE` is empty, so nothing the system builds can wake anyone up |
-| Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job` all live. Cron at `/api/cron/{sense-weather,match,drain}` behind `CRON_SECRET` — written, **not yet on a timer**: the clock is `trigger/watch-pipeline.ts` (Trigger.dev, hourly) and there is no account yet. 232 tests (`npm test`) |
+| Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job` all live. Cron at `/api/cron/{sense-weather,match,drain}` behind `CRON_SECRET` — written, **not yet on a timer**: the clock is `src/trigger/watch-pipeline.ts` (Trigger.dev, hourly) and there is no account yet. 232 tests (`npm test`) |
 | Judge | Prompt, guards and router written and unit-tested; the four validators enforce evidence, tier, no-empty-helpful and the confidence floor. **The model itself has never been called** |
 | Catalogue | **Loaded**: 64 sense regions, 12 corridors, 13,338 places (11,590 `verified`, 1,748 `raw`). Per focus area: Tbilisi core 4,008, Kakheti 830, Kazbegi corridor 730, Svaneti 301. **0 / 600 curated** |
 | Recruiting | Not started |
@@ -38,7 +38,7 @@ curated places. `/curate` still waits on Google OAuth + `CURATOR_EMAILS`.
 - [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — also gates `/curate`; set `CURATOR_EMAILS` to your Google address
 - [ ] **Trigger.dev account** + `CRON_SECRET` — what makes Phase 3 run on a timer. Vercel cron was
       tried and failed the deployment (Hobby rejects sub-daily schedules), so the clock is
-      `trigger/watch-pipeline.ts` instead: hourly, free at that cadence, $10/mo for finer against
+      `src/trigger/watch-pipeline.ts` instead: hourly, free at that cadence, $10/mo for finer against
       $20/mo for Vercel Pro. Written but never executed — there is no account yet
 - [ ] Vercel Pro — no longer blocking. Hobby allows 300s functions, which is all the pipeline needs;
       Pro is now only worth buying for the 800s ceiling or if Vercel cron is wanted back

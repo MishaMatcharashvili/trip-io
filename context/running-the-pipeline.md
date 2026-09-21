@@ -48,23 +48,30 @@ It also gates trip generation, which is separately blocked on the 600 curated pl
 
 ### 2. A Trigger.dev account — nothing runs on a timer
 
-The clock is `trigger/watch-pipeline.ts`: one hourly scheduled task that calls the three
+The clock is `src/trigger/watch-pipeline.ts`: one hourly scheduled task that calls the three
 `/api/cron/*` handlers in order over HTTP. **Trigger.dev is the clock and nothing else** — the work
 stays on Vercel, and the Postgres queue and its drain are untouched.
 
 To switch it on:
 
-1. Create a Trigger.dev project; copy the project ref into `TRIGGER_PROJECT_REF` and a secret key
-   into `TRIGGER_SECRET_KEY` locally (both are CLI-only — the Next app never reads them).
+1. `npx trigger.dev@latest login` (opens a browser), then put the **development** secret key from
+   the dashboard into `TRIGGER_SECRET_KEY` in `.env`. Both are CLI-only — the Next app never reads
+   them. The project ref is committed in `trigger.config.ts`.
 2. On the Trigger.dev environment, set **`APP_URL`** (the deployed origin, no trailing slash) and
    **`CRON_SECRET`** — the task reads those, not the local `.env`.
 3. Set the same `CRON_SECRET` on Vercel. Without it the routes return 503 rather than running: an
    unset secret in production is the configuration mistake the guard exists to survive, so it
    refuses instead of waving requests through.
-4. `npm run trigger:deploy`. `npm run trigger:dev` runs it against a local server first.
+4. `npm run trigger:dev` registers the tasks against the development environment and keeps them
+   running locally; `npm run trigger:deploy` publishes them.
 
-**None of this has been verified** — there is no account yet, so the task has never executed. The
-config and task typecheck and the Next build is unaffected, and that is all that is known.
+Two tasks are exported. `watch-pipeline` is the hourly schedule. `run-watch-pipeline` does the same
+pass on demand — trigger it from the dashboard when you want a cycle now rather than at seven
+minutes past, which is most of what you want while the pipeline is still being read by hand.
+
+Note that `src/trigger` is a layer in its own right (`src/layers.test.ts`): an entry point beside
+`src/server`, allowed to call a use case and not a repository. That is what keeps the option of
+running the pipeline on Trigger.dev open without the tasks quietly growing their own data access.
 
 #### Why not Vercel cron
 
