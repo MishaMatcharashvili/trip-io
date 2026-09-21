@@ -84,10 +84,15 @@ POST         /api/telegram/webhook     road reports → world_event             
 0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     Phase 5
 ```
 
-The three built handlers are written and behind `CRON_SECRET`, but **not scheduled yet**. Hobby cron
-runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying these
-schedules fails the build outright, which is what happened when Phase 3 first tried to ship one. The
-day Vercel Pro is enabled, this file is the whole change:
+The three built handlers are written and behind `CRON_SECRET`. They are **not on Vercel cron**:
+Hobby runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying
+these schedules fails the build outright, which is what happened when Phase 3 first tried to ship
+one. The clock is Trigger.dev instead (`src/trigger/watch-pipeline.ts`), one hourly task calling the
+three handlers in order over HTTP: free at that cadence against $20/mo for Vercel Pro, and hourly is
+what the design calls for while the finer schedules below are throughput settings for scale.
+Trigger.dev is the clock only — the work, the queue and the drain stay here.
+
+Should Vercel Pro ever be bought for other reasons, this file is the whole change back:
 
 ```json
 {
@@ -100,7 +105,8 @@ day Vercel Pro is enabled, this file is the whole change:
 }
 ```
 
-Until then the handlers are invoked by hand or by `npm run smoke:watch`; nothing runs on a timer.
+Until a Trigger.dev account exists the handlers are invoked by hand or by `npm run smoke:watch`;
+nothing runs on a timer. `context/running-the-pipeline.md` has the rest of the switch list.
 
 Cron handlers never call the model directly — they enqueue jobs. The drain handler is what makes the
 system survive a spike: claim with `SKIP LOCKED LIMIT n`, track elapsed time, stop cleanly at 240s,
