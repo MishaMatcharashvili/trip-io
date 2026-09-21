@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import type {
   ComposeFeedback,
@@ -6,6 +5,7 @@ import type {
   Composer,
 } from "../domain/trip/generate/pipeline.ts";
 import { planSchema, type RefPlan } from "../domain/trip/generate/plan.ts";
+import { genai, MODEL } from "./gemini.ts";
 
 // The only model call in trip generation, and the only file that knows which
 // provider we use: it implements the domain's `Composer` port, and everything
@@ -14,8 +14,6 @@ import { planSchema, type RefPlan } from "../domain/trip/generate/plan.ts";
 // The model chooses places and their order; it never sets clock times —
 // `schedule.ts` does that, because models are weak at time arithmetic and the
 // result has to satisfy the coherent-day validator either way.
-
-export const MODEL = "gemini-2.0-flash";
 
 const SYSTEM = `You compose day-by-day itineraries for travellers in Georgia (the country).
 
@@ -69,14 +67,6 @@ const retryTurn = (feedback: ComposeFeedback) =>
   ]
     .filter(Boolean)
     .join("\n\n");
-
-let client: GoogleGenAI | undefined;
-function genai() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  client ??= new GoogleGenAI({ apiKey });
-  return client;
-}
 
 export const composeWithGemini: Composer = async (input, feedback) => {
   // The refs become an enum in the response schema, so an invented place is
