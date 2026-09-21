@@ -105,6 +105,17 @@ export const eventMatch = pgTable(
     // Why a verdict was refused, when it was. Rejection-reason frequency is the
     // earliest signal that a prompt edit went wrong.
     rejections: jsonb("rejections"),
+    // Set when a briefing has written about this pair. The last of the four
+    // stamps a match collects on its way through the pipeline — matched,
+    // queued, judged, delivered — and the one that stops the same rain over
+    // the same stop being reported again tomorrow.
+    //
+    // It belongs here and not on `intervention` because the two count
+    // different things: one event can match two stops on the same day, which
+    // is two pairs to write about but one delivery, and folding them would
+    // either lose a stop or double-count the outcome that the kill criteria
+    // read.
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   },
   (t) => [
     // Unique, not just indexed: the matcher runs every five minutes and its
@@ -121,6 +132,11 @@ export const eventMatch = pgTable(
     index("event_match_unqueued_idx")
       .on(t.matchedAt)
       .where(sql`${t.queuedAt} is null`),
+    // What the briefing gathers each morning: this trip's judged, undelivered
+    // pairs. Partial, because delivered rows are the ones that accumulate.
+    index("event_match_undelivered_idx")
+      .on(t.tripId)
+      .where(sql`${t.deliveredAt} is null`),
   ],
 );
 

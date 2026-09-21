@@ -1,0 +1,2 @@
+ALTER TABLE "event_match" ADD COLUMN "delivered_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "event_match_undelivered_idx" ON "event_match" USING btree ("trip_id") WHERE "event_match"."delivered_at" is null;
