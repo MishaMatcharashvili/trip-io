@@ -12,6 +12,7 @@ import {
   stopsOn,
 } from "../dal/briefings.ts";
 import { enqueue } from "../dal/jobs.ts";
+import { placeNames } from "../dal/places.ts";
 import { dayKey } from "../domain/trip/document.ts";
 import {
   type Briefer,
@@ -19,7 +20,10 @@ import {
   type BriefingRejection,
   brieferInput,
   bundle,
+  type ChangeRow,
   type ComposeInput,
+  changePlaceIds,
+  changePreview,
   dayIndexOf,
   type Mailer,
   quietBriefing,
@@ -252,6 +256,43 @@ export async function briefingView(
   return (
     (await briefingOn(tripId, dayKey(now))) ?? (await latestBriefing(tripId))
   );
+}
+
+export type BriefingPage = {
+  briefing: StoredBriefing;
+  /** The before-and-after of the recommended change, already resolved. */
+  change: { sentence: string; rows: ChangeRow[] } | null;
+};
+
+/**
+ * The in-app briefing, with the one thing the stored document cannot carry: the
+ * names of any places the change would swap in. Proposals hold catalogue ids,
+ * and an id is not something to show a traveller.
+ *
+ * Access is the caller's to check — the page knows whose trip it is
+ * (src/bll/trip-document.ts, accessTrip) and this only reads.
+ */
+export async function briefingPage(
+  tripId: string,
+  now: Date = new Date(),
+): Promise<BriefingPage | null> {
+  const briefing = await briefingView(tripId, now);
+  if (!briefing) return null;
+
+  const change = briefing.document.change;
+  if (!change) return { briefing, change: null };
+
+  const ids = changePlaceIds(change);
+  const names =
+    ids.length > 0 ? await placeNames(ids) : new Map<string, string>();
+
+  return {
+    briefing,
+    change: {
+      sentence: change.sentence,
+      rows: changePreview(change, briefing.document.day.stops, names),
+    },
+  };
 }
 
 /** Opened, once. The kill-criteria stamp (src/dal/briefings.ts). */
