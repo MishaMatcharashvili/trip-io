@@ -1,7 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import type { Judge, JudgeInput } from "../domain/watch/judge.ts";
 import { verdict } from "../domain/watch/judge.ts";
+import { generate, MODEL } from "./gemini.ts";
 
 // The only model call in the watch pipeline, and the only one that runs per
 // matched pair rather than per region. Everything in the architecture upstream
@@ -11,8 +11,6 @@ import { verdict } from "../domain/watch/judge.ts";
 // It implements the domain's `Judge` port and knows nothing else: the guards
 // that decide whether its answer is usable are in src/domain/watch/judge.ts,
 // where they can be tested without a key.
-
-export const MODEL = "gemini-2.0-flash";
 
 const SYSTEM = `You advise travellers in Georgia (the country) whose plans a real-world event may affect.
 
@@ -85,16 +83,8 @@ const userTurn = (input: JudgeInput) =>
     alternatives: input.alternatives,
   });
 
-let client: GoogleGenAI | undefined;
-function genai() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  client ??= new GoogleGenAI({ apiKey });
-  return client;
-}
-
 export const judgeWithGemini: Judge = async (input) => {
-  const response = await genai().models.generateContent({
+  const response = await generate({
     model: MODEL,
     contents: [{ role: "user", parts: [{ text: userTurn(input) }] }],
     config: {

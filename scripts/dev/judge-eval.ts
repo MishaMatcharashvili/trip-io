@@ -23,7 +23,8 @@ import {
   scoreFixture,
   summarise,
 } from "../../src/domain/watch/eval/score.ts";
-import { judgeWithGemini, MODEL } from "../../src/infra/gemini-judge.ts";
+import { MODEL } from "../../src/infra/gemini.ts";
+import { judgeWithGemini } from "../../src/infra/gemini-judge.ts";
 
 const args = process.argv.slice(2);
 const verbose = args.includes("-v") || args.includes("--verbose");
