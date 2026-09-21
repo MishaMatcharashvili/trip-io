@@ -7,6 +7,9 @@ import { describe, test } from "node:test";
 //
 //   domain ← dal ← bll ← server ← app
 //
+// `src/trigger` sits beside `src/server`: both are entry points that call use
+// cases, one over HTTP and one on a schedule.
+//
 // Each layer may use the ones to its left and must not know the ones to its
 // right. The domain knows nothing at all: it is plain functions over plain
 // values, which is what makes it testable without a database or a model.
@@ -16,7 +19,15 @@ import { describe, test } from "node:test";
 
 const SRC = resolve(import.meta.dirname);
 
-type Layer = "domain" | "dal" | "bll" | "infra" | "server" | "app" | "lib";
+type Layer =
+  | "domain"
+  | "dal"
+  | "bll"
+  | "infra"
+  | "server"
+  | "app"
+  | "lib"
+  | "trigger";
 
 /** What each layer is allowed to import. */
 const mayImport: Record<Layer, readonly Layer[]> = {
@@ -27,6 +38,11 @@ const mayImport: Record<Layer, readonly Layer[]> = {
   server: ["domain", "bll", "infra", "lib"],
   app: ["domain", "bll", "server", "infra", "lib"],
   lib: ["domain", "server"],
+  // Trigger.dev tasks are an entry point, like a route handler: the scheduler
+  // calls in from outside. Same rights as `server` — it may call a use case,
+  // never a repository — which is what keeps the option of running the
+  // pipeline there open without the tasks growing their own data access.
+  trigger: ["domain", "bll", "infra", "lib"],
 };
 
 const layerOf = (path: string): Layer | null => {
@@ -38,6 +54,7 @@ const layerOf = (path: string): Layer | null => {
     case "infra":
     case "server":
     case "lib":
+    case "trigger":
       return first;
     case "app":
     case "ui":
