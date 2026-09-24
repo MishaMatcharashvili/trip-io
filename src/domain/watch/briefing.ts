@@ -162,6 +162,11 @@ export const briefingRejectionReasons = [
   "duplicate-ref",
   "dropped-item",
   "change-without-proposal",
+  // Not a bad answer but no answer: the provider was unreachable for every
+  // attempt the queue allows. Recorded like the rest, because "the model was
+  // down" and "the model wrote something we refused" are different problems
+  // and only the reason tells them apart the next morning.
+  "composer-unreachable",
 ] as const;
 export type BriefingRejectionReason = (typeof briefingRejectionReasons)[number];
 
