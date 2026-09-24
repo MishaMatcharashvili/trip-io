@@ -366,6 +366,17 @@ try {
   }
   step("open rate (whole database, 1 day)", await openRate(1));
 } finally {
+  // Two passes, and the order is the whole point.
+  //
+  // Every smoke trip sits in Tbilisi at overlapping times, so the event written
+  // for one run matches the stops of every other run still in the database.
+  // `intervention.event_id` is ON DELETE restrict — deliberately, because the
+  // outcome log has to outlive the ephemeral events it cites — so deleting one
+  // trip's events while another trip's interventions still point at them fails,
+  // aborts the loop, and strands everything after it. That is how twelve trips
+  // and twelve events accumulated in the real database before anyone looked.
+  //
+  // So: every trip goes first, then the events nothing cites any more.
   for (const tripId of written) {
     await db.execute(sql`DELETE FROM intervention WHERE trip_id = ${tripId}`);
     await db.execute(sql`
@@ -379,10 +390,41 @@ try {
         )
     `);
     await db.execute(sql`DELETE FROM trip WHERE id = ${tripId}`);
+  }
+
+  for (const tripId of written) {
     await db.execute(
       sql`DELETE FROM world_event WHERE dedupe_key LIKE ${`%|smoke-${tripId}`}`,
     );
   }
+
   await db.execute(sql`DELETE FROM "user" WHERE id = ${userId}`);
+
+  // Belt and braces: a run killed before its `finally` (a 503 from the model
+  // taking the process down mid-step, which is exactly what happened) leaves
+  // rows behind that no later run has the ids for. This sweeps them by name, so
+  // the rehearsal cleans up after its own crashes as well as its own successes.
+  await db.execute(sql`
+    DELETE FROM intervention WHERE trip_id IN (
+      SELECT id FROM trip WHERE title LIKE 'Briefing smoke · %'
+    )
+  `);
+  await db.execute(sql`DELETE FROM trip WHERE title LIKE 'Briefing smoke · %'`);
+  await db.execute(sql`DELETE FROM world_event WHERE source = 'smoke'`);
+  await db.execute(sql`DELETE FROM "user" WHERE id LIKE 'smoke-%'`);
+
+  // And the jobs those crashes queued. A judge job whose match is gone, or a
+  // briefing job whose trip is gone, can never succeed — it will be claimed,
+  // fail, and back off five times before the queue gives up on it. Orphaned by
+  // definition, so sweeping them is safe rather than merely convenient.
+  await db.execute(sql`
+    DELETE FROM job WHERE completed_at IS NULL AND (
+      (kind = ${JUDGE_JOB} AND NOT EXISTS (
+        SELECT 1 FROM event_match m WHERE m.id::text = job.payload->>'matchId'))
+      OR
+      (kind = ${BRIEFING_JOB} AND NOT EXISTS (
+        SELECT 1 FROM trip t WHERE t.id::text = job.payload->>'tripId'))
+    )
+  `);
   console.log("\ncleaned up");
 }
