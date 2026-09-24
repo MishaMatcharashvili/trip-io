@@ -234,7 +234,12 @@ try {
     })),
   );
 
-  step("schedule", await scheduleBriefings());
+  // Told which morning it is, rather than left to read the clock. The stops
+  // above are three hours out, so run this late enough in a Tbilisi evening and
+  // they fall on tomorrow's date while `scheduleBriefings()` would brief for
+  // today — and find nothing. The cron passes no argument; only a rehearsal
+  // that has to work at 22:00 needs one.
+  step("schedule", await scheduleBriefings(new Date(OUTDOOR_AT)));
 
   const drained = await drain({
     handlers: {
@@ -321,7 +326,39 @@ try {
     (await briefingPage(refused.tripId))?.briefing.document.lines,
   );
 
-  // ── 4. The kill-criteria instrument.
+  // ── 4. A composer that cannot be reached at all. While retries remain the
+  //    error is thrown on, so the queue's backoff gets to try again; on the
+  //    last attempt the morning gets the plain briefing rather than silence.
+  //    The briefing is the only channel this product has, so "no briefing" is
+  //    not an acceptable resting state.
+  const unreachable = await buildTrip("Briefing smoke · an unreachable model");
+  await routeToBriefing(unreachable, "Rain over the fortress from three.");
+  const down: Briefer = async () => {
+    throw new Error("503 the model is currently experiencing high demand");
+  };
+
+  let threw = false;
+  try {
+    await writeBriefing(unreachable.tripId, DATE, { brief: down, mail });
+  } catch {
+    threw = true;
+  }
+  step("with retries left, it throws so the queue retries", { threw });
+
+  step(
+    "on the last attempt, it sends the fallback",
+    await writeBriefing(unreachable.tripId, DATE, {
+      brief: down,
+      mail,
+      lastChance: true,
+    }),
+  );
+  step(
+    "…and the fallback is a real briefing",
+    (await briefingPage(unreachable.tripId))?.briefing.document.lines,
+  );
+
+  // ── 5. The kill-criteria instrument.
   if (page) {
     await db.execute(
       sql`UPDATE briefing SET opened_at = now() WHERE id = ${page.briefing.id}`,
