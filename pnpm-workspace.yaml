@@ -1,0 +1,18 @@
+# pnpm blocks dependency install scripts by default. This is where it reads the
+# decisions from — not package.json's "pnpm" field, which pnpm 12 ignores, and
+# not the `onlyBuiltDependencies` / `ignoredBuiltDependencies` lists that pnpm
+# 10 and 11 used. `pnpm approve-builds` writes this map; edit it by hand only
+# after reading what the script in question actually does.
+#
+#   esbuild        postinstall links the platform binary. drizzle-kit and the
+#                  Trigger.dev build both run on it, so it is allowed.
+#   @google/genai  preinstall is `echo 'preinstall: no-op'`.
+#   protobufjs     postinstall only warns when a dependent pins it with the
+#                  wrong version scheme.
+#
+# The last two are denied rather than left unanswered, so the install stays
+# quiet about them instead of failing with ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  '@google/genai': false
+  esbuild: true
+  protobufjs: false
