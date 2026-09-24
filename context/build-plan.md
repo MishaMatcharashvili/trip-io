@@ -63,7 +63,8 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [x] In-app briefing view — the first screen reading the database rather than the fixtures, with the change rendered as a before-and-after
 - [x] `briefing` table (migration 0005) and `event_match.delivered_at` (0006); open tracking from both the email pixel and the app, because "briefing opened per trip-day" is a kill criterion
 - [x] `npm run smoke:briefing` — the whole path against the real database, composer and mailer stubbed
-- [ ] **Never run against the model.** `GEMINI_API_KEY` is set but no briefing has been composed by Gemini; every briefing so far came from a stub or from the deterministic paths
+- [x] **Run against the real model.** `npm run smoke:briefing -- --model` composed a briefing with Gemini on 2026-09-24: greeting, a headlined line covering its item, and a nominated change, all through the guards. Framing held — *"making the paths slick while the museum stays dry"*, an opportunity rather than an alarm
+- [x] Survive a composer outage. `gemini-3.8-flash` returned 503 on two of three runs that evening, which exposed the fallback covering only a refused draft and not an unreachable model. Fixed: the error is thrown on while the queue has retries left, and the last attempt sends the fallback rather than nothing
 - [ ] Get it in front of 3 real travellers this phase (people you know travelling in Georgia in October), ahead of the Phase 10 cohort
 
 ## Phase 5 — interrupts, budget enforcer, road form
