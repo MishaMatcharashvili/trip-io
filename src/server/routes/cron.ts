@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { scheduleBriefings } from "@/bll/briefing.ts";
 import { drain } from "@/bll/drain.ts";
+import { sweepOutcomes } from "@/bll/interventions.ts";
 import { runMatch } from "@/bll/match.ts";
 import { senseWeather } from "@/bll/sense.ts";
 import { requireCronSecret } from "../cron.ts";
@@ -29,6 +30,11 @@ export const cron = new Hono()
 
   // * * * * * — claim, judge, stop at 240s, let the next minute continue.
   .get("/drain", async (c) => c.json(await drain()))
+
+  // 0 * * * * — silence past expiry becomes `ignored`. Written by the clock,
+  // not left to the client: an acceptance rate whose denominator is only the
+  // interventions someone answered is the number that flatters us most.
+  .get("/outcomes", async (c) => c.json(await sweepOutcomes()))
 
   // 30 3 * * * — 07:30 in Tbilisi. One job per live trip-day; the model call
   // itself happens in the drain, like every other one.
