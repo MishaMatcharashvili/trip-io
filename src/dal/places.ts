@@ -243,16 +243,29 @@ export async function curatedInArea(
   });
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Ids worth asking the catalogue about. `place.id` is a uuid column, and
+ * Postgres answers `id IN ('p7')` with a type error rather than an empty
+ * result — so an id a model invented, or a client mistyped, would crash the
+ * query that exists to report it as unknown. Anything not uuid-shaped cannot be
+ * a place, and is simply not found.
+ */
+const lookupable = (ids: readonly string[]) =>
+  ids.filter((id) => UUID.test(id));
+
 /** Catalogue facts the validator needs, for every place a document mentions. */
 export async function placeFacts(
   ids: readonly string[],
   conn: Queryable = db,
 ): Promise<Map<string, PlaceInfo>> {
-  if (ids.length === 0) return new Map();
+  const wanted = lookupable(ids);
+  if (wanted.length === 0) return new Map();
   const rows = await conn.execute(sql`
     SELECT id, tier, opening_hours,
            ST_X(geom::geometry) AS lon, ST_Y(geom::geometry) AS lat
-    FROM place WHERE id IN (${list(ids)})
+    FROM place WHERE id IN (${list(wanted)})
   `);
   return new Map(
     rows.rows.map((r) => {
@@ -276,9 +289,10 @@ export async function placeNames(
   ids: readonly string[],
   conn: Queryable = db,
 ): Promise<Map<string, string>> {
-  if (ids.length === 0) return new Map();
+  const wanted = lookupable(ids);
+  if (wanted.length === 0) return new Map();
   const rows = await conn.execute(sql`
-    SELECT id, name FROM place WHERE id IN (${list(ids)})
+    SELECT id, name FROM place WHERE id IN (${list(wanted)})
   `);
   return new Map(rows.rows.map((r) => [r.id as string, r.name as string]));
 }
