@@ -11,6 +11,7 @@ import { checkVerdict } from "./judge.ts";
 import {
   CONFIDENCE,
   describeReport,
+  describeStored,
   onApproval,
   ROAD_SOURCE,
   type RoadReportInput,
@@ -68,6 +69,20 @@ describe("the form's input", () => {
         hazard: null,
       }),
       "Georgian Military Road — open again",
+    );
+  });
+});
+
+describe("a stored report", () => {
+  test("is described by when it ends, in Tbilisi", () => {
+    assert.equal(
+      describeStored({
+        corridorSlug: "military-road",
+        condition: "restricted",
+        hazard: "snow-closure",
+        validTo: "2026-12-05T12:00:00Z",
+      }),
+      "Georgian Military Road — restricted (snow), until Sat 16:00",
     );
   });
 });

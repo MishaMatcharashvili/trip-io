@@ -113,6 +113,34 @@ export function describeReport(report: RoadReportInput): string {
   return `${road} — ${what}${cause}${howLong}`;
 }
 
+const untilFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Tbilisi",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/**
+ * A report as it stands once sent: its end is a time, not a duration any more.
+ * "Until Sat 16:00" is what an operator deciding whether to approve it, and a
+ * reporter hearing what became of it, both actually need.
+ */
+export function describeStored(report: {
+  corridorSlug: string;
+  condition: RoadCondition;
+  hazard: RoadHazard | null;
+  validTo: string;
+}): string {
+  const road = corridorName(report.corridorSlug);
+  if (report.condition === "reopened") return `${road} — open again`;
+  const what = conditionLabels[report.condition].split(" — ")[0].toLowerCase();
+  const cause = report.hazard
+    ? ` (${hazardLabels[report.hazard].toLowerCase()})`
+    : "";
+  return `${road} — ${what}${cause}, until ${untilFormat.format(new Date(report.validTo))}`;
+}
+
 // ---------------------------------------------------------------------------
 // From a report to an event
 
