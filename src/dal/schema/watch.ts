@@ -69,6 +69,12 @@ export const tripWatch = pgTable(
     channels: deliveryChannel("channels").array().notNull(),
     quietHours: jsonb("quiet_hours").notNull(),
     cap: integer("cap").notNull(),
+    // The first time push was switched off while the watch was awake.
+    // "Notifications disabled during trip" is a kill criterion (continue below
+    // 10%, stop above 25%), and in a proactive product a mute is not a dip —
+    // it is usually permanent, which makes it the most informative thing a
+    // traveller can do. First one wins: turning push back on does not unsay it.
+    mutedAt: timestamp("muted_at", { withTimezone: true }),
   },
   (t) => [
     index("trip_watch_regions_idx").using("gist", t.regions),

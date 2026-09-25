@@ -1,5 +1,6 @@
 export * from "./auth.ts";
 export * from "./catalogue.ts";
+export * from "./device.ts";
 export * from "./generation.ts";
 export * from "./job.ts";
 export * from "./trip.ts";
