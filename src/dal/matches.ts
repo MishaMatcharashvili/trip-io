@@ -409,11 +409,15 @@ export async function loadDay(
  * judge may propose. The tier filter is what makes "the model cannot name a
  * place it did not retrieve" mean something, and the validator checks it again
  * once the verdict comes back.
+ *
+ * The stop's own place is left out: it is always the nearest, so it would take
+ * a slot and invite a swap to itself, which changes nothing.
  */
 export async function nearbyAlternatives(
   lonLat: [number, number],
   radiusM: number,
   limit: number,
+  excludePlaceId: string | null = null,
 ): Promise<
   {
     placeId: string;
@@ -430,6 +434,7 @@ export async function nearbyAlternatives(
     FROM place p
     WHERE p.tier IN ('curated', 'verified')
       AND ST_DWithin(p.geom, ${point}, ${radiusM})
+      ${excludePlaceId ? sql`AND p.id <> ${excludePlaceId}` : sql``}
     ORDER BY p.tier = 'curated' DESC, distance_m
     LIMIT ${limit}
   `);
