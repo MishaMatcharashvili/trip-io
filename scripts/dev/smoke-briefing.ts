@@ -36,7 +36,7 @@ import type { Briefer, Mailer } from "../../src/domain/watch/briefing.ts";
 import { dedupeKey } from "../../src/domain/watch/event.ts";
 import type { Verdict } from "../../src/domain/watch/judge.ts";
 import { renderBriefingEmail } from "../../src/infra/briefing-email.ts";
-import { briefWithGemini } from "../../src/infra/gemini-briefing.ts";
+import { briefWithOpenAI } from "../../src/infra/openai-briefing.ts";
 
 /**
  * `--model` swaps the stubbed composer for the real one. Worth running whenever
@@ -112,7 +112,7 @@ const verdict = (oneLine: string, outdoorId: string): Verdict => ({
 });
 
 const goodDraft: Briefer = USE_MODEL
-  ? briefWithGemini
+  ? briefWithOpenAI
   : async (input) => ({
       greeting: "Dry until mid-afternoon, and one thing worth moving.",
       lines: [

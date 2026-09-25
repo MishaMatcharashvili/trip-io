@@ -31,7 +31,7 @@ schema and cron design this section summarizes.
 | Auth | Better Auth | anonymous trip in local state → account created at save → trip claimed; Expo support built in |
 | Map | MapLibre GL + PMTiles | one `.pmtiles` file on Vercel Blob or R2, read via HTTP range requests; no tile server |
 | Queue | Postgres table + `SELECT ... FOR UPDATE SKIP LOCKED` | no Redis; cron handlers enqueue, a drain handler claims and processes |
-| Scheduling | Vercel Cron → route handlers | **Vercel Pro is a hard dependency** — Hobby cron runs once/day only |
+| Scheduling | Trigger.dev schedules → `/api/cron/*` route handlers | the clock only; Hobby cron runs once/day and rejects finer schedules at deploy time (see Cron topology) |
 | Email | Resend | daily briefing |
 | Push | expo-notifications + EAS | APNs + FCM; credential setup starts week 1, latency doesn't compress |
 | Telegram | grammY, webhook | manual road-corridor report form (detector #2) |
@@ -54,7 +54,7 @@ is moving the code one layer further left.
 | `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router and the briefing document | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
 | `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
 | `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
-| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, the Gemini briefer, Open-Meteo, Resend, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/infra` | Outbound adapters: the OpenAI composer, the OpenAI judge, the OpenAI briefer, Open-Meteo, Resend, Better Auth | Implements a port the domain declares. The only files that name an external provider |
 | `src/server` | The Hono app, its routers and the session middleware | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 
@@ -64,9 +64,11 @@ Two consequences worth stating, because they are what the layering buys:
   scheduler and the pipeline are pure; the pipeline takes its model, its cache and its travel estimate
   as injected ports, so every branch — cache hit, model retry, fallback, insufficient coverage — runs
   against fakes in `pipeline.test.ts`.
-- **Swapping an implementation is a one-file change.** `Composer`, `PlanCache` and `TravelEstimator`
-  are declared in the domain and implemented outside it: moving off Gemini, or replacing
-  straight-line travel with an OSRM matrix, touches `src/infra` or `src/dal` and nothing else.
+- **Swapping an implementation stays in `src/infra` or `src/dal`.** `Composer`, `Judge`, `Briefer`,
+  `PlanCache` and `TravelEstimator` are declared in the domain and implemented outside it. The move
+  from Gemini to OpenAI replaced four files in `src/infra` and one import line in each use case that
+  names a default; the domain, its guards and their tests did not change. Replacing straight-line
+  travel with an OSRM matrix would be the same shape of change in `src/dal`.
 
 This also means Hono runs unchanged on Bun or Node if the project ever outgrows Vercel — only the
 entry file changes.
@@ -235,6 +237,12 @@ the proposed ops are attached from the verdict afterwards — so a bad answer ca
 sentence about a real event, never a fabricated one. `src/domain/watch/briefing.ts` holds the guards
 and the two briefings written without a model: the quiet one and the fallback.
 
+A composer that cannot be reached is not a lost morning: the queue retries it while attempts
+remain, and on the job's final attempt the same fallback a refused draft gets is sent instead,
+written from the verdicts. Guests are briefed in the app only — Better Auth gives an
+anonymous user a placeholder address, so a guest is recognised by `is_anonymous`, never by a null
+email.
+
 The bundle looks 48 hours ahead rather than only at today. Rain on Thursday is worth knowing on
 Tuesday, when the traveller can still move something; beyond two days the forecast churns, so the
 item stays undelivered and is offered again as its day approaches.
@@ -277,6 +285,11 @@ no list.
   traveller has been told they are covered. *Enforced:* `checkDraft` in
   `src/domain/watch/briefing.ts`, which falls back to a briefing written from the verdicts rather
   than sending a refused draft. *Tested:* `briefing.test.ts`.
+- **A quiet briefing is not an all-clear while the judge owes a verdict.** "Found nothing" is only
+  said when no stop in the 48h window has a match the judge has not settled (unjudged, or refused);
+  otherwise the briefing says not everything has been checked, and never in green. *Enforced:*
+  `quietBriefing` in `src/domain/watch/briefing.ts`, fed by `unresolvedStops`. *Tested:*
+  `briefing.test.ts`, `briefing-email.test.ts`.
 - **A recommended change has something to apply.** "1 change recommended" citing an item that
   proposes no moves is the briefing's own empty-helpful verdict — a button that does nothing.
   *Enforced:* `checkDraft`. *Tested:* `briefing.test.ts`.
@@ -303,8 +316,10 @@ no list.
 
 - Open-Meteo's free tier is non-commercial (CC BY 4.0); a paid product needs the commercial API
   Standard tier (~15 calls/hour for Georgia, well inside the 1M/month allowance).
-- Vercel Hobby cron is once-per-day, enforced at deploy time — Pro ($20/mo) is required for the
-  hourly sense loop, not an later optimization.
+- Vercel Hobby cron is once-per-day, enforced at deploy time, so the hourly sense loop's clock is
+  Trigger.dev rather than Vercel cron (see Cron topology). Hobby's 300s function ceiling is enough
+  for the drain's 240s budget; Pro is only worth buying for the 800s ceiling or to bring Vercel cron
+  back.
 - There is no scrapeable Georgian road-conditions source (`georoad.ge` now redirects to a
   non-machine-readable news feed). Detector #2 (road-corridor) is a manual Telegram form through at
   least week 10, when an automation spike is evaluated against real collected events.

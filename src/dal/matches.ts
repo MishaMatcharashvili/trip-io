@@ -52,9 +52,13 @@ export type MatchedPair = {
  * the sense loop refreshes what is still true every hour, so anything it has
  * stopped re-reporting has stopped being forecast.
  *
- * The insert is `ON CONFLICT DO NOTHING` rather than the plan's `NOT EXISTS`.
- * Invocations of a five-minute cron overlap, and a uniqueness constraint
- * settles the race that a NOT EXISTS only narrows.
+ * It needs both the plan's `NOT EXISTS` and `ON CONFLICT DO NOTHING`, for
+ * different reasons. The `LIMIT` applies to the SELECT, before any conflict is
+ * seen, and every live pair keeps satisfying the join for as long as its event
+ * is re-forecast — so without the `NOT EXISTS`, once `limit` pairs had been
+ * matched they would fill every run's quota, conflict, and no new pair would
+ * ever be inserted. The constraint is still what settles the race between
+ * overlapping invocations, which a `NOT EXISTS` only narrows.
  */
 export async function matchEvents(limit: number): Promise<MatchedPair[]> {
   const rows = await db.execute(sql`
@@ -69,6 +73,9 @@ export async function matchEvents(limit: number): Promise<MatchedPair[]> {
     WHERE tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
        && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
       AND e.observed_at > now() - interval '6 hours'
+      AND NOT EXISTS (
+        SELECT 1 FROM event_match m WHERE m.event_id = e.id AND m.node_id = n.id
+      )
     ORDER BY ${matchScore} DESC
     LIMIT ${limit}
     ON CONFLICT (event_id, node_id) DO NOTHING
@@ -128,14 +135,6 @@ export async function recordVerdict(
           : null
       }::jsonb
     WHERE id = ${matchId}
-  `);
-}
-
-/** Put a pair back in the queue: a transient failure is not a verdict. */
-export async function releaseClaim(matchId: string): Promise<void> {
-  await db.execute(sql`
-    UPDATE event_match SET queued_at = NULL
-    WHERE id = ${matchId} AND judged_at IS NULL
   `);
 }
 
@@ -268,11 +267,15 @@ export async function loadDay(
  * judge may propose. The tier filter is what makes "the model cannot name a
  * place it did not retrieve" mean something, and the validator checks it again
  * once the verdict comes back.
+ *
+ * The stop's own place is left out: it is always the nearest, so it would take
+ * a slot and invite a swap to itself, which changes nothing.
  */
 export async function nearbyAlternatives(
   lonLat: [number, number],
   radiusM: number,
   limit: number,
+  excludePlaceId: string | null = null,
 ): Promise<
   {
     placeId: string;
@@ -289,6 +292,7 @@ export async function nearbyAlternatives(
     FROM place p
     WHERE p.tier IN ('curated', 'verified')
       AND ST_DWithin(p.geom, ${point}, ${radiusM})
+      ${excludePlaceId ? sql`AND p.id <> ${excludePlaceId}` : sql``}
     ORDER BY p.tier = 'curated' DESC, distance_m
     LIMIT ${limit}
   `);

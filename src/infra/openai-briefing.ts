@@ -1,7 +1,7 @@
-import { z } from "zod";
+import { zodTextFormat } from "openai/helpers/zod";
 import type { Briefer, BrieferInput } from "../domain/watch/briefing.ts";
 import { briefingDraft } from "../domain/watch/briefing.ts";
-import { generate, MODEL } from "./gemini.ts";
+import { generateJson } from "./openai.ts";
 
 // The second model call this product makes on a live trip, and the cheaper one:
 // once per trip-day with something to say, against once per matched pair for
@@ -63,25 +63,15 @@ const userTurn = (input: BrieferInput) =>
     items: input.items,
   });
 
-export const briefWithGemini: Briefer = async (input) => {
-  const response = await generate({
-    model: MODEL,
-    contents: [{ role: "user", parts: [{ text: userTurn(input) }] }],
-    config: {
-      systemInstruction: SYSTEM,
-      responseMimeType: "application/json",
-      responseJsonSchema: z.toJSONSchema(briefingDraft, { io: "output" }),
-      // Higher than the judge's 0.2. The judge is deciding and should be
-      // repeatable; this one is only writing, and a briefing that reads
-      // identically every morning is a briefing that stops being read.
-      temperature: 0.6,
-    },
-  });
+const FORMAT = zodTextFormat(briefingDraft, "briefing");
 
-  const text = response.text;
-  if (!text) throw new Error("the briefing composer returned no content");
-  // Parsed, not checked: the guards live in the domain, so a refused draft
-  // becomes the fallback briefing with its reasons recorded rather than an
-  // exception that loses the morning.
-  return JSON.parse(text);
-};
+export const briefWithOpenAI: Briefer = (input) =>
+  generateJson({
+    instructions: SYSTEM,
+    input: [{ role: "user", content: userTurn(input) }],
+    format: FORMAT,
+    // Low: the facts are fixed before the model sees them and attached after,
+    // so all it does here is order and write. A refused draft still becomes
+    // the fallback briefing with its reasons recorded, not a lost morning.
+    effort: "low",
+  });

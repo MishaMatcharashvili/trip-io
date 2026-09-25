@@ -25,7 +25,6 @@
     "catalogue:load": "node --env-file=.env scripts/catalogue/load.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.23.0",
     "@hono/zod-validator": "^0.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@trigger.dev/sdk": "^4.6.3",
@@ -33,6 +32,7 @@
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.7",
     "next": "16.3.4",
+    "openai": "^7.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.28.1",
