@@ -14,10 +14,12 @@ import {
 } from "../dal/briefings.ts";
 import { enqueue } from "../dal/jobs.ts";
 import { placeNames } from "../dal/places.ts";
+import { loadTrip } from "../dal/trips.ts";
 import { dayKey } from "../domain/trip/document.ts";
 import {
   type Briefer,
   type Briefing,
+  type BriefingItem,
   type BriefingRejection,
   brieferInput,
   bundle,
@@ -31,6 +33,7 @@ import {
   quietBriefing,
   readDraft,
 } from "../domain/watch/briefing.ts";
+import { briefingOffers } from "../domain/watch/interrupt.ts";
 import { renderBriefingEmail } from "../infra/briefing-email.ts";
 import { briefWithGemini } from "../infra/gemini-briefing.ts";
 import { emailConfigured, sendWithResend } from "../infra/resend.ts";
@@ -218,12 +221,19 @@ async function finish(
   input: ComposeInput,
   briefing: Briefing,
   rejections: BriefingRejection[],
-  taken: readonly { eventId: string }[],
+  taken: readonly BriefingItem[],
   overflow: readonly unknown[],
   deps: BriefingDeps,
 ): Promise<WriteOutcome> {
   const { tripId } = input;
   const date = input.day.date;
+
+  // The change's moves become absolute against the day as it stands now, so
+  // accepting it tomorrow cannot move a stop twice. Only read when there is a
+  // change to translate — most mornings have none.
+  const clocks = briefing.change
+    ? new Map(Object.entries((await loadTrip(tripId))?.doc.nodes ?? {}))
+    : new Map();
 
   const emailTo = await recipientFor(tripId);
   const saved = await saveBriefing({
@@ -236,7 +246,12 @@ async function finish(
     matchIds: briefing.matchIds,
     // One per event, not per pair: the same rain over two stops is one thing
     // the traveller was told (src/dal/briefings.ts).
-    eventIds: [...new Set(taken.map((i) => i.eventId))],
+    offers: briefingOffers({
+      items: taken,
+      change: briefing.change,
+      clocks,
+      now: input.now,
+    }),
   });
 
   if (!saved) {

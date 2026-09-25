@@ -5,6 +5,7 @@ import type {
   BriefingStop,
 } from "../domain/watch/briefing.ts";
 import type { EventKind, Severity } from "../domain/watch/event.ts";
+import type { BriefingOffer } from "../domain/watch/interrupt.ts";
 import type { Verdict } from "../domain/watch/judge.ts";
 import { db } from "./client.ts";
 
@@ -180,7 +181,8 @@ export async function saveBriefing(row: {
   document: Briefing;
   emailTo: string | null;
   matchIds: readonly string[];
-  eventIds: readonly string[];
+  /** One per event: what the traveller was offered about it, and until when. */
+  offers: readonly BriefingOffer[];
 }): Promise<SavedBriefing | null> {
   const inserted = await db.execute(sql`
     INSERT INTO briefing (trip_id, day, day_index, quiet, document, email_to)
@@ -204,15 +206,15 @@ export async function saveBriefing(row: {
 
   // One intervention per event, not per pair: the same rain over two stops is
   // one thing the traveller was told, and `intervention.outcome` is the number
-  // the kill criteria read.
-  if (row.eventIds.length > 0) {
+  // the kill criteria read. Each carries what it offered and when it expires,
+  // so the sweep can mark it `ignored` and the card can still show it later.
+  if (row.offers.length > 0) {
     await db.execute(sql`
-      INSERT INTO intervention (trip_id, event_id, channel)
-      SELECT ${row.tripId}::uuid, e, 'briefing'::delivery_channel
-      FROM unnest(ARRAY[${sql.join(
-        row.eventIds.map((e) => sql`${e}::uuid`),
-        sql`, `,
-      )}]) AS e
+      INSERT INTO intervention (trip_id, event_id, channel, offer, expires_at)
+      SELECT ${row.tripId}::uuid, (o->>'eventId')::uuid,
+             'briefing'::delivery_channel, o->'offer',
+             (o->>'expiresAt')::timestamptz
+      FROM jsonb_array_elements(${JSON.stringify(row.offers)}::jsonb) AS o
     `);
   }
 
