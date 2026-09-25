@@ -66,6 +66,9 @@ export type Watch = WatchSettings & {
   activeTo: string;
 };
 
+// `channels` is selected as `text[]`: an array of a custom enum comes back
+// from both Neon drivers as its literal, `{push,briefing}`, and a string that
+// happens to answer `.includes("push")` correctly is how that went unnoticed.
 const toWatch = (r: Record<string, unknown>): Watch => ({
   tripId: r.trip_id as string,
   channels: r.channels as string[],
@@ -77,7 +80,7 @@ const toWatch = (r: Record<string, unknown>): Watch => ({
 
 export async function loadWatch(tripId: string): Promise<Watch | null> {
   const rows = await db.execute(sql`
-    SELECT trip_id, channels, quiet_hours, cap, active_from, active_to
+    SELECT trip_id, channels::text[] AS channels, quiet_hours, cap, active_from, active_to
     FROM trip_watch WHERE trip_id = ${tripId}
   `);
   return rows.rows[0] ? toWatch(rows.rows[0]) : null;
@@ -124,7 +127,7 @@ export async function lockWatch(
   tripId: string,
 ): Promise<Watch | null> {
   const rows = await conn.execute(sql`
-    SELECT trip_id, channels, quiet_hours, cap, active_from, active_to
+    SELECT trip_id, channels::text[] AS channels, quiet_hours, cap, active_from, active_to
     FROM trip_watch WHERE trip_id = ${tripId}
     FOR UPDATE
   `);
