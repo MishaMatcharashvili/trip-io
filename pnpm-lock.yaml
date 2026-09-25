@@ -35,6 +35,9 @@ importers:
       next:
         specifier: 16.3.4
         version: 16.3.4(@babel/core@7.29.7(supports-color@8.1.1))(@opentelemetry/api@1.9.1)(@types/node@20.19.43)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      openai:
+        specifier: ^7.23.0
+        version: 7.23.0(ws@8.21.3)(zod@4.6.5)
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -3330,6 +3333,30 @@ packages:
   open@7.4.2:
     resolution: {integrity: sha512-MVHddDVweXZF3awtlAS+6pgKLlm/JgxZ90+/NBurBoQctVOOB/zDdVjcyPzQ+0laDGbsWgrRkflI65sQeOgT9Q==}
     engines: {node: '>=8'}
+
+  openai@7.23.0:
+    resolution: {integrity: sha512-0ecOXnFSMNWZq6cUBcTV6Lf93y+fm8BH/+QzFvpoP1UGNOE5pnytRa6HAPGCw+3IS9SIAW7rc1M8yyzN1PiBAQ==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: '>=5 <9'
+      ws: ^8.21.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   ora@3.4.0:
     resolution: {integrity: sha512-eNwHudNbO1folBP3JsZ19v9azXWtQZjICdr3Q0TDPIaeBQ3mXLrh54wM+er0+hSp+dWKf+Z8KM58CYzEyIYxYg==}
@@ -7352,6 +7379,11 @@ snapshots:
     dependencies:
       is-docker: 2.2.1
       is-wsl: 2.2.0
+
+  openai@7.23.0(ws@8.21.3)(zod@4.6.5):
+    optionalDependencies:
+      ws: 8.21.3
+      zod: 4.6.5
 
   ora@3.4.0:
     dependencies:
