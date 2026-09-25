@@ -10,7 +10,7 @@ turning each one on unblocks.
 Phase 5 built the interrupt path, the budget enforced at send time, the intervention card with its
 outcomes, and the road-report bot — and switched none of it on, deliberately. `INTERRUPT_ELIGIBLE` is
 still empty: its rule is a week of hand-audited briefing-only verdicts, and the judge has never
-produced one (the Gemini quota below). The bot needs a Telegram token, and push needs the Phase 7
+produced one (no working model key yet; see below). The bot needs a Telegram token, and push needs the Phase 7
 app to register a phone. Everything between those edges is rehearsed against Neon by
 `smoke:interrupt`, `smoke:road` and `smoke:telegram`, which found three real bugs on the way.
 
@@ -21,11 +21,11 @@ interrupts by design — `INTERRUPT_ELIGIBLE` is still empty, so nothing can wak
 mailer stubbed; it wrote real briefings for three synthetic trips, merged four live Tbilisi weather
 events into one line, and produced the fallback briefing when a draft dropped five of its six items.
 
-**`GEMINI_API_KEY` is now set — and it is on the free tier, which allows twenty calls a day per
-model.** That is below one run of anything here. The briefing composer's first real call came back
-`RESOURCE_EXHAUSTED … quotaValue: 20`, so the prompt is wired and has still never produced a draft;
-the same quota is what stands between the project and `judge:eval` and the half of the kill-criteria
-check that decides Phase 8. Enabling billing on that key is now the single highest-value switch.
+**The model calls moved from Gemini to OpenAI (`gpt-5.4-mini`) on 2026-09-25, and
+`OPENAI_API_KEY` is not set yet.** The Gemini key was on a free tier of twenty calls a day —
+enough for the one briefing it composed on 2026-09-24, not for a single eval run — so the judge has
+never produced a verdict, and nothing has run on OpenAI yet. The prompts are unchanged; setting the key is now the single highest-value switch, and it stands between the
+project and `judge:eval` and the half of the kill-criteria check that decides Phase 8.
 
 The briefing email is written and rendered but not posted: `RESEND_API_KEY` and `BRIEFING_FROM` are
 unset, which skips only the send and records why in `briefing.email_error`. The in-app briefing at
@@ -53,11 +53,11 @@ OAuth + `CURATOR_EMAILS`.
 ### Phase 0 procurement checklist (blocks on you, not on code)
 
 - [x] Neon project + PostGIS enabled; migrations applied and the catalogue loaded
-- [~] `GEMINI_API_KEY` — **set, but on the free tier: twenty calls a day per model.** Enough for one
-      briefing, not for the eval harness's thirty fixtures. The briefing composer has now run on it
-      (2026-09-24); `judge:eval` and `kill:count -- --judge` still cannot. Free-tier
-      `gemini-3.8-flash` also returns 503 UNAVAILABLE often — two runs in three that evening — which
-      the queue now survives but a traveller would feel. Enable billing on that key
+- [ ] `OPENAI_API_KEY` — on a project with billing. It gates the judge, the briefing composer and
+      trip generation alike (`gpt-5.4-mini`, pinned in `src/infra/openai.ts`). Replaces
+      `GEMINI_API_KEY`, whose free tier allowed twenty calls a day — enough for one briefing
+      (composed 2026-09-24), not for `judge:eval`'s thirty fixtures — and whose `gemini-3.8-flash`
+      returned 503 on two runs in three
 - [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — also gates `/curate`; set `CURATOR_EMAILS` to your Google address
 - [ ] **Trigger.dev account** + `CRON_SECRET` — what makes Phase 3 run on a timer. Vercel cron was
       tried and failed the deployment (Hobby rejects sub-daily schedules), so the clock is
@@ -82,9 +82,9 @@ be updated as phases close, not item-by-item.
 
 | Phase | Focus | Status |
 |---|---|---|
-| 0 | Foundations + procurement | Code done; procurement 1/9, with `GEMINI_API_KEY` set but rate-limited |
+| 0 | Foundations + procurement | Code done; procurement 1/9; `OPENAI_API_KEY` not yet set |
 | 1 | Catalogue + corridors | Code done; load blocked on Neon; curation 0/600 |
-| 2 | Trip document + patch log | Built and running against Neon. Generation is untestable end to end until curated places exist; the Gemini call has never run (free-tier quota) |
+| 2 | Trip document + patch log | Built and running against Neon. Generation is untestable end to end until curated places exist; the model call has never run (no working key yet) |
 | 3 | Pipeline, weather only | Built and exercised on Neon. Judge never called (free-tier quota), so the eval harness and half the kill-criteria check are unrun |
 | 4 | Daily briefing | Built, exercised on Neon end to end, and composed once by Gemini. Email never sent (Resend unset); not yet in front of the three travellers — the only item left |
 | 5 | Interrupts, budget, road form | Built and rehearsed on Neon. Nothing switched on: no detector graduated, no bot token, no phone registered |
@@ -116,7 +116,7 @@ real match query: **0.8 matched pairs per trip-day**, worst case 3.4 in Svaneti 
 comfortably inside the dozen-per-trip-day budget, so the match radius is not the problem.
 
 The other half — how many of those pairs the router would actually send — needs the judge and so
-needs `GEMINI_API_KEY`. Run `npm run kill:count -- --judge` the day it is set, before building
+needs `OPENAI_API_KEY`. Run `npm run kill:count -- --judge` the day it is set, before building
 anything past Phase 4. If it comes back at 1–2 interventions per trip, detector expansion (Phase 8)
 becomes urgent rather than optional. The pair counts already hint at the shape of the answer: a
 September week in Kazbegi produced no events at all, while January in Svaneti produced 24 pairs.
@@ -215,6 +215,12 @@ above gets resolved. Keep entries short — this is a log, not a report.
   a backoff and a give-up. Measured nothing new — the composer has never produced a draft, because
   `GEMINI_API_KEY` turns out to be a free-tier key capped at twenty calls a day.
 
+- **2026-09-25** — Model provider switched from Gemini to OpenAI `gpt-5.4-mini`, for all three
+  calls (judge, briefing composer, trip composer). Prompts carried over unchanged, so the first
+  `judge:eval` measures the model and not a prompt edit. Strict structured outputs via
+  `zodTextFormat` keep the decoder held to the domain's schemas; reasoning effort replaces
+  temperature (medium for the judge, low for the two composers); `store: false` keeps itineraries
+  off OpenAI's side. Needs `OPENAI_API_KEY`.
 - **2026-09-25** — Review of Phases 0–4, one commit per fix. Phase 4's three went with the
   composer-outage fix: guests' briefings would have been emailed to Better Auth's placeholder
   addresses; the quiet briefing said "found nothing" while matches were still unjudged; a malformed

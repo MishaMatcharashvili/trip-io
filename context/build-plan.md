@@ -50,8 +50,8 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [x] Router as a pure, unit-tested function (`interrupt` / `briefing` / `drop`), every path returning its reason
 - [x] No delivery yet — verdicts land in `event_match` with their route, reason and rejections
 - [ ] Cron *scheduled* — the three handlers exist and are secured; the clock is `src/trigger/watch-pipeline.ts` (hourly, Trigger.dev, free at that cadence) rather than Vercel cron, which Hobby rejects at deploy time. Unverified: needs a Trigger.dev account
-- [x] Eval harness: 30 `(event, node, trip) → expected verdict` fixtures (10 fire / 10 don't / 10 ambiguous). **Never run against the model** — `GEMINI_API_KEY` is not set
-- [~] **Kill-criteria check**: `npm run kill:count`. The match half is measured — **0.8 pairs per trip-day** over 24 synthetic trips (4 areas x 6 weather weeks), worst case 3.4 in Svaneti in January, well inside the dozen-per-trip-day budget. The half that decides Phase 8 — interventions per trip — needs the judge, and so needs `GEMINI_API_KEY`.
+- [x] Eval harness: 30 `(event, node, trip) → expected verdict` fixtures (10 fire / 10 don't / 10 ambiguous). **Never run against the model** — `OPENAI_API_KEY` is not set
+- [~] **Kill-criteria check**: `npm run kill:count`. The match half is measured — **0.8 pairs per trip-day** over 24 synthetic trips (4 areas x 6 weather weeks), worst case 3.4 in Svaneti in January, well inside the dozen-per-trip-day budget. The half that decides Phase 8 — interventions per trip — needs the judge, and so needs `OPENAI_API_KEY`.
 
 ## Phase 4 — the daily briefing
 
@@ -65,6 +65,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [x] `npm run smoke:briefing` — the whole path against the real database, composer and mailer stubbed
 - [x] **Run against the real model.** `npm run smoke:briefing -- --model` composed a briefing with Gemini on 2026-09-24: greeting, a headlined line covering its item, and a nominated change, all through the guards. Framing held — *"making the paths slick while the museum stays dry"*, an opportunity rather than an alarm
 - [x] Survive a composer outage. `gemini-3.8-flash` returned 503 on two of three runs that evening, which exposed the fallback covering only a refused draft and not an unreachable model. Fixed: the error is thrown on while the queue has retries left, and the last attempt sends the fallback rather than nothing
+- [ ] **Run the OpenAI composer.** The model calls moved from Gemini to OpenAI `gpt-5.4-mini` on 2026-09-25 with the prompt unchanged; `smoke:briefing -- --model` has not been re-run on it, because `OPENAI_API_KEY` is not set yet
 - [ ] Get it in front of 3 real travellers this phase (people you know travelling in Georgia in October), ahead of the Phase 10 cohort
 
 ## Phase 5 — interrupts, budget enforcer, road form
