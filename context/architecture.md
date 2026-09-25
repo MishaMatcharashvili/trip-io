@@ -31,7 +31,7 @@ schema and cron design this section summarizes.
 | Auth | Better Auth | anonymous trip in local state → account created at save → trip claimed; Expo support built in |
 | Map | MapLibre GL + PMTiles | one `.pmtiles` file on Vercel Blob or R2, read via HTTP range requests; no tile server |
 | Queue | Postgres table + `SELECT ... FOR UPDATE SKIP LOCKED` | no Redis; cron handlers enqueue, a drain handler claims and processes |
-| Scheduling | Vercel Cron → route handlers | **Vercel Pro is a hard dependency** — Hobby cron runs once/day only |
+| Scheduling | Trigger.dev schedules → `/api/cron/*` route handlers | the clock only; Hobby cron runs once/day and rejects finer schedules at deploy time (see Cron topology) |
 | Email | Resend | daily briefing |
 | Push | expo-notifications + EAS | APNs + FCM; credential setup starts week 1, latency doesn't compress |
 | Telegram | grammY, webhook | manual road-corridor report form (detector #2) |
@@ -264,6 +264,12 @@ the proposed ops are attached from the verdict afterwards — so a bad answer ca
 sentence about a real event, never a fabricated one. `src/domain/watch/briefing.ts` holds the guards
 and the two briefings written without a model: the quiet one and the fallback.
 
+A composer that cannot be reached is not a lost morning: the queue retries it while attempts
+remain, and on the job's final attempt the same fallback a refused draft gets is sent instead,
+written from the verdicts. Guests are briefed in the app only — Better Auth gives an
+anonymous user a placeholder address, so a guest is recognised by `is_anonymous`, never by a null
+email.
+
 The bundle looks 48 hours ahead rather than only at today. Rain on Thursday is worth knowing on
 Tuesday, when the traveller can still move something; beyond two days the forecast churns, so the
 item stays undelivered and is offered again as its day approaches.
@@ -349,6 +355,11 @@ no list.
   traveller has been told they are covered. *Enforced:* `checkDraft` in
   `src/domain/watch/briefing.ts`, which falls back to a briefing written from the verdicts rather
   than sending a refused draft. *Tested:* `briefing.test.ts`.
+- **A quiet briefing is not an all-clear while the judge owes a verdict.** "Found nothing" is only
+  said when no stop in the 48h window has a match the judge has not settled (unjudged, or refused);
+  otherwise the briefing says not everything has been checked, and never in green. *Enforced:*
+  `quietBriefing` in `src/domain/watch/briefing.ts`, fed by `unresolvedStops`. *Tested:*
+  `briefing.test.ts`, `briefing-email.test.ts`.
 - **A recommended change has something to apply.** "1 change recommended" citing an item that
   proposes no moves is the briefing's own empty-helpful verdict — a button that does nothing.
   *Enforced:* `checkDraft`. *Tested:* `briefing.test.ts`.
@@ -396,8 +407,10 @@ no list.
 
 - Open-Meteo's free tier is non-commercial (CC BY 4.0); a paid product needs the commercial API
   Standard tier (~15 calls/hour for Georgia, well inside the 1M/month allowance).
-- Vercel Hobby cron is once-per-day, enforced at deploy time — Pro ($20/mo) is required for the
-  hourly sense loop, not an later optimization.
+- Vercel Hobby cron is once-per-day, enforced at deploy time, so the hourly sense loop's clock is
+  Trigger.dev rather than Vercel cron (see Cron topology). Hobby's 300s function ceiling is enough
+  for the drain's 240s budget; Pro is only worth buying for the 800s ceiling or to bring Vercel cron
+  back.
 - There is no scrapeable Georgian road-conditions source (`georoad.ge` now redirects to a
   non-machine-readable news feed). Detector #2 (road-corridor) is a manual Telegram form through at
   least week 10, when an automation spike is evaluated against real collected events.

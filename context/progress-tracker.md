@@ -215,6 +215,16 @@ above gets resolved. Keep entries short — this is a log, not a report.
   a backoff and a give-up. Measured nothing new — the composer has never produced a draft, because
   `GEMINI_API_KEY` turns out to be a free-tier key capped at twenty calls a day.
 
+- **2026-09-25** — Review of Phases 0–4, one commit per fix. Phase 4's three went with the
+  composer-outage fix: guests' briefings would have been emailed to Better Auth's placeholder
+  addresses; the quiet briefing said "found nothing" while matches were still unjudged; a malformed
+  briefing id was a 500. Phases 0–3: escalated forecasts were never re-judged (`reopenMatches` left
+  `queued_at` set) nor re-briefed; a model-invented or malformed place id crashed the judge job and
+  500'd a patch instead of being refused; a failed judge call re-queued its own pair, multiplying
+  jobs during an outage; already-matched pairs could fill `MATCH_LIMIT` and starve new ones; an open
+  redirect in `?next=`; a dropped message in the validate dry run; and the stop's own place offered
+  to the judge as an alternative. None of it has run against the live pipeline yet — run
+  `smoke:watch` and `smoke:briefing` before relying on it.
 - **2026-09-26** — Phase 5 built: the budget enforcer, the interrupt path, Expo push, the
   intervention card and its outcomes, the `ignored` sweep, device registration and watch settings,
   and the road-report bot. Decisions made along the way: road reports are open to anyone and
@@ -228,7 +238,6 @@ above gets resolved. Keep entries short — this is a log, not a report.
   verdicts that requires. The rehearsals found three bugs no unit test could: switched-off quiet
   hours read back as the defaults, a watch's channels arrived as the string `{push,briefing}`, and an
   offer with nothing to apply could not be read back.
-
 - **2026-09-20** — Neon live; migrations `0000`–`0002` applied and `catalogue:load` run (64 regions,
   12 corridors, 13,338 places). Phase 2 finished in code: patch log with stored inverses, the
   coherent-day validator, generation (candidates → Gemini → schedule → validate → retry → template
