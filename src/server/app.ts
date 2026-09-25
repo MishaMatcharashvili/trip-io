@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { briefings } from "./routes/briefings";
 import { cron } from "./routes/cron";
 import { curation } from "./routes/curation";
+import { devices } from "./routes/devices";
 import { interventions } from "./routes/interventions";
 import { trips } from "./routes/trips";
 
@@ -15,6 +16,7 @@ const app = new Hono()
   .route("/briefings", briefings)
   .route("/cron", cron)
   .route("/curation", curation)
+  .route("/devices", devices)
   .route("/interventions", interventions)
   .route("/trips", trips);
 

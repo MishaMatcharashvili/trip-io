@@ -15,15 +15,33 @@ import {
   undoLast,
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
+import { updateWatchSettings } from "@/bll/watch-settings.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
+import { CLOCK_TIME, channels } from "@/domain/watch/settings.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
 // The trip document over HTTP. The work is done in src/bll/*; these handlers do
 // validation, status codes and nothing else.
 
 const params = z.object({ id: z.uuid() });
+
+const clockTime = z.string().regex(CLOCK_TIME, "expected HH:MM");
+
+/** What a traveller may change about how a trip's watch reaches them. */
+const watchSettings = z
+  .object({
+    channels: z.array(z.enum(channels)).max(channels.length).optional(),
+    // Null switches quiet hours off: an answer, not a missing value.
+    quietHours: z
+      .object({ start: clockTime, end: clockTime })
+      .nullable()
+      .optional(),
+  })
+  .refine((s) => s.channels !== undefined || s.quietHours !== undefined, {
+    message: "nothing to change",
+  });
 
 /** Why a trip is off limits, as the status code the client acts on. */
 const denied = (c: Context, reason: "not-found" | "forbidden") =>
@@ -180,6 +198,27 @@ export const trips = new Hono<SessionEnv>()
             }
           : result,
       );
+    },
+  )
+
+  // Channels and quiet hours. Push switched off mid-trip is recorded as a mute
+  // (src/bll/watch-settings.ts) — a kill criterion, not just a preference.
+  .patch(
+    "/:id/watch",
+    zValidator("param", params),
+    zValidator("json", watchSettings),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const body = c.req.valid("json");
+      const saved = await updateWatchSettings(id, {
+        channels: body.channels ? [...new Set(body.channels)] : undefined,
+        quietHours: body.quietHours,
+      });
+      // A trip with no stops has no watch yet: nothing to be reached about.
+      return saved ? c.body(null, 204) : c.json({ error: "not watched" }, 409);
     },
   )
 
