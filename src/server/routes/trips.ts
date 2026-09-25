@@ -189,15 +189,25 @@ export const trips = new Hono<SessionEnv>()
 
       const result = await previewPatch(id, c.req.valid("json").ops);
       if (!result) return c.json({ error: "not found" }, 404);
-      return c.json(
-        result.ok
-          ? {
-              ok: true as const,
-              violations: result.violations,
-              introduced: result.introduced,
-            }
-          : result,
-      );
+      if (result.ok) {
+        return c.json({
+          ok: true as const,
+          violations: result.violations,
+          introduced: result.introduced,
+        });
+      }
+      // A PatchError is an Error, whose `message` is not enumerable: passed
+      // through as-is it serialises without the one field that says what
+      // went wrong.
+      if (result.kind === "patch") {
+        const { code, path, message } = result.error;
+        return c.json({
+          ok: false as const,
+          kind: "patch" as const,
+          error: { code, path, message },
+        });
+      }
+      return c.json(result);
     },
   )
 
