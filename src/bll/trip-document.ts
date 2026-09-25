@@ -17,7 +17,7 @@ import {
   type TripRef,
   upsertNode,
 } from "../dal/trips.ts";
-import { withTransaction } from "../dal/tx.ts";
+import { type Tx, withTransaction } from "../dal/tx.ts";
 import { refreshWatch } from "../dal/watches.ts";
 import { diffDocs } from "../domain/trip/diff.ts";
 import { placeIdsOf, type TripDoc } from "../domain/trip/document.ts";
@@ -91,87 +91,102 @@ export type AppendSuccess = {
 export async function appendPatch(
   input: AppendInput,
 ): Promise<AppendSuccess | AppendFailure> {
+  guardAuthor(input);
+  return withTransaction((tx) => appendPatchIn(tx, input));
+}
+
+/** Nothing the system proposes is applied without someone accepting it. */
+function guardAuthor(input: AppendInput) {
   if (input.author === "intervention" && !input.acceptedBy) {
     throw new Error("an intervention patch needs the user who accepted it");
   }
+}
 
-  return withTransaction(async (tx) => {
-    const locked = await lockTrip(tx, input.tripId);
-    if (!locked) return { ok: false, code: "not-found" };
-    if (locked.headPatchId !== input.parentId) {
-      return { ok: false, code: "stale", headPatchId: locked.headPatchId };
-    }
+/**
+ * `appendPatch` inside a transaction the caller already holds. Accepting an
+ * intervention is the one caller: the patch and the outcome it records have to
+ * commit together or not at all (docs/implementation-plan.md §6).
+ */
+export async function appendPatchIn(
+  tx: Tx,
+  input: AppendInput,
+): Promise<AppendSuccess | AppendFailure> {
+  guardAuthor(input);
+  const locked = await lockTrip(tx, input.tripId);
+  if (!locked) return { ok: false, code: "not-found" };
+  if (locked.headPatchId !== input.parentId) {
+    return { ok: false, code: "stale", headPatchId: locked.headPatchId };
+  }
 
-    const current = await loadTrip(input.tripId, tx);
-    if (!current) return { ok: false, code: "not-found" };
+  const current = await loadTrip(input.tripId, tx);
+  if (!current) return { ok: false, code: "not-found" };
 
-    // Places the document mentions now, plus any the ops introduce.
-    const proposed = patchOps.safeParse(input.ops);
-    const added = proposed.success ? placeIdsInOps(proposed.data) : [];
-    const places = await placeFacts([...placeIdsOf(current.doc), ...added], tx);
+  // Places the document mentions now, plus any the ops introduce.
+  const proposed = patchOps.safeParse(input.ops);
+  const added = proposed.success ? placeIdsInOps(proposed.data) : [];
+  const places = await placeFacts([...placeIdsOf(current.doc), ...added], tx);
 
-    const result = validateProposal(current.doc, input.ops, {
-      places,
-      travel: straightLineTravel,
-      author: input.author,
-    });
-    if (!result.ok) {
-      return result.kind === "invalid"
-        ? { ok: false, code: "invalid", issues: result.issues }
-        : result.kind === "patch"
-          ? { ok: false, code: "patch", message: result.error.message }
-          : {
-              ok: false,
-              code: "violations",
-              blocking: result.blocking,
-              violations: result.violations,
-            };
-    }
-
-    const seq = current.seq + 1;
-    const patchId = await insertPatch(tx, {
-      tripId: input.tripId,
-      parentId: input.parentId,
-      intent: input.intent,
-      ops: input.ops,
-      inverseOps: result.inverse,
-      author: input.author,
-      acceptedBy: input.acceptedBy ?? null,
-      seq,
-      clientSeq: input.clientSeq ?? null,
-      meta: input.meta ?? {},
-    });
-
-    for (const id of result.change.nodes) {
-      const node = result.doc.nodes[id];
-      if (node) await upsertNode(tx, input.tripId, id, node);
-      else await deleteNode(tx, input.tripId, id);
-    }
-
-    await setHead(tx, input.tripId, patchId);
-
-    // The watch is written here rather than at trip creation because it is
-    // derived from the node projection: an empty trip has no footprint to
-    // watch, and a trip that has been replanned must not stay watched in a
-    // region it no longer visits. Same transaction, same guarantee as the
-    // projection itself.
-    await refreshWatch(input.tripId, watchDefaults(result.doc.trip), tx);
-
-    // Seq 1 is checkpointed too: the generated plan is the largest patch there
-    // is, and no restore should have to replay it.
-    if (seq === 1 || seq % CHECKPOINT_EVERY === 0) {
-      await insertCheckpoint(tx, input.tripId, patchId, result.doc);
-    }
-
-    return {
-      ok: true,
-      patchId,
-      seq,
-      doc: result.doc,
-      violations: result.violations,
-      introduced: result.introduced,
-    };
+  const result = validateProposal(current.doc, input.ops, {
+    places,
+    travel: straightLineTravel,
+    author: input.author,
   });
+  if (!result.ok) {
+    return result.kind === "invalid"
+      ? { ok: false, code: "invalid", issues: result.issues }
+      : result.kind === "patch"
+        ? { ok: false, code: "patch", message: result.error.message }
+        : {
+            ok: false,
+            code: "violations",
+            blocking: result.blocking,
+            violations: result.violations,
+          };
+  }
+
+  const seq = current.seq + 1;
+  const patchId = await insertPatch(tx, {
+    tripId: input.tripId,
+    parentId: input.parentId,
+    intent: input.intent,
+    ops: input.ops,
+    inverseOps: result.inverse,
+    author: input.author,
+    acceptedBy: input.acceptedBy ?? null,
+    seq,
+    clientSeq: input.clientSeq ?? null,
+    meta: input.meta ?? {},
+  });
+
+  for (const id of result.change.nodes) {
+    const node = result.doc.nodes[id];
+    if (node) await upsertNode(tx, input.tripId, id, node);
+    else await deleteNode(tx, input.tripId, id);
+  }
+
+  await setHead(tx, input.tripId, patchId);
+
+  // The watch is written here rather than at trip creation because it is
+  // derived from the node projection: an empty trip has no footprint to
+  // watch, and a trip that has been replanned must not stay watched in a
+  // region it no longer visits. Same transaction, same guarantee as the
+  // projection itself.
+  await refreshWatch(input.tripId, watchDefaults(result.doc.trip), tx);
+
+  // Seq 1 is checkpointed too: the generated plan is the largest patch there
+  // is, and no restore should have to replay it.
+  if (seq === 1 || seq % CHECKPOINT_EVERY === 0) {
+    await insertCheckpoint(tx, input.tripId, patchId, result.doc);
+  }
+
+  return {
+    ok: true,
+    patchId,
+    seq,
+    doc: result.doc,
+    violations: result.violations,
+    introduced: result.introduced,
+  };
 }
 
 /**
