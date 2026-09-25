@@ -161,12 +161,27 @@ await db.execute(sql`
   VALUES (${userId}, 'Smoke Traveller', ${`${userId}@example.test`}, false)
 `);
 
+/**
+ * A guest, shaped the way Better Auth's anonymous plugin really makes one: an
+ * `is_anonymous` row with a generated placeholder address, not a trip with no
+ * owner. The address is the trap — it looks sendable.
+ */
+const guestId = `smoke-guest-${randomUUID()}`;
+const guestEmail = `${guestId}@anonymous.example.test`;
+await db.execute(sql`
+  INSERT INTO "user" (id, name, email, email_verified, is_anonymous)
+  VALUES (${guestId}, 'Anonymous', ${guestEmail}, false, true)
+`);
+
 type Built = { tripId: string; outdoorId: string };
 
-async function buildTrip(title: string, owned = false): Promise<Built> {
+async function buildTrip(
+  title: string,
+  owner: string | null = null,
+): Promise<Built> {
   const outdoorId = randomUUID();
   const doc = plan(title, outdoorId);
-  const tripId = await createTrip(doc.trip, owned ? userId : null);
+  const tripId = await createTrip(doc.trip, owner);
   written.push(tripId);
   const built = await appendPatch({
     tripId,
@@ -219,7 +234,7 @@ async function routeToBriefing({ tripId, outdoorId }: Built, oneLine: string) {
 
 try {
   // ── 1. A day with news on it, and a composer that behaves.
-  const loud = await buildTrip("Briefing smoke · a loud day", true);
+  const loud = await buildTrip("Briefing smoke · a loud day", userId);
   step(
     "pairs routed to briefing",
     await routeToBriefing(loud, "Rain over the fortress from three."),
@@ -301,7 +316,7 @@ try {
   step("mailer", sent);
 
   // ── 2. A quiet day. No model call, and still a briefing.
-  const quiet = await buildTrip("Briefing smoke · a quiet day", true);
+  const quiet = await buildTrip("Briefing smoke · a quiet day", userId);
   step(
     "quiet day",
     await writeBriefing(quiet.tripId, DATE, {
@@ -313,14 +328,20 @@ try {
   );
   step("quiet briefing", (await briefingPage(quiet.tripId))?.briefing.document);
 
-  // ── 3. A draft the guards refuse. The day still gets its briefing.
-  const refused = await buildTrip("Briefing smoke · a refused draft");
+  // ── 3. A draft the guards refuse, on a guest's trip. The day still gets its
+  // briefing, in the app — and nothing is posted to the guest's placeholder.
+  const refused = await buildTrip("Briefing smoke · a refused draft", guestId);
   await routeToBriefing(refused, "Rain over the fortress from three.");
   const outcome = await writeBriefing(refused.tripId, DATE, {
     brief: losingDraft,
     mail,
+    appUrl: "https://example.test",
   });
   step("refused draft", outcome);
+  if (sent.some((m) => m.to === guestEmail)) {
+    console.error("a guest's placeholder address was emailed");
+    process.exitCode = 1;
+  }
   step(
     "fallback briefing",
     (await briefingPage(refused.tripId))?.briefing.document.lines,
@@ -398,7 +419,7 @@ try {
     );
   }
 
-  await db.execute(sql`DELETE FROM "user" WHERE id = ${userId}`);
+  await db.execute(sql`DELETE FROM "user" WHERE id IN (${userId}, ${guestId})`);
 
   // Belt and braces: a run killed before its `finally` (a 503 from the model
   // taking the process down mid-step, which is exactly what happened) leaves

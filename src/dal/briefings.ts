@@ -300,15 +300,21 @@ export async function openRate(sinceDays: number): Promise<OpenRate> {
 }
 
 /**
- * Who the briefing goes to. An anonymous trip has no account and so no address:
- * it gets the in-app briefing and no email, which is the correct behaviour and
- * not a failure to report.
+ * Who the briefing goes to. An anonymous trip has no address to send to: it
+ * gets the in-app briefing and no email, which is the correct behaviour and not
+ * a failure to report.
+ *
+ * "No address" is not the same as a null `email`. Better Auth's anonymous
+ * plugin gives every guest a generated placeholder (`<id>@anonymous.…`) because
+ * the column is NOT NULL, so a guest has to be recognised by `is_anonymous` —
+ * otherwise every guest's briefing is posted to a mailbox that does not exist,
+ * at a cost to the sending domain's reputation.
  */
 export async function recipientFor(tripId: string): Promise<string | null> {
   const rows = await db.execute(sql`
     SELECT u.email FROM trip t
     JOIN "user" u ON u.id = t.user_id
-    WHERE t.id = ${tripId}
+    WHERE t.id = ${tripId} AND u.is_anonymous IS NOT TRUE
   `);
   return (rows.rows[0]?.email as string | undefined) ?? null;
 }

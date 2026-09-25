@@ -259,9 +259,9 @@ async function deliver(
   emailTo: string | null,
   deps: BriefingDeps,
 ): Promise<{ email: "sent" | "skipped" | "failed"; emailError?: string }> {
-  // An anonymous trip has no account and so no address. That is the designed
-  // behaviour — the trip is watched and briefed in the app — not a failure, so
-  // nothing is recorded against it.
+  // An anonymous trip has no address (`recipientFor` does not count a guest's
+  // placeholder as one). That is the designed behaviour — the trip is watched
+  // and briefed in the app — not a failure, so nothing is recorded against it.
   if (!emailTo) return { email: "skipped" };
 
   const appUrl = (deps.appUrl ?? process.env.APP_URL ?? "").replace(/\/$/, "");
