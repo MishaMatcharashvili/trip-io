@@ -67,6 +67,7 @@ export async function judgeMatch(
       pair.node.lonLat,
       ALTERNATIVE_RADIUS_M,
       ALTERNATIVE_LIMIT,
+      pair.node.placeId,
     ),
     loadWatch(pair.trip.id),
     spentBudget(pair.trip.id),
