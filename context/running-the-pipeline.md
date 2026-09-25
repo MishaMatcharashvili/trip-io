@@ -179,7 +179,8 @@ about delivery.
   window, keeping any an intervention cites. Nothing calls the sense loop on a timer, so nothing is
   being purged.
 - Failed jobs keep their row after `MAX_ATTEMPTS` — the error is the only record of what the
-  pipeline could not do. `queueDepth()` counts them; nothing surfaces them yet. That is Phase 9's
+  pipeline could not do. A judge job that gives up leaves its pair queued and unjudged; the quiet
+  briefing counts it as unresolved rather than calling the day clear. `queueDepth()` counts them; nothing surfaces them yet. That is Phase 9's
   dashboard.
 - `event_match` rows accumulate for the life of the trip. Fine at this scale; revisit when
   `pairsPerTripDay` is being read regularly.

@@ -10,9 +10,9 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 ## Phase 0 — foundations + procurement with latency
 
 - [x] Neon project with PostGIS extension enabled (eu-central-1, PostGIS 3.6)
-- [ ] Drizzle schema, first migration (core tables from `context/architecture.md`)
-- [ ] Hono mounted at `app/api/[[...route]]/route.ts`, one typed route proving the RPC client end to end
-- [ ] Better Auth wired: anonymous trip in local state → account at save → trip claimed
+- [x] Drizzle schema, first migration (core tables from `context/architecture.md`)
+- [x] Hono mounted at `app/api/[[...route]]/route.ts`, one typed route proving the RPC client end to end
+- [x] Better Auth wired: anonymous trip in local state → account at save → trip claimed
 - [ ] Vercel Pro enabled, preview deploys working, `CRON_SECRET` set
 - [ ] Apple Developer enrolment started (APNs key)
 - [ ] FCM project created
