@@ -55,7 +55,7 @@ export const handlers: Record<string, Handler> = {
   // Posted by the 03:30 cron, one per trip-day. It is here rather than in the
   // cron handler for the same reason judging is: it calls a model, and a model
   // call belongs behind the queue that already has a time budget, a backoff and
-  // a give-up. A Gemini outage at 03:30 then costs a retry, not a morning.
+  // a give-up. A model outage at 03:30 then costs a retry, not a morning.
   [BRIEFING_JOB]: async (payload, job) => {
     const { tripId, date } = payload as { tripId?: string; date?: string };
     if (typeof tripId !== "string" || typeof date !== "string") {

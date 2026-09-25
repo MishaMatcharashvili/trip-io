@@ -133,7 +133,7 @@ export type BrieferInput = {
   }[];
 };
 
-/** The port. `src/infra/gemini-briefing.ts` is the only implementation. */
+/** The port. `src/infra/openai-briefing.ts` is the only implementation. */
 export type Briefer = (input: BrieferInput) => Promise<unknown>;
 
 /** One email, as the delivery layer needs it and no provider's shape. */
