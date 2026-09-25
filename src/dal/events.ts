@@ -120,12 +120,18 @@ export async function upsertEvent(
  * Let an escalated event be judged again. The dedupe key deliberately collapses
  * a re-forecast onto one row, which means a spell that turns from `minor` into
  * `severe` would otherwise keep the verdict formed when it was drizzle.
+ *
+ * Reopening means putting the pair back where a new match starts: unqueued, so
+ * the matcher's claim (`WHERE queued_at IS NULL`) picks it up again, and
+ * undelivered, so a traveller already told about the drizzle is told about the
+ * downpour. Clearing only the verdict would leave the pair judged by nobody and
+ * briefed never.
  */
 export async function reopenMatches(eventId: string): Promise<number> {
   const rows = await db.execute(sql`
     UPDATE event_match
     SET judged_at = NULL, verdict = NULL, route = NULL, route_reason = NULL,
-        rejections = NULL
+        rejections = NULL, queued_at = NULL, delivered_at = NULL
     WHERE event_id = ${eventId} AND judged_at IS NOT NULL
     RETURNING id
   `);
