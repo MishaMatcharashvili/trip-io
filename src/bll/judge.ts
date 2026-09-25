@@ -164,7 +164,9 @@ export async function judgeMatch(
     ledger: { sentSoFar: ledger.sentSoFar, cap },
     watch: {
       channels: watch?.channels ?? [],
-      quietHours: watch?.quietHours ?? DEFAULT_QUIET_HOURS,
+      // Null is an answer, not a gap: the traveller switched quiet hours off.
+      // The default is for a trip with no watch row at all.
+      quietHours: watch ? watch.quietHours : DEFAULT_QUIET_HOURS,
     },
     now: deps.now?.() ?? new Date(),
     interruptEligible: deps.interruptEligible,
