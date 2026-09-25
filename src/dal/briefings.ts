@@ -118,6 +118,10 @@ export async function briefingBundle(
       AND m.route = 'briefing'
       AND m.delivered_at IS NULL
       AND m.verdict IS NOT NULL
+      -- Over before the stop begins: a road reopened, a spell re-forecast
+      -- away. Telling the traveller tomorrow would be telling them news that
+      -- stopped being true.
+      AND (e.valid_to IS NULL OR e.valid_to > ${now.toISOString()}::timestamptz)
       AND n.starts_at > ${now.toISOString()}::timestamptz
       AND n.starts_at < ${now.toISOString()}::timestamptz
                         + ${`${LOOKAHEAD_HOURS} hours`}::interval

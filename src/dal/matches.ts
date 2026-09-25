@@ -3,7 +3,9 @@ import { isOutdoor } from "../domain/catalogue/categories.ts";
 import {
   type EventKind,
   eventKinds,
+  nodeKindsFor,
   radiusFor,
+  staleAfterHours,
 } from "../domain/watch/event.ts";
 import type { Rejection, Verdict } from "../domain/watch/judge.ts";
 import type { Route, RouteReason } from "../domain/watch/route.ts";
@@ -23,6 +25,34 @@ const matchRadius = sql`CASE e.kind ${sql.join(
   eventKinds.map((kind) => sql`WHEN ${kind} THEN ${radiusFor(kind)}`),
   sql` `,
 )} ELSE 10000 END`;
+
+/**
+ * `staleAfterHours(kind)`, the same way: six hours for a forecast the sense
+ * loop re-reports hourly, three days for a road report nothing re-observes.
+ */
+const staleAfter = sql`CASE e.kind ${sql.join(
+  eventKinds.map((kind) => sql`WHEN ${kind} THEN ${staleAfterHours(kind)}`),
+  sql` `,
+)} ELSE 6 END`;
+
+/**
+ * `nodeKindsFor(kind)`, the same way: a road event may only meet a transfer.
+ * Kinds with no restriction fall through to TRUE.
+ */
+const nodeKindAllowed = sql`CASE e.kind ${sql.join(
+  eventKinds.flatMap((kind) => {
+    const allowed = nodeKindsFor(kind);
+    return allowed
+      ? [
+          sql`WHEN ${kind} THEN n.kind IN (${sql.join(
+            allowed.map((k) => sql`${k}`),
+            sql`, `,
+          )})`,
+        ]
+      : [];
+  }),
+  sql` `,
+)} ELSE TRUE END`;
 
 /**
  * What the judge sees first. Worst weather, best-trusted forecast, outdoors:
@@ -46,35 +76,65 @@ export type MatchedPair = {
 };
 
 /**
+ * Everything but the join between an event and a node: the live watch, the
+ * overlapping windows, the kinds of stop the event may meet, and freshness.
+ */
+const matchable = sql`
+  JOIN trip t ON t.id = n.trip_id
+  JOIN trip_watch w ON w.trip_id = t.id
+                   AND tstzrange(w.active_from, w.active_to) @> now()
+  WHERE tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
+     && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
+    AND ${nodeKindAllowed}
+    AND e.observed_at > now() - ${staleAfter} * interval '1 hour'
+`;
+
+/**
  * The join, as specced in docs/implementation-plan.md §5.
  *
- * `observed_at > now() - interval '6 hours'` is what keeps a stale event out:
- * the sense loop refreshes what is still true every hour, so anything it has
- * stopped re-reporting has stopped being forecast.
+ * `observed_at` is what keeps a stale event out: the sense loop refreshes what
+ * is still true every hour, so a forecast it has stopped re-reporting has
+ * stopped being forecast. A road report is not refreshed, so its allowance is
+ * its longest window instead (`staleAfterHours`).
  *
  * The insert is `ON CONFLICT DO NOTHING` rather than the plan's `NOT EXISTS`.
  * Invocations of a five-minute cron overlap, and a uniqueness constraint
  * settles the race that a NOT EXISTS only narrows.
+ *
+ * Two passes. The first is the spatial join, and the one that matters for
+ * cost: GiST on both sides. The second catches a transfer that names the
+ * corridor it drives (`meta.corridorSlug`) but is located at a destination
+ * further off the road than the radius — matched by name, not by distance. It
+ * is a separate statement rather than an OR in the first join, which would
+ * cost the spatial index for every event to serve the few that are roads.
  */
 export async function matchEvents(limit: number): Promise<MatchedPair[]> {
-  const rows = await db.execute(sql`
+  const spatial = await db.execute(sql`
     INSERT INTO event_match (event_id, trip_id, node_id, score)
     SELECT e.id, t.id, n.id, ${matchScore}
     FROM world_event e
     JOIN trip_node n
       ON ST_DWithin(e.geom, n.geom, ${matchRadius})
-    JOIN trip t ON t.id = n.trip_id
-    JOIN trip_watch w ON w.trip_id = t.id
-                     AND tstzrange(w.active_from, w.active_to) @> now()
-    WHERE tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
-       && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
-      AND e.observed_at > now() - interval '6 hours'
+    ${matchable}
     ORDER BY ${matchScore} DESC
     LIMIT ${limit}
     ON CONFLICT (event_id, node_id) DO NOTHING
     RETURNING id, event_id, trip_id, node_id, score
   `);
-  return rows.rows.map(toPair);
+  const named = await db.execute(sql`
+    INSERT INTO event_match (event_id, trip_id, node_id, score)
+    SELECT e.id, t.id, n.id, ${matchScore}
+    FROM world_event e
+    JOIN trip_node n
+      ON n.meta->>'corridorSlug' = e.payload->>'corridor'
+    ${matchable}
+      AND e.payload ? 'corridor'
+    ORDER BY ${matchScore} DESC
+    LIMIT ${limit}
+    ON CONFLICT (event_id, node_id) DO NOTHING
+    RETURNING id, event_id, trip_id, node_id, score
+  `);
+  return [...spatial.rows, ...named.rows].map(toPair);
 }
 
 const toPair = (r: Record<string, unknown>): MatchedPair => ({
