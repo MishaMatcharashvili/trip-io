@@ -301,6 +301,7 @@ export type AlertSummary = {
 };
 
 export type AlertsPage = {
+  title: string;
   alerts: AlertSummary[];
   told: number;
   applied: number;
@@ -313,9 +314,10 @@ export type AlertsPage = {
  * to check, as with every read model here.
  */
 export async function alertsPage(tripId: string): Promise<AlertsPage> {
-  const [rows, checks] = await Promise.all([
+  const [rows, checks, trip] = await Promise.all([
     interventionsFor(tripId),
     checksRun(tripId),
+    loadTrip(tripId),
   ]);
 
   const alerts = rows.flatMap((row): AlertSummary[] => {
@@ -335,6 +337,7 @@ export async function alertsPage(tripId: string): Promise<AlertsPage> {
   });
 
   return {
+    title: trip?.doc.trip.title ?? "",
     alerts,
     told: alerts.length,
     applied: alerts.filter((a) => a.outcome === "accepted").length,
