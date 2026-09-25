@@ -35,7 +35,12 @@ export type BriefingView = {
   heading: string;
   prose: string;
   lines: BriefingLineView[];
-  change: { sentence: string; rows: ChangeRow[] } | null;
+  change: {
+    sentence: string;
+    rows: ChangeRow[];
+    /** The intervention card, where the change is accepted or dismissed. */
+    href?: string;
+  } | null;
   dayHref: string;
   sourceCount: number;
   watchTone: Tone;
@@ -113,6 +118,15 @@ export function BriefingScreen({ view }: { view: BriefingView }) {
                 <Num className="text-mini font-medium text-agent">{row.to}</Num>
               </div>
             ))}
+            {view.change.href ? (
+              <ButtonLink
+                href={view.change.href}
+                size="sm"
+                className="self-start"
+              >
+                Review the change
+              </ButtonLink>
+            ) : null}
           </Card>
         ) : null}
 

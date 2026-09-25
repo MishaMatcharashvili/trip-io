@@ -12,6 +12,7 @@ import {
   stopsOn,
   unresolvedStops,
 } from "../dal/briefings.ts";
+import { briefingOfferFor } from "../dal/interventions.ts";
 import { enqueue } from "../dal/jobs.ts";
 import { placeNames } from "../dal/places.ts";
 import { loadTrip } from "../dal/trips.ts";
@@ -326,8 +327,16 @@ export async function briefingView(
 
 export type BriefingPage = {
   briefing: StoredBriefing;
-  /** The before-and-after of the recommended change, already resolved. */
-  change: { sentence: string; rows: ChangeRow[] } | null;
+  /**
+   * The before-and-after of the recommended change, already resolved, and the
+   * intervention it was recorded as — where it is accepted or dismissed, on the
+   * same card a push opens. Null on a briefing written before offers were.
+   */
+  change: {
+    sentence: string;
+    rows: ChangeRow[];
+    interventionId: string | null;
+  } | null;
 };
 
 /**
@@ -349,14 +358,17 @@ export async function briefingPage(
   if (!change) return { briefing, change: null };
 
   const ids = changePlaceIds(change);
-  const names =
-    ids.length > 0 ? await placeNames(ids) : new Map<string, string>();
+  const [names, interventionId] = await Promise.all([
+    ids.length > 0 ? placeNames(ids) : new Map<string, string>(),
+    briefingOfferFor(tripId, change.matchId),
+  ]);
 
   return {
     briefing,
     change: {
       sentence: change.sentence,
       rows: changePreview(change, briefing.document.day.stops, names),
+      interventionId,
     },
   };
 }
