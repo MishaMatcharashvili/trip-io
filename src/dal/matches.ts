@@ -131,14 +131,6 @@ export async function recordVerdict(
   `);
 }
 
-/** Put a pair back in the queue: a transient failure is not a verdict. */
-export async function releaseClaim(matchId: string): Promise<void> {
-  await db.execute(sql`
-    UPDATE event_match SET queued_at = NULL
-    WHERE id = ${matchId} AND judged_at IS NULL
-  `);
-}
-
 export type PairContext = {
   match: MatchedPair;
   judgedAt: string | null;
