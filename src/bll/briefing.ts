@@ -10,6 +10,7 @@ import {
   type StoredBriefing,
   saveBriefing,
   stopsOn,
+  unresolvedStops,
 } from "../dal/briefings.ts";
 import { enqueue } from "../dal/jobs.ts";
 import { placeNames } from "../dal/places.ts";
@@ -25,6 +26,7 @@ import {
   changePlaceIds,
   changePreview,
   dayIndexOf,
+  fallbackBriefing,
   type Mailer,
   quietBriefing,
   readDraft,
@@ -87,6 +89,15 @@ export type BriefingDeps = {
   now?: () => Date;
   /** The origin every link in the email points at. */
   appUrl?: string;
+  /**
+   * Set by the drain on a job's final attempt. A composer that cannot be
+   * reached is worth retrying — a 503 from the provider is usually a minute
+   * old, and a briefing written from the fallback is plainer than one the model
+   * would have written. But it is only worth retrying while retries remain:
+   * past that the choice is between the plain briefing and none at all, and the
+   * briefing is the only channel this product has.
+   */
+  lastChance?: boolean;
 };
 
 export type WriteOutcome =
@@ -158,21 +169,61 @@ export async function writeBriefing(
 
   if (taken.length === 0) {
     // No model call on a quiet day — see src/domain/watch/briefing.ts for why
-    // that is a correctness decision and not only a cost one.
-    briefing = quietBriefing(input);
+    // that is a correctness decision and not only a cost one. Whether it may
+    // say "all clear" depends on what the judge has not ruled on yet.
+    briefing = quietBriefing({
+      ...input,
+      unresolved: await unresolvedStops(tripId, now),
+    });
   } else {
-    const raw = await (deps.brief ?? briefWithGemini)(
-      brieferInput(input, {
-        title: trip.title,
-        party: trip.party,
-        pace: trip.pace,
-        prefs: trip.prefs,
-      }),
-    );
+    const ask = brieferInput(input, {
+      title: trip.title,
+      party: trip.party,
+      pace: trip.pace,
+      prefs: trip.prefs,
+    });
+
+    let raw: unknown;
+    try {
+      raw = await (deps.brief ?? briefWithGemini)(ask);
+    } catch (error) {
+      // Thrown on, so the queue's backoff gets to try again — unless there is
+      // nothing left to try, in which case the morning gets the plain briefing
+      // rather than silence.
+      if (!deps.lastChance) throw error;
+      briefing = fallbackBriefing(input);
+      rejections = [
+        {
+          reason: "composer-unreachable",
+          detail: (error as Error).message.slice(0, 500),
+        },
+      ];
+      return finish(input, briefing, rejections, taken, overflow, deps);
+    }
+
     const read = readDraft(raw, input);
     briefing = read.briefing;
     if (!read.ok) rejections = read.rejections;
   }
+
+  return finish(input, briefing, rejections, taken, overflow, deps);
+}
+
+/**
+ * Store, then deliver, then report. Shared by the three ways a briefing gets
+ * written — composed, refused into the fallback, or written without a model at
+ * all — because the claim and the send must not differ between them.
+ */
+async function finish(
+  input: ComposeInput,
+  briefing: Briefing,
+  rejections: BriefingRejection[],
+  taken: readonly { eventId: string }[],
+  overflow: readonly unknown[],
+  deps: BriefingDeps,
+): Promise<WriteOutcome> {
+  const { tripId } = input;
+  const date = input.day.date;
 
   const emailTo = await recipientFor(tripId);
   const saved = await saveBriefing({
@@ -213,9 +264,9 @@ async function deliver(
   emailTo: string | null,
   deps: BriefingDeps,
 ): Promise<{ email: "sent" | "skipped" | "failed"; emailError?: string }> {
-  // An anonymous trip has no account and so no address. That is the designed
-  // behaviour — the trip is watched and briefed in the app — not a failure, so
-  // nothing is recorded against it.
+  // An anonymous trip has no address (`recipientFor` does not count a guest's
+  // placeholder as one). That is the designed behaviour — the trip is watched
+  // and briefed in the app — not a failure, so nothing is recorded against it.
   if (!emailTo) return { email: "skipped" };
 
   const appUrl = (deps.appUrl ?? process.env.APP_URL ?? "").replace(/\/$/, "");

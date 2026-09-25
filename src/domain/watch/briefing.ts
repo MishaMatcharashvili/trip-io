@@ -162,6 +162,11 @@ export const briefingRejectionReasons = [
   "duplicate-ref",
   "dropped-item",
   "change-without-proposal",
+  // Not a bad answer but no answer: the provider was unreachable for every
+  // attempt the queue allows. Recorded like the rest, because "the model was
+  // down" and "the model wrote something we refused" are different problems
+  // and only the reason tells them apart the next morning.
+  "composer-unreachable",
 ] as const;
 export type BriefingRejectionReason = (typeof briefingRejectionReasons)[number];
 
@@ -467,26 +472,50 @@ export function composeBriefing(
  *
  * So the quiet briefing is a template, and it says only what is true: what the
  * day looks like, and how many sources found nothing.
+ *
+ * "Found nothing" is only true when nothing is waiting on the judge. A stop
+ * the detector matched but the judge has not ruled on — the queue is behind,
+ * the model's quota is spent, or its answer was refused — is not an all-clear,
+ * and green is the one colour that must never be spent on a guess. Those
+ * mornings say plainly that not everything has been checked.
  */
-export function quietBriefing(input: Omit<ComposeInput, "items">): Briefing {
+export function quietBriefing(
+  input: Omit<ComposeInput, "items"> & {
+    /** Stops in the lookahead with a match the judge has not settled. */
+    unresolved?: number;
+  },
+): Briefing {
   const sources = WATCHED_SOURCES.length;
+  const unresolved = input.unresolved ?? 0;
   return {
     tripId: input.tripId,
     day: input.day,
     quiet: true,
     greeting: dayShape(input.day),
     lines: [
-      {
-        matchIds: [],
-        kind: "All clear",
-        tone: "ok",
-        title: "Nothing to report",
-        detail:
-          sources === 1
-            ? "One source watched overnight and found nothing on your route."
-            : `${sources} sources watched overnight and found nothing on your route.`,
-        evidence: [],
-      },
+      unresolved > 0
+        ? {
+            matchIds: [],
+            kind: "Watch",
+            tone: "agent",
+            title: "Not everything is checked yet",
+            detail:
+              unresolved === 1
+                ? "The watch flagged one stop that hasn't been assessed yet, so this isn't an all-clear."
+                : `The watch flagged ${unresolved} stops that haven't been assessed yet, so this isn't an all-clear.`,
+            evidence: [],
+          }
+        : {
+            matchIds: [],
+            kind: "All clear",
+            tone: "ok",
+            title: "Nothing to report",
+            detail:
+              sources === 1
+                ? "One source watched overnight and found nothing on your route."
+                : `${sources} sources watched overnight and found nothing on your route.`,
+            evidence: [],
+          },
     ],
     change: null,
     matchIds: [],

@@ -161,12 +161,27 @@ await db.execute(sql`
   VALUES (${userId}, 'Smoke Traveller', ${`${userId}@example.test`}, false)
 `);
 
+/**
+ * A guest, shaped the way Better Auth's anonymous plugin really makes one: an
+ * `is_anonymous` row with a generated placeholder address, not a trip with no
+ * owner. The address is the trap — it looks sendable.
+ */
+const guestId = `smoke-guest-${randomUUID()}`;
+const guestEmail = `${guestId}@anonymous.example.test`;
+await db.execute(sql`
+  INSERT INTO "user" (id, name, email, email_verified, is_anonymous)
+  VALUES (${guestId}, 'Anonymous', ${guestEmail}, false, true)
+`);
+
 type Built = { tripId: string; outdoorId: string };
 
-async function buildTrip(title: string, owned = false): Promise<Built> {
+async function buildTrip(
+  title: string,
+  owner: string | null = null,
+): Promise<Built> {
   const outdoorId = randomUUID();
   const doc = plan(title, outdoorId);
-  const tripId = await createTrip(doc.trip, owned ? userId : null);
+  const tripId = await createTrip(doc.trip, owner);
   written.push(tripId);
   const built = await appendPatch({
     tripId,
@@ -219,7 +234,7 @@ async function routeToBriefing({ tripId, outdoorId }: Built, oneLine: string) {
 
 try {
   // ── 1. A day with news on it, and a composer that behaves.
-  const loud = await buildTrip("Briefing smoke · a loud day", true);
+  const loud = await buildTrip("Briefing smoke · a loud day", userId);
   step(
     "pairs routed to briefing",
     await routeToBriefing(loud, "Rain over the fortress from three."),
@@ -234,7 +249,12 @@ try {
     })),
   );
 
-  step("schedule", await scheduleBriefings());
+  // Told which morning it is, rather than left to read the clock. The stops
+  // above are three hours out, so run this late enough in a Tbilisi evening and
+  // they fall on tomorrow's date while `scheduleBriefings()` would brief for
+  // today — and find nothing. The cron passes no argument; only a rehearsal
+  // that has to work at 22:00 needs one.
+  step("schedule", await scheduleBriefings(new Date(OUTDOOR_AT)));
 
   const drained = await drain({
     handlers: {
@@ -296,7 +316,7 @@ try {
   step("mailer", sent);
 
   // ── 2. A quiet day. No model call, and still a briefing.
-  const quiet = await buildTrip("Briefing smoke · a quiet day", true);
+  const quiet = await buildTrip("Briefing smoke · a quiet day", userId);
   step(
     "quiet day",
     await writeBriefing(quiet.tripId, DATE, {
@@ -308,20 +328,58 @@ try {
   );
   step("quiet briefing", (await briefingPage(quiet.tripId))?.briefing.document);
 
-  // ── 3. A draft the guards refuse. The day still gets its briefing.
-  const refused = await buildTrip("Briefing smoke · a refused draft");
+  // ── 3. A draft the guards refuse, on a guest's trip. The day still gets its
+  // briefing, in the app — and nothing is posted to the guest's placeholder.
+  const refused = await buildTrip("Briefing smoke · a refused draft", guestId);
   await routeToBriefing(refused, "Rain over the fortress from three.");
   const outcome = await writeBriefing(refused.tripId, DATE, {
     brief: losingDraft,
     mail,
+    appUrl: "https://example.test",
   });
   step("refused draft", outcome);
+  if (sent.some((m) => m.to === guestEmail)) {
+    console.error("a guest's placeholder address was emailed");
+    process.exitCode = 1;
+  }
   step(
     "fallback briefing",
     (await briefingPage(refused.tripId))?.briefing.document.lines,
   );
 
-  // ── 4. The kill-criteria instrument.
+  // ── 4. A composer that cannot be reached at all. While retries remain the
+  //    error is thrown on, so the queue's backoff gets to try again; on the
+  //    last attempt the morning gets the plain briefing rather than silence.
+  //    The briefing is the only channel this product has, so "no briefing" is
+  //    not an acceptable resting state.
+  const unreachable = await buildTrip("Briefing smoke · an unreachable model");
+  await routeToBriefing(unreachable, "Rain over the fortress from three.");
+  const down: Briefer = async () => {
+    throw new Error("503 the model is currently experiencing high demand");
+  };
+
+  let threw = false;
+  try {
+    await writeBriefing(unreachable.tripId, DATE, { brief: down, mail });
+  } catch {
+    threw = true;
+  }
+  step("with retries left, it throws so the queue retries", { threw });
+
+  step(
+    "on the last attempt, it sends the fallback",
+    await writeBriefing(unreachable.tripId, DATE, {
+      brief: down,
+      mail,
+      lastChance: true,
+    }),
+  );
+  step(
+    "…and the fallback is a real briefing",
+    (await briefingPage(unreachable.tripId))?.briefing.document.lines,
+  );
+
+  // ── 5. The kill-criteria instrument.
   if (page) {
     await db.execute(
       sql`UPDATE briefing SET opened_at = now() WHERE id = ${page.briefing.id}`,
@@ -329,6 +387,17 @@ try {
   }
   step("open rate (whole database, 1 day)", await openRate(1));
 } finally {
+  // Two passes, and the order is the whole point.
+  //
+  // Every smoke trip sits in Tbilisi at overlapping times, so the event written
+  // for one run matches the stops of every other run still in the database.
+  // `intervention.event_id` is ON DELETE restrict — deliberately, because the
+  // outcome log has to outlive the ephemeral events it cites — so deleting one
+  // trip's events while another trip's interventions still point at them fails,
+  // aborts the loop, and strands everything after it. That is how twelve trips
+  // and twelve events accumulated in the real database before anyone looked.
+  //
+  // So: every trip goes first, then the events nothing cites any more.
   for (const tripId of written) {
     await db.execute(sql`DELETE FROM intervention WHERE trip_id = ${tripId}`);
     await db.execute(sql`
@@ -342,10 +411,41 @@ try {
         )
     `);
     await db.execute(sql`DELETE FROM trip WHERE id = ${tripId}`);
+  }
+
+  for (const tripId of written) {
     await db.execute(
       sql`DELETE FROM world_event WHERE dedupe_key LIKE ${`%|smoke-${tripId}`}`,
     );
   }
-  await db.execute(sql`DELETE FROM "user" WHERE id = ${userId}`);
+
+  await db.execute(sql`DELETE FROM "user" WHERE id IN (${userId}, ${guestId})`);
+
+  // Belt and braces: a run killed before its `finally` (a 503 from the model
+  // taking the process down mid-step, which is exactly what happened) leaves
+  // rows behind that no later run has the ids for. This sweeps them by name, so
+  // the rehearsal cleans up after its own crashes as well as its own successes.
+  await db.execute(sql`
+    DELETE FROM intervention WHERE trip_id IN (
+      SELECT id FROM trip WHERE title LIKE 'Briefing smoke · %'
+    )
+  `);
+  await db.execute(sql`DELETE FROM trip WHERE title LIKE 'Briefing smoke · %'`);
+  await db.execute(sql`DELETE FROM world_event WHERE source = 'smoke'`);
+  await db.execute(sql`DELETE FROM "user" WHERE id LIKE 'smoke-%'`);
+
+  // And the jobs those crashes queued. A judge job whose match is gone, or a
+  // briefing job whose trip is gone, can never succeed — it will be claimed,
+  // fail, and back off five times before the queue gives up on it. Orphaned by
+  // definition, so sweeping them is safe rather than merely convenient.
+  await db.execute(sql`
+    DELETE FROM job WHERE completed_at IS NULL AND (
+      (kind = ${JUDGE_JOB} AND NOT EXISTS (
+        SELECT 1 FROM event_match m WHERE m.id::text = job.payload->>'matchId'))
+      OR
+      (kind = ${BRIEFING_JOB} AND NOT EXISTS (
+        SELECT 1 FROM trip t WHERE t.id::text = job.payload->>'tripId'))
+    )
+  `);
   console.log("\ncleaned up");
 }

@@ -69,7 +69,11 @@ export type RenderedEmail = { subject: string; html: string; text: string };
  */
 export function subjectFor(briefing: Briefing): string {
   const day = `Day ${briefing.day.index}`;
-  if (briefing.quiet) return `${day} · all clear`;
+  // Quiet is not the same as clear: a quiet day with matches still waiting on
+  // the judge says so, and its subject must not say otherwise.
+  if (briefing.quiet && briefing.lines.every((l) => l.tone === "ok")) {
+    return `${day} · all clear`;
+  }
   const first = briefing.lines[0]?.title ?? "your briefing";
   return `${day} · ${first.length > 60 ? `${first.slice(0, 57)}…` : first}`;
 }

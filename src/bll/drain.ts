@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { claim, complete, fail, type Job } from "../dal/jobs.ts";
+import { claim, complete, fail, type Job, MAX_ATTEMPTS } from "../dal/jobs.ts";
 import { BRIEFING_JOB, writeBriefing } from "./briefing.ts";
 import { judgeMatch } from "./judge.ts";
 import { JUDGE_JOB } from "./match.ts";
@@ -22,7 +22,12 @@ export const DRAIN_BUDGET_MS = 240_000;
 /** Claimed at a time. Small, so a drain that is about to stop wastes little. */
 export const DRAIN_BATCH = 5;
 
-export type Handler = (payload: unknown) => Promise<unknown>;
+/**
+ * The job is passed alongside its payload because a handler sometimes needs to
+ * know it is out of retries — see the briefing's, which would rather send a
+ * plainer briefing than let the queue give up and say nothing at all.
+ */
+export type Handler = (payload: unknown, job: Job) => Promise<unknown>;
 
 export const handlers: Record<string, Handler> = {
   [JUDGE_JOB]: async (payload) => {
@@ -37,12 +42,17 @@ export const handlers: Record<string, Handler> = {
   // cron handler for the same reason judging is: it calls a model, and a model
   // call belongs behind the queue that already has a time budget, a backoff and
   // a give-up. A Gemini outage at 03:30 then costs a retry, not a morning.
-  [BRIEFING_JOB]: async (payload) => {
+  [BRIEFING_JOB]: async (payload, job) => {
     const { tripId, date } = payload as { tripId?: string; date?: string };
     if (typeof tripId !== "string" || typeof date !== "string") {
       throw new Error("briefing job needs a tripId and a date");
     }
-    return writeBriefing(tripId, date);
+    // `claim` returns the post-increment count, so this is the run after which
+    // `fail` would mark the job given up. Past here there is no sixth attempt
+    // to be optimistic on behalf of.
+    return writeBriefing(tripId, date, {
+      lastChance: job.attempts >= MAX_ATTEMPTS,
+    });
   },
 };
 
@@ -117,7 +127,7 @@ async function run(
     return false;
   }
   try {
-    await handler(job.payload);
+    await handler(job.payload, job);
     await complete(job.id);
     return true;
   } catch (error) {

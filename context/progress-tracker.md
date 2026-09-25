@@ -37,17 +37,18 @@ OAuth + `CURATOR_EMAILS`.
 | Detectors | **1 of 7 built**: weather-vs-activity, hourly, thresholds derived here (no Georgian warning feed exists). Open-Meteo on the free tier — commercial key still to buy. No detector has graduated out of briefing-only: `INTERRUPT_ELIGIBLE` is empty, so nothing the system builds can wake anyone up |
 | Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job`, `briefing` all live. Cron at `/api/cron/{sense-weather,match,drain,briefing}` behind `CRON_SECRET`. The clock is `src/trigger/watch-pipeline.ts` — `watch-pipeline` hourly, `morning-briefing` at 07:30 Asia/Tbilisi — and there is no Trigger.dev account yet. 269 tests (`npm test`) |
 | Judge | Prompt, guards and router written and unit-tested; the four validators enforce evidence, tier, no-empty-helpful and the confidence floor. **The model itself has never been called** |
-| Briefing | Built end to end: bundle (48h lookahead) → compose → guards → store → email → open tracking. Quiet days and refused drafts are written without a model. In-app view reads the database; email renders in HTML and text with evidence beside every claim. **The composer has never produced a draft** (free-tier quota), and **nothing has been emailed** (`RESEND_API_KEY` unset) |
+| Briefing | Built end to end and **run against Gemini** (2026-09-24): bundle (48h lookahead) → compose → guards → store → email → open tracking. Quiet days, refused drafts and an unreachable model are all written without a model call. In-app view reads the database; email renders in HTML and text with evidence beside every claim. **Nothing has been emailed** (`RESEND_API_KEY` unset) |
 | Catalogue | **Loaded**: 64 sense regions, 12 corridors, 13,338 places (11,590 `verified`, 1,748 `raw`). Per focus area: Tbilisi core 4,008, Kakheti 830, Kazbegi corridor 730, Svaneti 301. **0 / 600 curated** |
 | Recruiting | Not started |
 
 ### Phase 0 procurement checklist (blocks on you, not on code)
 
 - [x] Neon project + PostGIS enabled; migrations applied and the catalogue loaded
-- [~] `GEMINI_API_KEY` — **set, but on the free tier: twenty calls a day per model**, which is below
-      one run of the eval harness (30 fixtures) or one briefing. Confirmed by a real 429 naming
-      `GenerateRequestsPerDayPerProjectPerModel-FreeTier`. Enable billing on that key; it gates the
-      judge, the briefing composer and trip generation alike
+- [~] `GEMINI_API_KEY` — **set, but on the free tier: twenty calls a day per model.** Enough for one
+      briefing, not for the eval harness's thirty fixtures. The briefing composer has now run on it
+      (2026-09-24); `judge:eval` and `kill:count -- --judge` still cannot. Free-tier
+      `gemini-3.8-flash` also returns 503 UNAVAILABLE often — two runs in three that evening — which
+      the queue now survives but a traveller would feel. Enable billing on that key
 - [ ] Google Cloud OAuth app (Credentials → OAuth client ID, web application) → `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — also gates `/curate`; set `CURATOR_EMAILS` to your Google address
 - [ ] **Trigger.dev account** + `CRON_SECRET` — what makes Phase 3 run on a timer. Vercel cron was
       tried and failed the deployment (Hobby rejects sub-daily schedules), so the clock is
@@ -76,7 +77,7 @@ be updated as phases close, not item-by-item.
 | 1 | Catalogue + corridors | Code done; load blocked on Neon; curation 0/600 |
 | 2 | Trip document + patch log | Built and running against Neon. Generation is untestable end to end until curated places exist; the Gemini call has never run (free-tier quota) |
 | 3 | Pipeline, weather only | Built and exercised on Neon. Judge never called (free-tier quota), so the eval harness and half the kill-criteria check are unrun |
-| 4 | Daily briefing | Built and exercised on Neon end to end. Composer never called (free-tier quota); email never sent (Resend unset); not yet in front of the three travellers |
+| 4 | Daily briefing | Built, exercised on Neon end to end, and composed once by Gemini. Email never sent (Resend unset); not yet in front of the three travellers — the only item left |
 | 5 | Interrupts, budget, road form | Not started |
 | 6 | Web client | Screens built against fixtures; nothing wired to the API or to MapLibre |
 | 7 | Native shell | Not started |

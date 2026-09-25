@@ -136,6 +136,29 @@ export async function briefingBundle(
   }));
 }
 
+/**
+ * Stops in the bundle's window that the detector matched and the judge has not
+ * settled: never judged (queued, retrying, or given up on), or judged with an
+ * answer the guards refused. An empty bundle only means "all clear" when this
+ * is zero — otherwise it means "not checked yet".
+ */
+export async function unresolvedStops(
+  tripId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const rows = await db.execute(sql`
+    SELECT count(DISTINCT m.node_id)::int AS stops
+    FROM event_match m
+    JOIN trip_node n ON n.id = m.node_id
+    WHERE m.trip_id = ${tripId}
+      AND (m.judged_at IS NULL OR m.route_reason = 'rejected')
+      AND n.starts_at > ${now.toISOString()}::timestamptz
+      AND n.starts_at < ${now.toISOString()}::timestamptz
+                        + ${`${LOOKAHEAD_HOURS} hours`}::interval
+  `);
+  return (rows.rows[0]?.stops as number | undefined) ?? 0;
+}
+
 export type SavedBriefing = { id: string };
 
 /**
@@ -300,15 +323,21 @@ export async function openRate(sinceDays: number): Promise<OpenRate> {
 }
 
 /**
- * Who the briefing goes to. An anonymous trip has no account and so no address:
- * it gets the in-app briefing and no email, which is the correct behaviour and
- * not a failure to report.
+ * Who the briefing goes to. An anonymous trip has no address to send to: it
+ * gets the in-app briefing and no email, which is the correct behaviour and not
+ * a failure to report.
+ *
+ * "No address" is not the same as a null `email`. Better Auth's anonymous
+ * plugin gives every guest a generated placeholder (`<id>@anonymous.…`) because
+ * the column is NOT NULL, so a guest has to be recognised by `is_anonymous` —
+ * otherwise every guest's briefing is posted to a mailbox that does not exist,
+ * at a cost to the sending domain's reputation.
  */
 export async function recipientFor(tripId: string): Promise<string | null> {
   const rows = await db.execute(sql`
     SELECT u.email FROM trip t
     JOIN "user" u ON u.id = t.user_id
-    WHERE t.id = ${tripId}
+    WHERE t.id = ${tripId} AND u.is_anonymous IS NOT TRUE
   `);
   return (rows.rows[0]?.email as string | undefined) ?? null;
 }

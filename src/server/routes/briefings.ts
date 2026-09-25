@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { openBriefing } from "@/bll/briefing.ts";
 
 // Two ways to say the same thing: this briefing was read.
@@ -30,12 +31,20 @@ const NO_STORE = {
   pragma: "no-cache",
 } as const;
 
+/**
+ * Briefing ids are uuids, and Postgres answers a malformed one with a type
+ * error rather than an empty result — so the id is checked here, where a
+ * mangled link can be an unknown briefing instead of a 500.
+ */
+const isId = (id: string) => z.uuid().safeParse(id).success;
+
 export const briefings = new Hono()
   .get("/:id/opened.gif", async (c) => {
     // The result is ignored on purpose. An unknown id still gets a pixel: an
     // email that renders a broken image because a row was deleted is a worse
     // outcome than an unrecorded open.
-    await openBriefing(c.req.param("id")).catch(() => false);
+    const id = c.req.param("id");
+    if (isId(id)) await openBriefing(id).catch(() => false);
     return c.body(PIXEL, 200, {
       ...NO_STORE,
       "content-type": "image/gif",
@@ -44,6 +53,7 @@ export const briefings = new Hono()
   })
 
   .post("/:id/opened", async (c) => {
-    const found = await openBriefing(c.req.param("id"));
+    const id = c.req.param("id");
+    const found = isId(id) && (await openBriefing(id));
     return found ? c.body(null, 204) : c.json({ error: "not found" }, 404);
   });
