@@ -11,6 +11,7 @@ import {
 import { type EventKind, eventKinds } from "./event.ts";
 import { impacts, type Verdict } from "./judge.ts";
 import { type NodeClock, proposal, toOps } from "./proposal.ts";
+import { hazardLabels, type RoadHazard } from "./road.ts";
 import {
   inQuietHours,
   type Ledger,
@@ -312,6 +313,10 @@ const KIND_NOUNS: Record<string, string> = {
   "weather.heat": "Heat",
   "weather.cold": "Cold",
   "weather.fog": "Fog",
+  "road.closure": "Road closed",
+  "road.restriction": "Road restricted",
+  "road.delay": "Delays",
+  "road.hazard": "Road hazard",
 };
 
 /** "Rain", not "Weather": the word a traveller would use for what happened. */
@@ -334,6 +339,20 @@ export function eventSummary(event: {
   const window = event.validTo
     ? `${at(event.validFrom)}–${at(event.validTo)}`
     : `from ${at(event.validFrom)}`;
+
+  // A road report: which road, and what the reporter said caused it.
+  const { corridorName, hazard } = event.payload as {
+    corridorName?: unknown;
+    hazard?: unknown;
+  };
+  if (typeof corridorName === "string") {
+    const cause =
+      typeof hazard === "string" && hazard in hazardLabels
+        ? ` (${hazardLabels[hazard as RoadHazard].toLowerCase()})`
+        : "";
+    return `${noun}${cause} · ${corridorName} · reported for ${window}`;
+  }
+
   const { peak, peakAt, unit } = event.payload as {
     peak?: unknown;
     peakAt?: unknown;
