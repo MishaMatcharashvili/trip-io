@@ -52,9 +52,13 @@ export type MatchedPair = {
  * the sense loop refreshes what is still true every hour, so anything it has
  * stopped re-reporting has stopped being forecast.
  *
- * The insert is `ON CONFLICT DO NOTHING` rather than the plan's `NOT EXISTS`.
- * Invocations of a five-minute cron overlap, and a uniqueness constraint
- * settles the race that a NOT EXISTS only narrows.
+ * It needs both the plan's `NOT EXISTS` and `ON CONFLICT DO NOTHING`, for
+ * different reasons. The `LIMIT` applies to the SELECT, before any conflict is
+ * seen, and every live pair keeps satisfying the join for as long as its event
+ * is re-forecast — so without the `NOT EXISTS`, once `limit` pairs had been
+ * matched they would fill every run's quota, conflict, and no new pair would
+ * ever be inserted. The constraint is still what settles the race between
+ * overlapping invocations, which a `NOT EXISTS` only narrows.
  */
 export async function matchEvents(limit: number): Promise<MatchedPair[]> {
   const rows = await db.execute(sql`
@@ -69,6 +73,9 @@ export async function matchEvents(limit: number): Promise<MatchedPair[]> {
     WHERE tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
        && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
       AND e.observed_at > now() - interval '6 hours'
+      AND NOT EXISTS (
+        SELECT 1 FROM event_match m WHERE m.event_id = e.id AND m.node_id = n.id
+      )
     ORDER BY ${matchScore} DESC
     LIMIT ${limit}
     ON CONFLICT (event_id, node_id) DO NOTHING
