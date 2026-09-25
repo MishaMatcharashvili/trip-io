@@ -92,7 +92,7 @@ export type JudgeInput = {
 };
 
 /**
- * The port. `src/infra/gemini-judge.ts` is the only implementation, and it
+ * The port. `src/infra/openai-judge.ts` is the only implementation, and it
  * returns whatever the model said: the guards below are what turn that into a
  * verdict, so a rejection is recorded with its reason rather than thrown.
  */
