@@ -122,7 +122,7 @@ describe("routing", () => {
     });
   });
 
-  test("no detector has graduated yet — nothing delivered in Phase 3 can wake anyone", () => {
+  test("no detector has graduated yet — nothing unaudited can wake anyone", () => {
     assert.equal(INTERRUPT_ELIGIBLE.size, 0);
     assert.equal(
       route({ ...input(), interruptEligible: undefined }).route,

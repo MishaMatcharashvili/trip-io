@@ -83,15 +83,50 @@ export async function loadWatch(tripId: string): Promise<Watch | null> {
   return rows.rows[0] ? toWatch(rows.rows[0]) : null;
 }
 
+export type PushLedger = { sentSoFar: number; lastSentAt: string | null };
+
 /**
- * How much of this trip's interrupt budget is already spent. Only delivered
- * pushes count: a verdict routed to the briefing costs the traveller nothing,
- * which is the entire reason the second channel exists.
+ * How much of this trip's interrupt budget is already spent, and when it was
+ * last spent. Only pushes count: a verdict routed to the briefing costs the
+ * traveller nothing, which is the entire reason the second channel exists.
+ *
+ * A reserved push counts before it is sent. The reservation is what spends the
+ * slot (src/bll/interrupt.ts), so counting only sent rows would let a second
+ * delivery see a free slot while the first is still talking to the push
+ * service.
  */
-export async function spentBudget(tripId: string): Promise<number> {
-  const rows = await db.execute(sql`
-    SELECT count(*)::int AS sent FROM intervention
-    WHERE trip_id = ${tripId} AND channel = 'push' AND sent_at IS NOT NULL
+export async function pushLedger(
+  tripId: string,
+  conn: Queryable = db,
+): Promise<PushLedger> {
+  const rows = await conn.execute(sql`
+    SELECT count(*)::int AS spent, max(sent_at) AS last_sent_at
+    FROM intervention
+    WHERE trip_id = ${tripId} AND channel = 'push'
   `);
-  return (rows.rows[0]?.sent as number) ?? 0;
+  const r = rows.rows[0] ?? {};
+  return {
+    sentSoFar: (r.spent as number) ?? 0,
+    lastSentAt: r.last_sent_at
+      ? new Date(r.last_sent_at as string).toISOString()
+      : null,
+  };
+}
+
+/**
+ * The watch, locked for the rest of the transaction. Every delivery for a trip
+ * takes this lock before counting its ledger, which is what makes "count, then
+ * reserve" one step: a second delivery for the same trip waits here and then
+ * counts the first one's reservation.
+ */
+export async function lockWatch(
+  conn: Queryable,
+  tripId: string,
+): Promise<Watch | null> {
+  const rows = await conn.execute(sql`
+    SELECT trip_id, channels, quiet_hours, cap, active_from, active_to
+    FROM trip_watch WHERE trip_id = ${tripId}
+    FOR UPDATE
+  `);
+  return rows.rows[0] ? toWatch(rows.rows[0]) : null;
 }

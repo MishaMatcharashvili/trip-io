@@ -312,24 +312,34 @@ export async function tripView(tripId: string): Promise<TripView | null> {
 
 /**
  * Would these ops leave the trip coherent? A dry run of what `appendPatch`
- * checks, changing nothing: the replan preview now, the intervention diff in
- * Phase 5.
+ * checks, changing nothing: the replan preview, and the intervention card's
+ * before-and-after.
  */
 export async function previewPatch(
   tripId: string,
   ops: readonly PatchOp[],
+  author: Author = "user",
 ): Promise<ProposalResult | null> {
   const trip = await loadTrip(tripId);
   if (!trip) return null;
+  return checkOps(trip.doc, ops, author);
+}
 
-  const places = await placeFacts([
-    ...placeIdsOf(trip.doc),
-    ...placeIdsInOps(ops),
-  ]);
-  return validateProposal(trip.doc, ops, {
+/**
+ * The validator over a document already in hand, with the places it needs
+ * looked up. `author` matters: an intervention may not introduce an error at
+ * all, where a traveller's own edit is applied with warnings.
+ */
+export async function checkOps(
+  doc: TripDoc,
+  ops: readonly PatchOp[],
+  author: Author,
+): Promise<ProposalResult> {
+  const places = await placeFacts([...placeIdsOf(doc), ...placeIdsInOps(ops)]);
+  return validateProposal(doc, ops, {
     places,
     travel: straightLineTravel,
-    author: "user",
+    author,
   });
 }
 
