@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  briefingOffers,
+  changeRows,
   checkDelivery,
   type DeliveryInput,
+  eventSummary,
   expiresAt,
   isMute,
   makeOffer,
@@ -307,5 +310,167 @@ describe("outcomes", () => {
     assert.ok(
       !isMute({ before: ["briefing"], after: ["push"], now: NOON, ...window }),
     );
+  });
+});
+
+describe("the card", () => {
+  const node = (title: string, startsAt: string, durationMin = 60) => ({
+    kind: "visit" as const,
+    placeId: null,
+    lonLat: [44.64, 42.66] as [number, number],
+    startsAt,
+    durationMin,
+    indoor: false,
+    meta: { title, urban: false },
+  });
+  const trip = {
+    title: "Kazbegi",
+    startsAt: "2026-10-03T00:00:00Z",
+    endsAt: "2026-10-06T00:00:00Z",
+    party: {},
+    pace: "moderate" as const,
+    budget: "€",
+    prefs: {},
+  };
+
+  test("the summary is the detector's figures, not the model's", () => {
+    assert.equal(
+      eventSummary({
+        kind: "weather.rain",
+        validFrom: "2026-10-04T10:00:00Z",
+        validTo: "2026-10-04T14:00:00Z",
+        payload: { unit: "mm/h", peak: 6.2, peakAt: "2026-10-04T11:00:00Z" },
+      }),
+      "Rain · 14:00–18:00 · peaks 6.2 mm/h at 15:00",
+    );
+    assert.equal(
+      eventSummary({
+        kind: "weather.fog",
+        validFrom: "2026-10-04T02:00:00Z",
+        validTo: "2026-10-04T05:00:00Z",
+        payload: { unit: "", peak: 45 },
+      }),
+      "Fog · 06:00–09:00",
+    );
+  });
+
+  test("every stop the cascade touches gets a row", () => {
+    const before = {
+      trip,
+      nodes: {
+        [HIKE]: node("Gergeti hike", "2026-10-04T10:00:00Z", 180),
+        [LUNCH]: node("Lunch at Shorena's", "2026-10-04T08:00:00Z"),
+      },
+    };
+    const after = {
+      trip,
+      nodes: {
+        [HIKE]: node("Gergeti hike", "2026-10-04T06:00:00Z", 180),
+        [LUNCH]: node("Lunch at Shorena's", "2026-10-04T09:30:00Z"),
+      },
+    };
+    assert.deepEqual(changeRows(before, after), [
+      {
+        nodeId: HIKE,
+        from: "14:00 · Gergeti hike",
+        to: "10:00 · Gergeti hike",
+      },
+      {
+        nodeId: LUNCH,
+        from: "12:00 · Lunch at Shorena's",
+        to: "13:30 · Lunch at Shorena's",
+      },
+    ]);
+  });
+
+  test("a shortened stop reads as a duration, a dropped one as not today", () => {
+    const before = {
+      trip,
+      nodes: {
+        [HIKE]: node("Gergeti hike", "2026-10-04T10:00:00Z", 180),
+        [LUNCH]: node("Lunch", "2026-10-04T08:00:00Z"),
+      },
+    };
+    const after = {
+      trip,
+      nodes: { [HIKE]: node("Gergeti hike", "2026-10-04T10:00:00Z", 90) },
+    };
+    assert.deepEqual(changeRows(before, after), [
+      { nodeId: LUNCH, from: "12:00 · Lunch", to: "Not today" },
+      {
+        nodeId: HIKE,
+        from: "Gergeti hike · 180 min",
+        to: "Gergeti hike · 90 min",
+      },
+    ]);
+  });
+
+  test("a stop moved to tomorrow is one row, not a move and a removal", () => {
+    const before = {
+      trip,
+      nodes: { [HIKE]: node("Gergeti hike", "2026-10-04T10:00:00Z") },
+    };
+    const after = {
+      trip,
+      nodes: { [HIKE]: node("Gergeti hike", "2026-10-05T06:00:00Z") },
+    };
+    assert.equal(changeRows(before, after).length, 1);
+  });
+});
+
+describe("briefing offers", () => {
+  const OTHER = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+  const EVENT = "1d2c3b4a-5f6e-4d7c-8b9a-0f1e2d3c4b5a";
+  const item = (matchId: string, nodeId: string, score: number) => ({
+    matchId,
+    eventId: EVENT,
+    nodeId,
+    kind: "weather.rain" as const,
+    severity: "moderate" as const,
+    source: "open-meteo",
+    score,
+    nodeTitle: "Gergeti hike",
+    nodeStartsAt: "2026-10-04T10:00:00Z",
+    verdict: verdict(),
+  });
+
+  test("one offer per event, and only the nominated change can be accepted", () => {
+    const offers = briefingOffers({
+      items: [item(MATCH, HIKE, 1), item(OTHER, LUNCH, 3)],
+      change: {
+        matchId: MATCH,
+        eventId: EVENT,
+        nodeId: HIKE,
+        sentence: "Walk up before lunch and keep the afternoon for the museum.",
+        evidence: verdict().evidence,
+        proposals: verdict().proposals,
+      },
+      clocks,
+      now: NOON,
+    });
+    assert.equal(offers.length, 1);
+    assert.equal(
+      offers[0].offer.matchId,
+      MATCH,
+      "the nominated item, not the top score",
+    );
+    assert.equal(offers[0].offer.ops.length, 1);
+    assert.match(offers[0].offer.sentence ?? "", /before lunch/);
+    assert.equal(offers[0].expiresAt, "2026-10-04T10:00:00.000Z");
+  });
+
+  test("an event nobody nominated is recorded as worth knowing, with nothing to accept", () => {
+    const [only] = briefingOffers({
+      items: [item(MATCH, HIKE, 1), item(OTHER, LUNCH, 3)],
+      change: null,
+      clocks,
+      now: NOON,
+    });
+    assert.equal(
+      only.offer.matchId,
+      OTHER,
+      "the highest-scoring item speaks for it",
+    );
+    assert.deepEqual(only.offer.ops, []);
   });
 });

@@ -1,6 +1,13 @@
 import { z } from "zod";
+import { diffDays } from "../trip/diff.ts";
+import type { TripDoc, TripNode } from "../trip/document.ts";
 import { patchOps } from "../trip/patch.ts";
-import { at, kindLabel } from "./briefing.ts";
+import {
+  at,
+  type BriefingChange,
+  type BriefingItem,
+  kindLabel,
+} from "./briefing.ts";
 import { type EventKind, eventKinds } from "./event.ts";
 import { impacts, type Verdict } from "./judge.ts";
 import { type NodeClock, proposal, toOps } from "./proposal.ts";
@@ -290,4 +297,162 @@ export function isMute(input: {
     Date.parse(input.activeFrom) <= now &&
     now < Date.parse(input.activeTo)
   );
+}
+
+// ---------------------------------------------------------------------------
+// The card: what changed, what it affects, what would move
+
+const KIND_NOUNS: Record<string, string> = {
+  "weather.rain": "Rain",
+  "weather.snow": "Snow",
+  "weather.wind": "Strong wind",
+  "weather.thunderstorm": "Thunderstorms",
+  "weather.heat": "Heat",
+  "weather.cold": "Cold",
+  "weather.fog": "Fog",
+};
+
+/**
+ * "Changed", in one line: what the event is, how strong at its worst, and its
+ * window. Every figure is the detector's, read from the payload it stored —
+ * nothing here is the model's, so it can sit beside the model's sentence as
+ * the thing that sentence is checked against.
+ */
+export function eventSummary(event: {
+  kind: string;
+  validFrom: string;
+  validTo: string | null;
+  payload: Record<string, unknown>;
+}): string {
+  const noun = KIND_NOUNS[event.kind] ?? kindLabel(event.kind as EventKind);
+  const window = event.validTo
+    ? `${at(event.validFrom)}–${at(event.validTo)}`
+    : `from ${at(event.validFrom)}`;
+  const { peak, peakAt, unit } = event.payload as {
+    peak?: unknown;
+    peakAt?: unknown;
+    unit?: unknown;
+  };
+  const measured =
+    typeof peak === "number" && typeof unit === "string" && unit.length > 0
+      ? ` · peaks ${peak} ${unit}${typeof peakAt === "string" ? ` at ${at(peakAt)}` : ""}`
+      : "";
+  return `${noun} · ${window}${measured}`;
+}
+
+export type ChangeRow = { nodeId: string; from: string; to: string };
+
+/**
+ * The coherent-day diff, as rows a traveller reads without opening anything.
+ * Every stop the change touches gets a row — the cascade is the point: moving
+ * the hike displaces lunch, and a card that showed only the hike would be
+ * asking for a decision about half of what it does.
+ *
+ * `names` resolves catalogue places; a stop without one is called by its own
+ * title. A stop that moves to another day appears once, where it now falls.
+ */
+export function changeRows(
+  before: TripDoc,
+  after: TripDoc,
+  names: ReadonlyMap<string, string> = new Map(),
+): ChangeRow[] {
+  const title = (n: TripNode) =>
+    (n.placeId ? names.get(n.placeId) : undefined) ?? n.meta.title;
+  const when = (n: TripNode) => `${at(n.startsAt)} · ${title(n)}`;
+
+  const rows = new Map<string, ChangeRow>();
+  for (const { changes } of diffDays(before, after)) {
+    for (const change of changes) {
+      // A move across midnight is listed twice by `diffDays`, as a move and a
+      // removal from the day it left. The move is the truer row.
+      if (change.kind === "removed" && after.nodes[change.id]) continue;
+      switch (change.kind) {
+        case "added":
+          rows.set(change.id, {
+            nodeId: change.id,
+            from: "New",
+            to: when(change.after),
+          });
+          break;
+        case "removed":
+          rows.set(change.id, {
+            nodeId: change.id,
+            from: when(change.before),
+            to: "Not today",
+          });
+          break;
+        case "moved": {
+          const { before: b, after: a } = change;
+          rows.set(
+            change.id,
+            b.startsAt === a.startsAt
+              ? {
+                  nodeId: change.id,
+                  from: `${title(b)} · ${b.durationMin} min`,
+                  to: `${title(a)} · ${a.durationMin} min`,
+                }
+              : { nodeId: change.id, from: when(b), to: when(a) },
+          );
+          break;
+        }
+        case "changed":
+          rows.set(change.id, {
+            nodeId: change.id,
+            from: when(change.before),
+            to: when(change.after),
+          });
+          break;
+      }
+    }
+  }
+  return [...rows.values()];
+}
+
+// ---------------------------------------------------------------------------
+// Briefing offers
+
+export type BriefingOffer = {
+  eventId: string;
+  offer: Offer;
+  expiresAt: string;
+};
+
+/**
+ * What each event in a briefing offered, one intervention per event — the same
+ * rain over two stops is one thing the traveller was told.
+ *
+ * Only the briefing's nominated change is actionable. The composer is allowed
+ * one, because a briefing offering three rearrangements is asking the traveller
+ * to plan; so the other items are recorded as what they were — worth knowing,
+ * with nothing to accept — even where the judge had proposed moves for them.
+ */
+export function briefingOffers(input: {
+  items: readonly BriefingItem[];
+  change: BriefingChange | null;
+  clocks: ReadonlyMap<string, NodeClock>;
+  now: Date;
+}): BriefingOffer[] {
+  const byEvent = new Map<string, BriefingItem[]>();
+  for (const item of input.items) {
+    byEvent.set(item.eventId, [...(byEvent.get(item.eventId) ?? []), item]);
+  }
+
+  return [...byEvent].map(([eventId, items]) => {
+    const nominated = items.find((i) => i.matchId === input.change?.matchId);
+    const chosen = nominated ?? [...items].sort((a, b) => b.score - a.score)[0];
+    const offer = makeOffer({
+      matchId: chosen.matchId,
+      nodeId: chosen.nodeId,
+      kind: chosen.kind,
+      verdict: chosen.verdict,
+      clocks: input.clocks,
+      sentence: nominated ? input.change?.sentence : undefined,
+      actionable: Boolean(nominated),
+    });
+    return {
+      eventId,
+      offer,
+      expiresAt: expiresAt("briefing", input.now, offer, chosen.nodeStartsAt),
+    };
+  });
 }
