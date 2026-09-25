@@ -29,7 +29,6 @@
     "catalogue:load": "node --env-file=.env scripts/catalogue/load.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.23.0",
     "@hono/zod-validator": "^0.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@trigger.dev/sdk": "^4.6.3",
