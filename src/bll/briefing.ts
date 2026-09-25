@@ -10,6 +10,7 @@ import {
   type StoredBriefing,
   saveBriefing,
   stopsOn,
+  unresolvedStops,
 } from "../dal/briefings.ts";
 import { enqueue } from "../dal/jobs.ts";
 import { placeNames } from "../dal/places.ts";
@@ -168,8 +169,12 @@ export async function writeBriefing(
 
   if (taken.length === 0) {
     // No model call on a quiet day — see src/domain/watch/briefing.ts for why
-    // that is a correctness decision and not only a cost one.
-    briefing = quietBriefing(input);
+    // that is a correctness decision and not only a cost one. Whether it may
+    // say "all clear" depends on what the judge has not ruled on yet.
+    briefing = quietBriefing({
+      ...input,
+      unresolved: await unresolvedStops(tripId, now),
+    });
   } else {
     const ask = brieferInput(input, {
       title: trip.title,

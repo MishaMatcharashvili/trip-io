@@ -267,6 +267,20 @@ describe("the quiet day", () => {
     // It claims exactly the coverage the system has and no more.
     assert.match(briefing.lines[0].detail, /One source watched overnight/);
   });
+
+  test("is not an all-clear while the judge still owes a verdict", () => {
+    const briefing = quietBriefing({
+      tripId: "trip-1",
+      day,
+      now: new Date("2026-10-04T03:30:00Z"),
+      unresolved: 2,
+    });
+    assert.equal(briefing.lines.length, 1);
+    // Green means all clear; an unchecked match is not one.
+    assert.notEqual(briefing.lines[0].tone, "ok");
+    assert.doesNotMatch(briefing.lines[0].detail, /found nothing/);
+    assert.match(briefing.lines[0].detail, /2 stops/);
+  });
 });
 
 describe("fallbackBriefing", () => {

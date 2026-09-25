@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { Briefing } from "../domain/watch/briefing.ts";
+import { type Briefing, quietBriefing } from "../domain/watch/briefing.ts";
 import {
   renderBriefingEmail,
   renderText,
@@ -57,7 +57,22 @@ describe("subjectFor", () => {
   });
 
   test("says so when there is nothing to say", () => {
-    assert.equal(subjectFor(briefing({ quiet: true })), "Day 3 · all clear");
+    const quiet = quietBriefing({
+      tripId: "t1",
+      day: briefing().day,
+      now: new Date("2026-10-04T03:30:00Z"),
+    });
+    assert.equal(subjectFor(quiet), "Day 3 · all clear");
+  });
+
+  test("never says all clear while the judge still owes a verdict", () => {
+    const unchecked = quietBriefing({
+      tripId: "t1",
+      day: briefing().day,
+      now: new Date("2026-10-04T03:30:00Z"),
+      unresolved: 1,
+    });
+    assert.doesNotMatch(subjectFor(unchecked), /all clear/);
   });
 
   test("truncates rather than overflowing the client's preview", () => {

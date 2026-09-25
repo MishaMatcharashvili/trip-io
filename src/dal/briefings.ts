@@ -136,6 +136,29 @@ export async function briefingBundle(
   }));
 }
 
+/**
+ * Stops in the bundle's window that the detector matched and the judge has not
+ * settled: never judged (queued, retrying, or given up on), or judged with an
+ * answer the guards refused. An empty bundle only means "all clear" when this
+ * is zero — otherwise it means "not checked yet".
+ */
+export async function unresolvedStops(
+  tripId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const rows = await db.execute(sql`
+    SELECT count(DISTINCT m.node_id)::int AS stops
+    FROM event_match m
+    JOIN trip_node n ON n.id = m.node_id
+    WHERE m.trip_id = ${tripId}
+      AND (m.judged_at IS NULL OR m.route_reason = 'rejected')
+      AND n.starts_at > ${now.toISOString()}::timestamptz
+      AND n.starts_at < ${now.toISOString()}::timestamptz
+                        + ${`${LOOKAHEAD_HOURS} hours`}::interval
+  `);
+  return (rows.rows[0]?.stops as number | undefined) ?? 0;
+}
+
 export type SavedBriefing = { id: string };
 
 /**

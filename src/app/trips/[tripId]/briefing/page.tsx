@@ -95,7 +95,8 @@ export default async function BriefingPage({
   const page = await briefingPage(tripId);
 
   // A trip saved after this morning's run has no briefing yet. Saying so is
-  // better than a 404 on a page the traveller was told to expect.
+  // better than a 404 on a page the traveller was told to expect — and it is
+  // not an all-clear, so it is not green: nothing has been checked yet.
   if (!page) {
     return (
       <BriefingScreen
@@ -107,10 +108,11 @@ export default async function BriefingPage({
           lines: [
             {
               key: "pending",
-              tone: "ok",
-              kind: "All clear",
-              title: "Nothing to report yet",
-              detail: "The watch is on. Nothing has changed on your route.",
+              tone: "agent",
+              kind: "Watch",
+              title: "No briefing yet",
+              detail:
+                "The first one is written at 07:30 on a morning with stops.",
             },
           ],
           change: null,
