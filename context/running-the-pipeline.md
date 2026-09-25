@@ -26,16 +26,17 @@ checklist in `context/progress-tracker.md` for whether the account is on a plan 
 
 ## The switches, in the order they pay off
 
-### 1. A Gemini plan that allows more than twenty calls a day
+### 1. `OPENAI_API_KEY` — the provider changed, and has not been called yet
 
-`GEMINI_API_KEY` **is now set**, and it is on the free tier: 20 `generateContent` requests per day
-per model. That is below what a single run of anything here needs — the eval harness alone is
-thirty fixtures, and one briefing for one trip-day is one more.
+Every model call — the judge, the briefing composer, trip generation — runs on OpenAI's
+`gpt-5.4-mini` (`src/infra/openai.ts`, which pins the id). It replaced Gemini on 2026-09-25. The
+Gemini key was on a free tier capped at twenty calls a day per model: enough for the one briefing
+it composed on 2026-09-24, below one run of the eval harness, and its `gemini-3.8-flash` returned
+503 on two runs in three.
 
-Confirmed by running it: the briefing composer's first real call came back
-`RESOURCE_EXHAUSTED … quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, quotaValue: 20`.
-The wiring is right and the quota is not. Enable billing on the Google Cloud project behind the key,
-then run the three things below — none of which has ever met the model.
+`OPENAI_API_KEY` is **not set yet**. Set it (on a project with billing, in `.env` and on Vercel),
+then run the three things below. The judge and `kill:count -- --judge` have never met a model;
+the briefing composer has, but not this one.
 
 ```
 npm run judge:eval                  # the 30 fixtures against the real model

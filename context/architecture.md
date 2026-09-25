@@ -54,7 +54,7 @@ is moving the code one layer further left.
 | `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router and the briefing document | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
 | `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
 | `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
-| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, the Gemini briefer, Open-Meteo, Resend, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/infra` | Outbound adapters: the OpenAI composer, the OpenAI judge, the OpenAI briefer, Open-Meteo, Resend, Better Auth | Implements a port the domain declares. The only files that name an external provider |
 | `src/server` | The Hono app, its routers and the session middleware | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 
@@ -64,9 +64,11 @@ Two consequences worth stating, because they are what the layering buys:
   scheduler and the pipeline are pure; the pipeline takes its model, its cache and its travel estimate
   as injected ports, so every branch — cache hit, model retry, fallback, insufficient coverage — runs
   against fakes in `pipeline.test.ts`.
-- **Swapping an implementation is a one-file change.** `Composer`, `PlanCache` and `TravelEstimator`
-  are declared in the domain and implemented outside it: moving off Gemini, or replacing
-  straight-line travel with an OSRM matrix, touches `src/infra` or `src/dal` and nothing else.
+- **Swapping an implementation stays in `src/infra` or `src/dal`.** `Composer`, `Judge`, `Briefer`,
+  `PlanCache` and `TravelEstimator` are declared in the domain and implemented outside it. The move
+  from Gemini to OpenAI replaced four files in `src/infra` and one import line in each use case that
+  names a default; the domain, its guards and their tests did not change. Replacing straight-line
+  travel with an OSRM matrix would be the same shape of change in `src/dal`.
 
 This also means Hono runs unchanged on Bun or Node if the project ever outgrows Vercel — only the
 entry file changes.
