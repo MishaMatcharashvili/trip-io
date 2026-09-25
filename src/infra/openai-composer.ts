@@ -1,3 +1,4 @@
+import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type {
   ComposeFeedback,
@@ -5,7 +6,7 @@ import type {
   Composer,
 } from "../domain/trip/generate/pipeline.ts";
 import { planSchema, type RefPlan } from "../domain/trip/generate/plan.ts";
-import { generate, MODEL } from "./gemini.ts";
+import { generateJson } from "./openai.ts";
 
 // The only model call in trip generation, and the only file that knows which
 // provider we use: it implements the domain's `Composer` port, and everything
@@ -68,7 +69,7 @@ const retryTurn = (feedback: ComposeFeedback) =>
     .filter(Boolean)
     .join("\n\n");
 
-export const composeWithGemini: Composer = async (input, feedback) => {
+export const composeWithOpenAI: Composer = async (input, feedback) => {
   // The refs become an enum in the response schema, so an invented place is
   // impossible at decoding time. The pipeline checks again anyway: cached and
   // fallback plans don't pass through here.
@@ -77,30 +78,27 @@ export const composeWithGemini: Composer = async (input, feedback) => {
     refs.length > 0 ? z.enum(refs as [string, ...string[]]) : z.string(),
   );
 
-  const previous = feedback ? JSON.stringify(feedback.previous) : null;
-  const response = await generate({
-    model: MODEL,
-    contents: [
-      { role: "user", parts: [{ text: userTurn(input) }] },
-      ...(previous
+  const raw = await generateJson({
+    instructions: SYSTEM,
+    input: [
+      { role: "user", content: userTurn(input) },
+      // A retry is the same conversation one turn on: the rejected plan as the
+      // model's own answer, then what was wrong with it.
+      ...(feedback
         ? [
-            { role: "model", parts: [{ text: previous }] },
             {
-              role: "user",
-              parts: [{ text: retryTurn(feedback as ComposeFeedback) }],
+              role: "assistant" as const,
+              content: JSON.stringify(feedback.previous),
             },
+            { role: "user" as const, content: retryTurn(feedback) },
           ]
         : []),
     ],
-    config: {
-      systemInstruction: SYSTEM,
-      responseMimeType: "application/json",
-      responseJsonSchema: z.toJSONSchema(schema, { io: "output" }),
-      temperature: 0.4,
-    },
+    format: zodTextFormat(schema, "plan"),
+    // Low: choosing and ordering places from a list. Clock times, the part
+    // models are bad at, are `schedule.ts`'s job, and whatever comes back is
+    // scheduled and validated before it can become a trip.
+    effort: "low",
   });
-
-  const text = response.text;
-  if (!text) throw new Error("the model returned no content");
-  return schema.parse(JSON.parse(text)) as RefPlan;
+  return schema.parse(raw) as RefPlan;
 };

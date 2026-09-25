@@ -9,7 +9,7 @@
 // quietly makes the model chatty about wind, the relevance score will hold
 // steady while the false-positive rate climbs, and that is the whole point.
 //
-// Needs GEMINI_API_KEY. Costs one model call per fixture.
+// Needs OPENAI_API_KEY. Costs one model call per fixture.
 
 import type { PlaceTier } from "../../src/domain/catalogue/tier.ts";
 import {
@@ -23,8 +23,8 @@ import {
   scoreFixture,
   summarise,
 } from "../../src/domain/watch/eval/score.ts";
-import { MODEL } from "../../src/infra/gemini.ts";
-import { judgeWithGemini } from "../../src/infra/gemini-judge.ts";
+import { MODEL } from "../../src/infra/openai.ts";
+import { judgeWithOpenAI } from "../../src/infra/openai-judge.ts";
 
 const args = process.argv.slice(2);
 const verbose = args.includes("-v") || args.includes("--verbose");
@@ -52,7 +52,7 @@ const results: FixtureResult[] = [];
 for (const fixture of corpus) {
   let result: FixtureResult;
   try {
-    const raw = await judgeWithGemini(fixture.input);
+    const raw = await judgeWithOpenAI(fixture.input);
     result = scoreFixture(fixture, raw, { tiers: tiersFor(fixture) });
   } catch (error) {
     result = {
