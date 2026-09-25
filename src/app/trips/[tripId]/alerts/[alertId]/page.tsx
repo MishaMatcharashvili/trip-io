@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { advisory, getTrip, roadAdvisory } from "@/data/trip";
+import { z } from "zod";
+import { interventionCard } from "@/bll/interventions.ts";
+import { advisory, getTrip, roadAdvisory, type Trip } from "@/data/trip";
+import { InterventionScreen } from "@/features/intervention";
+import { getAuth } from "@/infra/auth.ts";
 import { Button, ButtonLink } from "@/ui/button";
 import { Divider } from "@/ui/card";
 import { Icon } from "@/ui/icon";
@@ -10,13 +15,35 @@ import { Display, Eyebrow, Num } from "@/ui/text";
 
 export const metadata: Metadata = { title: "Alert" };
 
+/**
+ * One intervention, and the decision it asks for. Where a push lands when it
+ * is tapped, and where a briefing's recommended change is reviewed.
+ *
+ * Real trips read `intervention` (src/bll/interventions.ts). The fixture trip
+ * still renders the canvas's reference card so `/design` keeps it; fixture ids
+ * are slugs and every real one is a UUID, so the two never collide.
+ */
 export default async function AlertPage({
   params,
 }: PageProps<"/trips/[tripId]/alerts/[alertId]">) {
   const { tripId, alertId } = await params;
-  const trip = getTrip(tripId);
-  if (!trip) notFound();
 
+  const fixture = getTrip(tripId);
+  if (fixture) return <FixtureAlert trip={fixture} alertId={alertId} />;
+
+  // Postgres answers a malformed uuid with an error, not an empty result.
+  if (!z.uuid().safeParse(alertId).success) notFound();
+
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  if (!session) notFound();
+
+  const result = await interventionCard(alertId, session.user.id);
+  if (!result.ok || result.card.tripId !== tripId) notFound();
+
+  return <InterventionScreen card={result.card} />;
+}
+
+function FixtureAlert({ trip, alertId }: { trip: Trip; alertId: string }) {
   // The road advisory is the fullest form of the card: it carries an "I did"
   // line, because the agent already found the detour before interrupting.
   const alert = alertId === advisory.id ? advisory : roadAdvisory;

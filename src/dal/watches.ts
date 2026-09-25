@@ -133,3 +133,29 @@ export async function lockWatch(
   `);
   return rows.rows[0] ? toWatch(rows.rows[0]) : null;
 }
+
+/**
+ * Write the traveller's own choice of channels and quiet hours. `muted` stamps
+ * `muted_at` the first time push is switched off mid-trip, and never moves it
+ * afterwards: the kill criterion counts trips where it happened, not how often.
+ */
+export async function saveWatchSettings(
+  conn: Queryable,
+  tripId: string,
+  settings: {
+    channels: readonly string[];
+    quietHours: QuietHours | null;
+    muted: boolean;
+  },
+): Promise<void> {
+  await conn.execute(sql`
+    UPDATE trip_watch SET
+      channels = ARRAY[${sql.join(
+        settings.channels.map((c) => sql`${c}`),
+        sql`, `,
+      )}]::delivery_channel[],
+      quiet_hours = ${JSON.stringify(settings.quietHours)}::jsonb,
+      muted_at = ${settings.muted ? sql`COALESCE(muted_at, now())` : sql`muted_at`}
+    WHERE trip_id = ${tripId}
+  `);
+}
