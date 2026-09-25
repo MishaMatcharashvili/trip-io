@@ -241,7 +241,7 @@ describe("the push", () => {
       url: "https://trip.io/trips/t/alerts/i",
       interventionId: "i",
     });
-    assert.equal(message.title, "Weather · Gergeti hike at 14:00");
+    assert.equal(message.title, "Rain · Gergeti hike at 14:00");
     assert.equal(message.body, made.oneLine);
   });
 

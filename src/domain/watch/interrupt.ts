@@ -232,7 +232,7 @@ export function pushMessage(input: {
 }): PushMessage {
   return {
     title: clip(
-      `${kindLabel(input.offer.kind)} · ${input.stop.title} at ${at(input.stop.startsAt)}`,
+      `${kindNoun(input.offer.kind)} · ${input.stop.title} at ${at(input.stop.startsAt)}`,
       PUSH_TITLE_MAX,
     ),
     body: input.offer.oneLine,
@@ -312,6 +312,10 @@ const KIND_NOUNS: Record<string, string> = {
   "weather.fog": "Fog",
 };
 
+/** "Rain", not "Weather": the word a traveller would use for what happened. */
+export const kindNoun = (kind: string): string =>
+  KIND_NOUNS[kind] ?? kindLabel(kind as EventKind);
+
 /**
  * "Changed", in one line: what the event is, how strong at its worst, and its
  * window. Every figure is the detector's, read from the payload it stored —
@@ -324,7 +328,7 @@ export function eventSummary(event: {
   validTo: string | null;
   payload: Record<string, unknown>;
 }): string {
-  const noun = KIND_NOUNS[event.kind] ?? kindLabel(event.kind as EventKind);
+  const noun = kindNoun(event.kind);
   const window = event.validTo
     ? `${at(event.validFrom)}–${at(event.validTo)}`
     : `from ${at(event.validFrom)}`;
