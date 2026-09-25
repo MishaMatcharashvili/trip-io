@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { diffDays } from "../trip/diff.ts";
 import type { TripDoc, TripNode } from "../trip/document.ts";
-import { patchOps } from "../trip/patch.ts";
+import { patchOp } from "../trip/patch.ts";
 import {
   at,
   type BriefingChange,
@@ -54,7 +54,9 @@ export const offer = z.object({
   horizonHrs: z.number(),
   confidence: z.number(),
   proposals: z.array(proposal),
-  ops: patchOps,
+  // Not `patchOps`, which demands at least one: an offer with nothing to apply
+  // is the common case — worth knowing, nothing to move — and must read back.
+  ops: z.array(patchOp).max(500),
 });
 export type Offer = z.infer<typeof offer>;
 

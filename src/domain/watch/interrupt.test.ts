@@ -222,6 +222,12 @@ describe("offers", () => {
     assert.deepEqual(made.ops, []);
     assert.deepEqual(made.proposals, []);
     assert.equal(made.oneLine, verdict().oneLine);
+    // The common case — worth knowing, nothing to move — has to read back
+    // from `intervention.offer`, or its card and its row in the list vanish.
+    assert.ok(
+      offer.safeParse(made).success,
+      "an offer with no moves round-trips",
+    );
   });
 });
 
