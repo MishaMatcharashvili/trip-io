@@ -335,7 +335,7 @@ From `concept.md`, with the instrumentation each depends on. Build the right\-ha
 | Briefing opened per trip\-day | ≥ 50% | \< 20% | open tracking on email and in\-app |
 | Interventions per trip worth sending | 4–8 | \< 2 | router log including `drop` |
 | False\-positive rate, hand\-audited | \< 15% | \> 35% | sampling queue \+ audit UI |
-| Would pay €5/mo, asked post\-trip | ≥ 25% | \< 8% | post\-trip survey trigger |
+| Would pay $5 per watched trip, asked post\-trip | ≥ 25% | \< 8% | post\-trip survey trigger |
 
 **Row 4 is the one your doc flags and it is the one this plan is most exposed to.** *"If the system only ever finds 1–2 things worth saying per trip, the watch layer is a feature, not a product."*
 
@@ -385,4 +385,4 @@ At 100 travellers on 7\-day trips: roughly 7,000 judge calls and 700 briefing ca
 1. **Domain.** Deliberately parked. `trip.io`, `tripio.ai`, `tripio.io` all registered; `roamline.io` is your researched best free option and `wandr.ai` is brokered with a price. Confirm at a registrar and run EUIPO / USPTO / Sakpatenti checks before any design spend. Positioning line already exists and is good: *"It notices before you do."*
 2. **Road automation.** Decided in week 10, on evidence from real manual events.
 3. **Who may submit road reports** — you alone, trusted locals, or any user. Changes the trust model on `world_event.confidence` and whether reports need moderation before they can trigger an interrupt. Needed by week 7.
-4. **Subscription mechanics** — trial length, whether the first trip is watched free. Needed by week 8, not before.
+4. ~~**Subscription mechanics**~~ — **decided 2026-09-26.** Watching is paid per trip rather than by subscription: $5 at an early-adopter price against a $50 list price, through Flitt. A traveller's first watched trip is free, and there is no separate trial.

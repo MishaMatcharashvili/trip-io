@@ -4,6 +4,7 @@ import {
   advisory,
   calmStrip,
   georgia,
+  georgiaMapStops,
   opportunity,
   todayWeather,
 } from "@/data/trip";
@@ -18,6 +19,7 @@ import { Chip, WatchChip } from "@/ui/chip";
 import { RadioRow, Toggle } from "@/ui/control";
 import { Dot } from "@/ui/dot";
 import { Icon, type IconName } from "@/ui/icon";
+import { TripMap } from "@/ui/map/trip-map";
 import { PillNav } from "@/ui/nav";
 import { Display, Eyebrow, Headline, Num, Prose, Title } from "@/ui/text";
 import { ThemeSegmented } from "@/ui/theme";
@@ -148,6 +150,8 @@ const screens = [
   ["Create an account", "/sign-up"],
   ["Account", "/account"],
 ];
+
+/** Day 3 of the fixture trip, on the real map. */
 
 function Spec({
   title,
@@ -376,6 +380,18 @@ export default function DesignSystemPage() {
                 <span className="text-micro text-ink-faint">{name}</span>
               </div>
             ))}
+          </Card>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <SectionRule>Map</SectionRule>
+          <Prose className="max-w-[640px]">
+            MapLibre over Georgia from the public Blob store, painted only in
+            the map tokens. The route is periwinkle because it is the plan the
+            agent watches; coral marks the one stop something real happened to.
+          </Prose>
+          <Card className="overflow-hidden p-0">
+            <TripMap stops={georgiaMapStops} className="h-[420px] w-full" />
           </Card>
         </section>
 

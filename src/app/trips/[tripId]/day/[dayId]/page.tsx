@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDay, getTrip, todayWeather } from "@/data/trip";
+import { dayForecast } from "@/bll/trip-screen";
+import {
+  type Day,
+  getDay,
+  getTrip,
+  type Trip,
+  todayWeather,
+} from "@/data/trip";
 import { MobileTitleBar, TopBar } from "@/features/chrome";
+import { DayEditor } from "@/features/day-editor";
 import { CheckpointList } from "@/features/itinerary";
+import { mapStops, weatherView } from "@/features/trip-model";
 import { WeatherRibbon } from "@/ui/bars";
 import { Button, ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
@@ -11,19 +20,33 @@ import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
 import { BottomNav, tripTabs } from "@/ui/nav";
 import { Display, Eyebrow } from "@/ui/text";
+import { loadTrip, pickDay } from "../../load";
 
 export const metadata: Metadata = { title: "Day" };
 
-export default async function DayPage({
-  params,
-}: PageProps<"/trips/[tripId]/day/[dayId]">) {
-  const { tripId, dayId } = await params;
-  const trip = getTrip(tripId);
-  const day = trip && getDay(trip, dayId);
-  if (!trip || !day) notFound();
+type Weather = {
+  hours: Parameters<typeof WeatherRibbon>[0]["hours"];
+  caption: string;
+  captionTone?: "alert" | "neutral";
+} | null;
 
+function DayScreen({
+  trip,
+  day,
+  weather,
+  recommended,
+  children,
+}: {
+  trip: Trip;
+  day: Day;
+  weather: Weather;
+  /** Where an open recommendation for this day is reviewed, if there is one. */
+  recommended: string | null;
+  children: React.ReactNode;
+}) {
   const done = day.checkpoints.filter((c) => c.state === "done").length;
-  const hasConflict = day.checkpoints.some((c) => c.conflict);
+  const previous = trip.days[day.index - 2];
+  const next = trip.days[day.index];
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -53,25 +76,44 @@ export default async function DayPage({
           </Chip>
         </div>
 
+        <div className="flex items-center gap-2">
+          {previous ? (
+            <Link
+              href={`/trips/${trip.id}/day/${previous.id}`}
+              className="flex items-center gap-1 text-small text-ink-muted hover:text-ink"
+            >
+              <Icon name="chevronLeft" size={14} />
+              Day {previous.index}
+            </Link>
+          ) : null}
+          <div className="flex-1" />
+          {next ? (
+            <Link
+              href={`/trips/${trip.id}/day/${next.id}`}
+              className="flex items-center gap-1 text-small text-ink-muted hover:text-ink"
+            >
+              Day {next.index}
+              <Icon name="chevronRight" size={14} />
+            </Link>
+          ) : null}
+        </div>
+
         {/* The day's weather above the day's plan — a conflict you can see as a
             shape before you read a word of it. */}
-        {hasConflict ? (
+        {weather ? (
           <Card className="px-3.5 py-3">
-            <WeatherRibbon hours={todayWeather} caption="Rain 15:30–19:00" />
+            <WeatherRibbon
+              hours={weather.hours}
+              caption={weather.caption}
+              captionTone={weather.captionTone}
+            />
           </Card>
         ) : null}
 
-        <Card className="overflow-hidden">
-          <CheckpointList day={day} trip={trip} divided linkPlaces />
-        </Card>
-
-        <div className="flex gap-2.5 pt-1">
-          <Button className="flex-1 lg:flex-none">Add a stop</Button>
-          <Button className="flex-1 lg:flex-none">Reorder</Button>
-        </div>
+        {children}
       </main>
 
-      {hasConflict ? (
+      {recommended ? (
         <Card
           tint
           accent="agent"
@@ -79,13 +121,9 @@ export default async function DayPage({
         >
           <Icon name="sparkle" size={16} className="text-agent" />
           <span className="flex-1 text-small font-medium">
-            1 change recommended for today
+            1 change recommended for this day
           </span>
-          <ButtonLink
-            href={`/trips/${trip.id}/replan`}
-            variant="primary"
-            size="sm"
-          >
+          <ButtonLink href={recommended} variant="primary" size="sm">
             Review
           </ButtonLink>
         </Card>
@@ -102,5 +140,77 @@ export default async function DayPage({
 
       <BottomNav items={tripTabs(trip.id)} active="Today" />
     </div>
+  );
+}
+
+export default async function DayPage({
+  params,
+  searchParams,
+}: PageProps<"/trips/[tripId]/day/[dayId]">) {
+  const { tripId, dayId } = await params;
+  const { add, q } = await searchParams;
+
+  const fixture = getTrip(tripId);
+  if (fixture) {
+    const day = getDay(fixture, dayId === "today" ? "3" : dayId);
+    if (!day) notFound();
+    const conflict = day.checkpoints.some((c) => c.conflict);
+    return (
+      <DayScreen
+        trip={fixture}
+        day={day}
+        weather={
+          conflict ? { hours: todayWeather, caption: "Rain 15:30–19:00" } : null
+        }
+        recommended={conflict ? `/trips/${fixture.id}/replan` : null}
+      >
+        <Card className="overflow-hidden">
+          <CheckpointList day={day} trip={fixture} divided linkPlaces />
+        </Card>
+        <div className="flex gap-2.5 pt-1">
+          <Button className="flex-1 lg:flex-none">Add a stop</Button>
+          <Button className="flex-1 lg:flex-none">Reorder</Button>
+        </div>
+      </DayScreen>
+    );
+  }
+
+  const { screen, trip } = await loadTrip(tripId);
+  const day = pickDay(trip, dayId);
+  if (!day?.date) notFound();
+
+  const stops = mapStops(day);
+  const near: [number, number] | null = stops.length
+    ? [
+        stops.reduce((s, p) => s + p.lonLat[0], 0) / stops.length,
+        stops.reduce((s, p) => s + p.lonLat[1], 0) / stops.length,
+      ]
+    : null;
+  const forecast = near ? await dayForecast(near, day.date) : null;
+
+  // An open recommendation that touches this day: the review card.
+  const touched = new Set(day.checkpoints.map((c) => c.id));
+  const open = screen.alerts.alerts.find((a) => a.outcome === null);
+  const conflicted = screen.matches.some((m) => touched.has(m.nodeId));
+
+  return (
+    <DayScreen
+      trip={trip}
+      day={day}
+      weather={forecast ? weatherView(forecast) : null}
+      recommended={
+        open && conflicted ? `/trips/${trip.id}/alerts/${open.id}` : null
+      }
+    >
+      <DayEditor
+        tripId={trip.id}
+        head={screen.head}
+        date={day.date}
+        stops={day.checkpoints}
+        near={near}
+        openAdd={add === "1"}
+        initialQuery={typeof q === "string" ? q : undefined}
+      />
+    </DayScreen>
   );
 }

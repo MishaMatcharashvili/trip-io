@@ -130,7 +130,7 @@ export async function generate(
   const attempts: Attempt[] = [];
 
   // Nothing to build a day out of: say so before spending a model call. This is
-  // the honest answer while the curated catalogue is still being filled.
+  // the honest answer for an area with no curated or verified places.
   const visitable = deps.candidates.filter(
     (p) => p.group !== "lodging" && p.group !== "transport",
   );

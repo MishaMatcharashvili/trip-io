@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–5 built; Phase 6 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–6 built; Phase 7 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -35,7 +35,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [x] `trip`, `trip_node`, `trip_patch`, `checkpoint_log` tables + JSON Patch application (migration 0002; restricted path grammar, inverse stored per patch)
 - [x] Append-only patch log, checkpoint every 20 patches (and at patch 1). Undo and restore both append
 - [x] Coherent-day validator (test-first): no overlapping nodes, travel time respected, nothing scheduled into darkness, opening hours honoured — re-validates the **whole day** after any patch
-- [x] Trip generation pipeline: constraints → candidate retrieval from `curated` → LLM composition → validator → patch set. **Cannot produce a trip until the 600 exist** — 0 curated places means candidate retrieval returns nothing
+- [x] Trip generation pipeline: constraints → candidate retrieval (`curated` first, `verified` filling in) → LLM composition → validator → patch set. Curation is optional since 2026-09-26: the 600 improve trips but no longer gate them
 - [x] Warm-start cache on coarse constraint hash (`plan_cache`, untimed plans, re-validated per date)
 - [x] Invented-place-id handling: reject → retry once with rejection as feedback → template fallback; never render an unvalidated plan
 
@@ -80,13 +80,13 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 6 — web client
 
-- [ ] MapLibre + PMTiles from blob storage
-- [ ] Trip creation and editing UI
-- [ ] Itinerary view
-- [ ] Checkpoint/undo UI
-- [ ] Settings: channels, quiet hours, frequency
-- [ ] Subscription paywall: free plans, paid watches
-- [ ] Decide: trial length, whether first trip is watched free (open question #4)
+- [x] MapLibre + PMTiles from blob storage — `TripMap` on every map surface: the trip, the day, the stop, home, Explore, `/new`
+- [x] Trip creation and editing UI — `/new` reads a sentence into constraints (`request.ts`) and builds on `/new/building`; the day editor moves, shortens, removes and adds stops; add a day; plan a trip again on new dates
+- [x] Itinerary view — the active trip, the whole trip, the day and the stop read the database (`tripScreen` → `tripModel`); "ask about your trip" answers from the trip
+- [x] Checkpoint/undo UI — `/trips/{id}/history`: every version, undo on the head, restore on any earlier one
+- [x] Settings: channels, quiet hours, frequency — plus per-trip muted sources, which the matcher honours (migration 0011)
+- [~] Paywall: free plans, paid watches — per trip, first trip free. Passes gate the pipeline (migrations 0012–0013); checkout is a **demo** that records a paid pass and charges nobody until Flitt is wired
+- [x] Decide: trial length, whether first trip is watched free (open question #4) — first trip free, then $5 per trip, no trial
 
 ## Phase 7 — native shell
 

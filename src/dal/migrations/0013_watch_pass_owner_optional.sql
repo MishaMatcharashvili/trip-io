@@ -1,0 +1,1 @@
+ALTER TABLE "watch_pass" ALTER COLUMN "user_id" DROP NOT NULL;

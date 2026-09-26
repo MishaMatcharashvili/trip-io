@@ -77,8 +77,11 @@ export const PACE_BUDGET_MIN: Record<Pace, number> = {
   packed: 8 * 60,
 };
 
+// Generation may use verified places: hand-curation is optional, and a trip
+// built from the verified tier beats no trip while the 600 are still being
+// verified. Raw places stay user-only.
 const allowedTiers: Record<Author, readonly PlaceTier[]> = {
-  system: ["curated"],
+  system: ["curated", "verified"],
   intervention: ["curated", "verified"],
   user: ["curated", "verified", "raw"],
 };

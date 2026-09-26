@@ -1,33 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getTrip } from "@/data/trip";
+import { georgiaMapStops, getTrip, type Trip } from "@/data/trip";
 import { TopBar } from "@/features/chrome";
+import { AddDayButton } from "@/features/trip-actions";
+import { duration, tripStops } from "@/features/trip-model";
 import { DayShape } from "@/ui/bars";
-import { Button } from "@/ui/button";
+import { Button, ButtonLink } from "@/ui/button";
 import { Card, Divider, SectionRule } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
-import { BasemapDetailed } from "@/ui/map/basemap-detailed";
+import { Icon } from "@/ui/icon";
+import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { BottomNav, tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num } from "@/ui/text";
+import { loadTrip } from "../load";
 
 export const metadata: Metadata = { title: "The whole trip" };
 
-const totals = [
-  { label: "Driving", value: "7h 40m total" },
-  { label: "Longest day on foot", value: "Day 4 · 11 km" },
-  { label: "Bookings held", value: "5" },
-  { label: "Changes I proposed", value: "8 · 6 applied" },
-];
+type Stat = { label: string; value: string };
 
-export default async function FullTripPage({
-  params,
-}: PageProps<"/trips/[tripId]/trip">) {
-  const { tripId } = await params;
-  const trip = getTrip(tripId);
-  if (!trip) notFound();
-
+function WholeTrip({
+  trip,
+  stats,
+  totals,
+  stops,
+  actions,
+}: {
+  trip: Trip;
+  stats: Stat[];
+  totals: Stat[];
+  stops: MapStop[];
+  actions: React.ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar trip={trip} tabs={tripTabs(trip.id)} active="Trip" />
@@ -44,11 +48,7 @@ export default async function FullTripPage({
               </Display>
             </div>
             <div className="hidden gap-5 lg:flex">
-              {[
-                { label: "Budget", value: "€640 / 700" },
-                { label: "Places", value: "31" },
-                { label: "Changes handled", value: "6" },
-              ].map((stat) => (
+              {stats.map((stat) => (
                 <div
                   key={stat.label}
                   className="flex flex-col items-end gap-0.5"
@@ -61,7 +61,7 @@ export default async function FullTripPage({
           </div>
 
           {/*
-            Seven days with a watch status each. This is the table where the
+            Every day with a watch status each. This is the table where the
             product stops being a planner: every row says not just what you are
             doing, but whether anything has moved under it.
           */}
@@ -131,17 +131,12 @@ export default async function FullTripPage({
             ))}
           </Card>
 
-          <div className="flex items-center gap-2.5">
-            <Button>Add a day</Button>
-            <Button>Reorder trip</Button>
-            <div className="flex-1" />
-            <Button variant="ghost">Export itinerary</Button>
-          </div>
+          <div className="flex flex-wrap items-center gap-2.5">{actions}</div>
         </main>
 
         <aside className="hidden w-[460px] shrink-0 flex-col border-l border-hairline bg-surface lg:flex">
           <div className="relative h-[470px] overflow-hidden border-b border-hairline">
-            <BasemapDetailed className="absolute inset-0 size-full" />
+            <TripMap stops={stops} className="absolute inset-0 size-full" />
           </div>
           <div className="flex flex-col gap-4 px-[26px] py-[22px]">
             <SectionRule>Across the whole trip</SectionRule>
@@ -167,5 +162,109 @@ export default async function FullTripPage({
 
       <BottomNav items={tripTabs(trip.id)} active="Trip" />
     </div>
+  );
+}
+
+export default async function FullTripPage({
+  params,
+}: PageProps<"/trips/[tripId]/trip">) {
+  const { tripId } = await params;
+
+  const fixture = getTrip(tripId);
+  if (fixture) {
+    return (
+      <WholeTrip
+        trip={fixture}
+        stats={[
+          { label: "Budget", value: "€640 / 700" },
+          { label: "Places", value: "31" },
+          { label: "Changes handled", value: "6" },
+        ]}
+        totals={[
+          { label: "Driving", value: "7h 40m total" },
+          { label: "Longest day on foot", value: "Day 4 · 11 km" },
+          { label: "Bookings held", value: "5" },
+          { label: "Changes I proposed", value: "8 · 6 applied" },
+        ]}
+        stops={georgiaMapStops}
+        actions={
+          <>
+            <Button>Add a day</Button>
+            <Button>Reorder trip</Button>
+            <div className="flex-1" />
+            <Button variant="ghost">Export itinerary</Button>
+          </>
+        }
+      />
+    );
+  }
+
+  const { screen, trip } = await loadTrip(tripId);
+  const nodes = Object.values(screen.doc.nodes);
+  const driving = nodes
+    .filter((n) => n.kind === "transfer")
+    .reduce((sum, n) => sum + n.durationMin, 0);
+  const busiest = trip.days.reduce(
+    (best, day) => {
+      const visits = day.checkpoints.filter(
+        (c) => c.node?.kind === "visit",
+      ).length;
+      return visits > best.visits ? { index: day.index, visits } : best;
+    },
+    { index: 0, visits: 0 },
+  );
+  const places = new Set(nodes.flatMap((n) => (n.placeId ? [n.placeId] : [])))
+    .size;
+  const { told, applied } = screen.alerts;
+
+  return (
+    <WholeTrip
+      trip={trip}
+      stats={[
+        { label: "Budget", value: screen.doc.trip.budget || "—" },
+        { label: "Places", value: String(places) },
+        { label: "Changes handled", value: String(applied) },
+      ]}
+      totals={[
+        {
+          label: "Driving",
+          value: driving ? `${duration(driving)} total` : "None planned",
+        },
+        {
+          label: "Busiest day",
+          value: busiest.visits
+            ? `Day ${busiest.index} · ${busiest.visits} visits`
+            : "—",
+        },
+        { label: "Stops", value: String(nodes.length) },
+        {
+          label: "Changes I proposed",
+          value: told ? `${told} · ${applied} applied` : "None yet",
+        },
+      ]}
+      stops={tripStops(trip)}
+      actions={
+        <>
+          <AddDayButton
+            tripId={trip.id}
+            head={screen.head}
+            endsAt={screen.doc.trip.endsAt}
+          />
+          <ButtonLink href={`/trips/${trip.id}/history`}>
+            <Icon name="revert" size={14} />
+            Change history
+          </ButtonLink>
+          <div className="flex-1" />
+          <a
+            href={`/api/trips/${trip.id}/itinerary.ics`}
+            download
+            className="inline-flex h-[38px] items-center gap-2 rounded-control px-[15px] text-[13px] font-medium text-ink-muted transition-colors hover:text-ink"
+          >
+            <Icon name="calendar" size={14} />
+            Export itinerary
+          </a>
+        </>
+      }
+    />
   );
 }

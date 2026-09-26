@@ -1,11 +1,19 @@
 import { sql } from "drizzle-orm";
-import { categoryGroup, isOutdoor } from "../domain/catalogue/categories.ts";
+import {
+  type CategoryGroup,
+  categoryGroup,
+  categoryGroups,
+  isOutdoor,
+} from "../domain/catalogue/categories.ts";
 import {
   type AreaMatch,
   areaBySlug,
   type FocusAreaSlug,
 } from "../domain/catalogue/focus-areas.ts";
-import { openingHours } from "../domain/catalogue/opening-hours.ts";
+import {
+  type OpeningHours,
+  openingHours,
+} from "../domain/catalogue/opening-hours.ts";
 import type {
   PlaceInput,
   ReviewInput,
@@ -207,21 +215,31 @@ export async function insertCurated(
 }
 
 /**
- * Curated places in one focus area — what trip generation may compose from. The
- * tier filter is what makes "the model cannot name a place it wasn't given" mean
- * something; the validator enforces it again when the plan is written
- * (context/architecture.md, place.tier).
+ * What trip generation may compose from in one focus area: every curated place
+ * first, then verified ones to fill in while the hand-verified catalogue is
+ * still being built. Verified places are dealt round-robin across categories,
+ * most confident first, so a dense category (Tbilisi has hundreds of cafés)
+ * cannot fill the prompt on its own. The validator checks the tier again when
+ * the plan is written (context/architecture.md, place.tier).
  */
-export async function curatedInArea(
+export async function candidatesInArea(
   slug: FocusAreaSlug,
   limit: number,
 ): Promise<Candidate[]> {
   const rows = await db.execute(sql`
-    SELECT p.id, p.name, p.category, p.opening_hours,
-           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
-    FROM place p
-    WHERE p.tier = 'curated' AND ${areaPredicate(areaBySlug(slug).match)}
-    ORDER BY p.name
+    SELECT id, name, category, tier, opening_hours, lon, lat
+    FROM (
+      SELECT p.id, p.name, p.category, p.tier, p.opening_hours,
+             ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
+             row_number() OVER (
+               PARTITION BY p.tier, p.category
+               ORDER BY (p.attrs->>'confidence')::float DESC NULLS LAST, p.name
+             ) AS rank
+      FROM place p
+      WHERE p.tier IN ('curated', 'verified')
+        AND ${areaPredicate(areaBySlug(slug).match)}
+    ) ranked
+    ORDER BY tier = 'curated' DESC, rank, name
     LIMIT ${limit}
   `);
   return rows.rows.map((r) => {
@@ -234,7 +252,7 @@ export async function curatedInArea(
       name: r.name as string,
       category,
       group: categoryGroup[category as keyof typeof categoryGroup],
-      tier: "curated" as const,
+      tier: r.tier as Candidate["tier"],
       lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
       openingHours: parsed?.success ? parsed.data : null,
       outdoor: isOutdoor(category),
@@ -295,4 +313,144 @@ export async function placeNames(
     SELECT id, name FROM place WHERE id IN (${list(wanted)})
   `);
   return new Map(rows.rows.map((r) => [r.id as string, r.name as string]));
+}
+
+export type PlaceCard = {
+  id: string;
+  name: string;
+  nameKa: string | null;
+  category: string;
+  tier: PlaceInfo["tier"];
+  lonLat: LonLat;
+  openingHours: OpeningHours | null;
+  address: string | null;
+  website: string | null;
+  phone: string | null;
+};
+
+const firstOf = (value: unknown): string | null =>
+  Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
+
+/** What a place screen shows about each place: name, kind, contacts, hours. */
+export async function placeCards(
+  ids: readonly string[],
+): Promise<Map<string, PlaceCard>> {
+  const wanted = lookupable(ids);
+  if (wanted.length === 0) return new Map();
+  const rows = await db.execute(sql`
+    SELECT id, name, name_ka, category, tier, opening_hours, attrs,
+           ST_X(geom::geometry) AS lon, ST_Y(geom::geometry) AS lat
+    FROM place WHERE id IN (${list(wanted)})
+  `);
+  return new Map(
+    rows.rows.map((r) => {
+      const hours = r.opening_hours
+        ? openingHours.safeParse(r.opening_hours)
+        : null;
+      const attrs = (r.attrs ?? {}) as Record<string, unknown>;
+      return [
+        r.id as string,
+        {
+          id: r.id as string,
+          name: r.name as string,
+          nameKa: (r.name_ka as string | null) ?? null,
+          category: r.category as string,
+          tier: r.tier as PlaceInfo["tier"],
+          lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+          openingHours: hours?.success ? hours.data : null,
+          address: typeof attrs.address === "string" ? attrs.address : null,
+          website: firstOf(attrs.websites),
+          phone: firstOf(attrs.phones),
+        },
+      ];
+    }),
+  );
+}
+
+export type PlaceHit = {
+  id: string;
+  name: string;
+  nameKa: string | null;
+  category: string;
+  group: CategoryGroup;
+  tier: PlaceInfo["tier"];
+  lonLat: LonLat;
+  outdoor: boolean;
+  /** From `near`, when one was given. */
+  distanceM: number | null;
+};
+
+export type PlaceSearch = {
+  /** Matched against the name in either script; empty browses. */
+  q?: string;
+  near?: LonLat;
+  area?: AreaMatch;
+  groups?: readonly CategoryGroup[];
+  limit: number;
+};
+
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/**
+ * The catalogue as a traveller searches it: adding a stop, browsing a region.
+ * Every tier is searchable (a traveller may add any place); curated places
+ * come first, then names that start with the query, then the nearest.
+ */
+export async function searchPlaces(search: PlaceSearch): Promise<PlaceHit[]> {
+  const q = search.q?.trim() ?? "";
+  const pattern = `%${escapeLike(q)}%`;
+  const prefix = `${escapeLike(q)}%`;
+  const near = search.near
+    ? sql`ST_SetSRID(ST_MakePoint(${search.near[0]}, ${search.near[1]}), 4326)::geography`
+    : null;
+  const categories = search.groups?.flatMap(
+    (g) => categoryGroups[g] as readonly string[],
+  );
+
+  const rows = await db.execute(sql`
+    SELECT p.id, p.name, p.name_ka, p.category, p.tier,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
+           ${near ? sql`ST_Distance(p.geom, ${near})` : sql`NULL`} AS distance_m
+    FROM place p
+    WHERE TRUE
+      ${q ? sql`AND (p.name ILIKE ${pattern} OR p.name_ka ILIKE ${pattern})` : sql``}
+      ${search.area ? sql`AND ${areaPredicate(search.area)}` : sql``}
+      ${categories?.length ? sql`AND p.category IN (${list(categories)})` : sql``}
+    ORDER BY CASE p.tier WHEN 'curated' THEN 0 WHEN 'verified' THEN 1 ELSE 2 END,
+             ${q ? sql`(p.name ILIKE ${prefix}) DESC,` : sql``}
+             ${near ? sql`ST_Distance(p.geom, ${near}),` : sql``}
+             (p.attrs->>'confidence')::float DESC NULLS LAST,
+             p.name
+    LIMIT ${search.limit}
+  `);
+  return rows.rows.map((r) => {
+    const category = r.category as string;
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      nameKa: (r.name_ka as string | null) ?? null,
+      category,
+      group: categoryGroup[category as keyof typeof categoryGroup],
+      tier: r.tier as PlaceInfo["tier"],
+      lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+      outdoor: isOutdoor(category),
+      distanceM: r.distance_m === null ? null : Number(r.distance_m),
+    };
+  });
+}
+
+/** How many places the catalogue holds in one area, by tier a plan may use. */
+export async function countInArea(
+  match: AreaMatch,
+): Promise<{ curated: number; verified: number }> {
+  const rows = await db.execute(sql`
+    SELECT count(*) FILTER (WHERE p.tier = 'curated')::int AS curated,
+           count(*) FILTER (WHERE p.tier = 'verified')::int AS verified
+    FROM place p WHERE ${areaPredicate(match)}
+  `);
+  const r = rows.rows[0] ?? {};
+  return {
+    curated: (r.curated as number) ?? 0,
+    verified: (r.verified as number) ?? 0,
+  };
 }

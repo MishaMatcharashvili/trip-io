@@ -75,10 +75,13 @@ export type WeatherHour = {
 export function WeatherRibbon({
   hours,
   caption,
+  captionTone = "alert",
   className,
 }: {
   hours: WeatherHour[];
   caption: string;
+  /** Coral only when the caption reports weather that matters. */
+  captionTone?: "alert" | "neutral";
   className?: string;
 }) {
   return (
@@ -103,7 +106,7 @@ export function WeatherRibbon({
       </div>
       <div className="flex items-center justify-between">
         <Eyebrow>{hours[0]?.hour}</Eyebrow>
-        <Eyebrow tone="alert">{caption}</Eyebrow>
+        <Eyebrow tone={captionTone}>{caption}</Eyebrow>
         <Eyebrow>{hours[hours.length - 1]?.hour}</Eyebrow>
       </div>
     </div>

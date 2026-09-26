@@ -34,7 +34,7 @@ export const place = pgTable(
   },
   (t) => [
     index("place_geom_idx").using("gist", t.geom),
-    // Candidate retrieval filters by tier (only `curated` is proposable) and category.
+    // Candidate retrieval filters by tier (curated first, then verified) and category.
     index("place_tier_category_idx").on(t.tier, t.category),
     // Reloading a newer Overture release upserts on this. Hand-added places have
     // a null source_id, which a unique index never treats as a conflict.

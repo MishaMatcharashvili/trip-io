@@ -8,7 +8,7 @@ import {
 import type { PatchOp } from "../domain/trip/patch.ts";
 import type { Author } from "../domain/trip/validate.ts";
 import { db, type Queryable } from "./client.ts";
-import { trip } from "./schema/index.ts";
+import { trip, watchPass } from "./schema/index.ts";
 import type { Tx } from "./tx.ts";
 
 // The patch log and the node projection that hangs off it, as rows.
@@ -118,6 +118,29 @@ export async function insertTrip(
     RETURNING id
   `);
   return rows.rows[0].id as string;
+}
+
+/**
+ * The header columns, from the document at head. A patch may change the title,
+ * the dates, the pace, the budget or the party, and the row must say what the
+ * log says.
+ */
+export async function updateTripHeader(
+  tx: Tx,
+  tripId: string,
+  header: TripDoc["trip"],
+): Promise<void> {
+  await tx.execute(sql`
+    UPDATE trip SET
+      title = ${header.title},
+      starts_at = ${header.startsAt},
+      ends_at = ${header.endsAt},
+      party = ${JSON.stringify(header.party)}::jsonb,
+      pace = ${header.pace},
+      budget = ${header.budget},
+      prefs = ${JSON.stringify(header.prefs)}::jsonb
+    WHERE id = ${tripId}
+  `);
 }
 
 /** Takes the row lock the whole append runs under. Null when there is no such trip. */
@@ -327,8 +350,55 @@ export async function reassignTrips(
   fromUserId: string,
   toUserId: string,
 ): Promise<void> {
-  await db
-    .update(trip)
-    .set({ userId: toUserId })
-    .where(eq(trip.userId, fromUserId));
+  // The anonymous user is deleted once linked, and passes and saved places
+  // cascade with their user: they move with the trips, or they are lost.
+  await db.batch([
+    db
+      .update(trip)
+      .set({ userId: toUserId })
+      .where(eq(trip.userId, fromUserId)),
+    db
+      .update(watchPass)
+      .set({ userId: toUserId })
+      .where(eq(watchPass.userId, fromUserId)),
+    db.execute(sql`
+      INSERT INTO saved_place (user_id, place_id, saved_at)
+      SELECT ${toUserId}, place_id, saved_at FROM saved_place
+      WHERE user_id = ${fromUserId}
+      ON CONFLICT DO NOTHING
+    `),
+  ]);
+}
+
+export type TripListRow = {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  stops: number;
+  /** Interventions the traveller applied: "4 changes handled". */
+  applied: number;
+  createdAt: string;
+};
+
+/** Every trip a user owns, soonest first. The home screen's list. */
+export async function tripsFor(userId: string): Promise<TripListRow[]> {
+  const rows = await db.execute(sql`
+    SELECT t.id, t.title, t.starts_at, t.ends_at, t.created_at,
+           (SELECT count(*)::int FROM trip_node n WHERE n.trip_id = t.id) AS stops,
+           (SELECT count(*)::int FROM intervention i
+             WHERE i.trip_id = t.id AND i.outcome = 'accepted') AS applied
+    FROM trip t
+    WHERE t.user_id = ${userId}
+    ORDER BY t.starts_at
+  `);
+  return rows.rows.map((r) => ({
+    id: r.id as string,
+    title: r.title as string,
+    startsAt: new Date(r.starts_at as string).toISOString(),
+    endsAt: new Date(r.ends_at as string).toISOString(),
+    stops: r.stops as number,
+    applied: r.applied as number,
+    createdAt: new Date(r.created_at as string).toISOString(),
+  }));
 }

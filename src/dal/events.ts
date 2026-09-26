@@ -6,6 +6,7 @@ import type {
   WorldEvent,
 } from "../domain/watch/event.ts";
 import { db } from "./client.ts";
+import { passHeld } from "./passes.ts";
 
 // `world_event` and the regions worth sensing.
 //
@@ -45,7 +46,8 @@ export async function regionsToSense(
     FROM region r
     JOIN trip_node n ON ST_Intersects(r.geom, n.geom)
     JOIN trip_watch w ON w.trip_id = n.trip_id
-    WHERE n.starts_at >= now() - interval '1 hour'
+    WHERE ${passHeld}
+      AND n.starts_at >= now() - interval '1 hour'
       AND n.starts_at < now() + ${horizon}::interval
       AND tstzrange(w.active_from, w.active_to)
           && tstzrange(now(), now() + ${horizon}::interval)

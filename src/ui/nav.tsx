@@ -87,7 +87,7 @@ export function BottomNav({
 
 /** The tabs a trip is read through. */
 export const tripTabs = (tripId: string): NavItem[] => [
-  { label: "Today", href: `/trips/${tripId}/day/3`, icon: "calendar" },
+  { label: "Today", href: `/trips/${tripId}/day/today`, icon: "calendar" },
   { label: "Map", href: `/trips/${tripId}`, icon: "map" },
   { label: "Trip", href: `/trips/${tripId}/trip`, icon: "list" },
   { label: "AI", href: `/trips/${tripId}/alerts`, icon: "sparkle" },

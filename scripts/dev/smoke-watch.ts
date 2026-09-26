@@ -22,6 +22,7 @@ import {
 import { db } from "../../src/dal/client.ts";
 import { upsertEvent } from "../../src/dal/events.ts";
 import { enqueue, queueDepth } from "../../src/dal/jobs.ts";
+import { insertPass } from "../../src/dal/passes.ts";
 import { loadWatch } from "../../src/dal/watches.ts";
 import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import { dedupeKey } from "../../src/domain/watch/event.ts";
@@ -81,6 +82,17 @@ const doc: TripDoc = {
 };
 
 const tripId = await createTrip(header, null);
+
+// Only a trip holding a pass is watched (src/dal/passes.ts).
+
+await insertPass({
+  tripId,
+  userId: null,
+  kind: "free",
+  amountCents: 0,
+  currency: "USD",
+  provider: "script",
+});
 console.log("trip", tripId);
 
 try {
