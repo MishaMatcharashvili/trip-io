@@ -11,7 +11,7 @@ import {
   generate,
   type PlanCache,
 } from "./pipeline.ts";
-import type { Plan, RefPlan } from "./plan.ts";
+import type { Candidate, Plan, RefPlan } from "./plan.ts";
 
 const constraints: Constraints = {
   startDate: PREV, // Tuesday; day 2 is Wednesday, when the museum is closed
@@ -259,6 +259,37 @@ describe("fallbackPlan", () => {
       d.stops.filter((s) => s.kind === "visit").map((s) => s.placeId),
     );
     assert.equal(new Set(visits).size, visits.length);
+  });
+
+  test("a long visit ends its slot, so the next one can still start", () => {
+    const at = (id: string, group: Candidate["group"], lon: number) =>
+      ({
+        ...(candidates.get(P.gergeti) as Candidate),
+        id,
+        name: id,
+        category: group,
+        group,
+        lonLat: [lon, 42.66],
+      }) satisfies Candidate;
+    const pool = [
+      at("10000000-0000-4000-8000-000000000a01", "lodging", 44.64),
+      at("10000000-0000-4000-8000-000000000a02", "nature", 44.641),
+      at("10000000-0000-4000-8000-000000000a03", "nature", 44.642),
+      at("10000000-0000-4000-8000-000000000a04", "heritage", 44.65),
+      at("10000000-0000-4000-8000-000000000a05", "food", 44.643),
+    ];
+    const plan = fallbackPlan({ ...constraints, interests: ["nature"] }, pool);
+    for (const day of plan.days) {
+      day.stops.forEach((stop, i) => {
+        const next = day.stops[i + 1];
+        if (stop.kind === "visit" && stop.durationMin > 90) {
+          assert.ok(
+            !(next?.kind === "visit" && next.slot === stop.slot),
+            `${day.day}: a visit follows ${stop.durationMin} min in the ${stop.slot}`,
+          );
+        }
+      });
+    }
   });
 
   test("leaves out excluded places", () => {
