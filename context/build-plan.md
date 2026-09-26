@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–5 built; Phase 6 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–6 built; Phase 7 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -80,12 +80,12 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 6 — web client
 
-- [ ] MapLibre + PMTiles from blob storage
-- [ ] Trip creation and editing UI
-- [ ] Itinerary view
-- [ ] Checkpoint/undo UI
-- [ ] Settings: channels, quiet hours, frequency
-- [ ] Paywall: free plans, paid watches — per trip, first trip free
+- [x] MapLibre + PMTiles from blob storage — `TripMap` on every map surface: the trip, the day, the stop, home, Explore, `/new`
+- [x] Trip creation and editing UI — `/new` reads a sentence into constraints (`request.ts`) and builds on `/new/building`; the day editor moves, shortens, removes and adds stops; add a day; plan a trip again on new dates
+- [x] Itinerary view — the active trip, the whole trip, the day and the stop read the database (`tripScreen` → `tripModel`); "ask about your trip" answers from the trip
+- [x] Checkpoint/undo UI — `/trips/{id}/history`: every version, undo on the head, restore on any earlier one
+- [x] Settings: channels, quiet hours, frequency — plus per-trip muted sources, which the matcher honours (migration 0011)
+- [~] Paywall: free plans, paid watches — per trip, first trip free. Passes gate the pipeline (migrations 0012–0013); checkout is a **demo** that records a paid pass and charges nobody until Flitt is wired
 - [x] Decide: trial length, whether first trip is watched free (open question #4) — first trip free, then $5 per trip, no trial
 
 ## Phase 7 — native shell

@@ -1,6 +1,6 @@
 # Progress tracker
 
-Last updated: 2026-09-26 (Phase 5).
+Last updated: 2026-09-27 (Phase 6).
 
 `context/running-the-pipeline.md` is the switch list: what is still switched off, why, and what
 turning each one on unblocks.
@@ -38,10 +38,10 @@ OAuth + `CURATOR_EMAILS`.
 |---|---|
 | Repo | Hono mounted at `app/api/[[...route]]/route.ts` (`GET /api/health` proven end-to-end via `hc<AppType>()`), Better Auth wired at `app/api/auth/[...all]/route.ts` (Google OAuth + anonymous sessions — `GOOGLE_CLIENT_ID`/`SECRET` not yet supplied) |
 | Catalogue pipeline | `npm run catalogue:extract` (Overture 2026-08-19.0 → gated Parquet, ~2 min cold), `catalogue:corridors` (OSRM → checked-in GeoJSON), `catalogue:load` (→ Postgres, idempotent). `/curate` review queue + add-missing-place form. 60 tests (`npm test`) |
-| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`, `@google/genai`, `@trigger.dev/sdk`, `resend`. Phase 1: + `@duckdb/node-api` (dev). Still not installed: MapLibre (Phase 6), Expo (Phase 7) |
+| Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`, `@google/genai`, `@trigger.dev/sdk`, `resend`. Phase 1: + `@duckdb/node-api` (dev). Phase 6: + `maplibre-gl`, `pmtiles`, `@protomaps/basemaps` |
 | Design system | `src/ui/` — Mist tokens in `app/globals.css` (`@theme`), primitives (button, card, chip, dot, controls, nav, bars, sheet, 28-glyph icon set) and composites in `src/features/`. Reference page at `/design` |
-| Screens | 17 screens under `src/app` (see `/design`). Layout and states are final; no MapLibre — maps are the canvas's schematic charts in `src/ui/map/`. All fixture-backed except `/trips/{id}/briefing`, which reads the database for a real trip and the fixtures for the design one |
-| Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0009` applied; `0007` adds `intervention.offer`/`expires_at` and one push per event, `0008` adds `device` and `trip_watch.muted_at`, `0009` adds `road_report`; `0005` adds the `briefing` table (one per trip-day, unique on `(trip_id, day)`), `0006` adds `event_match.delivered_at`. `0003` adds `event_match.route_reason`/`rejections` and makes the event/node pair unique, `0004` adds `queued_at`. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
+| Screens | Every screen reads the database for a real trip or account, on MapLibre; the canvas's Georgia trip (`/trips/georgia`) keeps its fixture render as the reference `/design` links to. New: `/trips/{id}/history`. Detectors not built yet (transport, hours, events, safety) are shown as 'not watched yet', never with invented statuses |
+| Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0013` applied; `0010` adds `saved_place`, `0011` adds `trip_watch.muted_sources`/`verbosity`, `0012`–`0013` add `watch_pass` (owner optional for scripted trips); `0007` adds `intervention.offer`/`expires_at` and one push per event, `0008` adds `device` and `trip_watch.muted_at`, `0009` adds `road_report`; `0005` adds the `briefing` table (one per trip-day, unique on `(trip_id, day)`), `0006` adds `event_match.delivered_at`. `0003` adds `event_match.route_reason`/`rejections` and makes the event/node pair unique, `0004` adds `queued_at`. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
 | Detectors | **2 of 7 built**: weather-vs-activity, hourly, thresholds derived here (no Georgian warning feed exists), Open-Meteo on the free tier — commercial key still to buy; and road-corridor, a Telegram form (anyone reports, operators approve), never connected to Telegram. No detector has graduated out of briefing-only: `INTERRUPT_ELIGIBLE` is empty, so nothing the system builds can wake anyone up |
 | Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job`, `briefing` all live. Cron at `/api/cron/{sense-weather,match,drain,briefing}` behind `CRON_SECRET`. The clock is `src/trigger/watch-pipeline.ts` — `watch-pipeline` hourly, `morning-briefing` at 07:30 Asia/Tbilisi — and there is no Trigger.dev account yet. 321 tests (`npm test`) |
 | Judge | Prompt, guards and router written and unit-tested; the four validators enforce evidence, tier, no-empty-helpful and the confidence floor. On `gpt-5.4-mini`: 28/30 on `judge:eval` in two runs; has not yet judged a real trip |
@@ -89,7 +89,7 @@ be updated as phases close, not item-by-item.
 | 3 | Pipeline, weather only | Built and exercised on Neon. Judge measured on OpenAI: 28/30 on the eval harness, 2.2 interventions per synthetic trip |
 | 4 | Daily briefing | Built, exercised on Neon end to end, and composed once by Gemini. Email never sent (Resend unset); not yet in front of the three travellers — the only item left |
 | 5 | Interrupts, budget, road form | Built and rehearsed on Neon. Nothing switched on: no detector graduated, no bot token, no phone registered |
-| 6 | Web client | Screens built against fixtures; nothing wired to the API or to MapLibre |
+| 6 | Web client | Built. Every screen on the database and MapLibre; checkout is a demo until Flitt |
 | 7 | Native shell | Not started |
 | 8 | Detector expansion + road spike | Not started |
 | 9 | Instrumentation + dashboard | Not started |
@@ -144,6 +144,14 @@ From `docs/implementation-plan.md` §13:
    the free first trip is the trial. Payments through Flitt.
 
 ## Log
+
+- **2026-09-27** — Phase 6 built. Curation made optional: generation takes curated places first and
+  fills from the verified tier, so trips can be planned with 0 of 600 curated (the fallback planner's
+  slot overflow, which this exposed, is fixed). Watching is gated by a per-trip pass — first free, then
+  $5 — and the sense loop, matcher and briefing only select passed trips; checkout is a demo. Two store
+  bugs fixed on the way: a header patch (dates, title) never reached the `trip` row, and signing up
+  lost an anonymous visitor's passes and saved places. `npm run seed:trip` builds a live trip for an
+  account without a model call.
 
 Add a dated entry here whenever a phase closes, a kill-criteria signal is measured, or a decision
 above gets resolved. Keep entries short — this is a log, not a report.
