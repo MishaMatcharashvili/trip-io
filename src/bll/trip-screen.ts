@@ -64,7 +64,7 @@ export async function tripScreen(tripId: string): Promise<TripScreen | null> {
   };
 }
 
-export type { TripListRow };
+export type { LiveMatch, TripListRow };
 
 /** A traveller's trips, soonest first. */
 export function myTrips(userId: string): Promise<TripListRow[]> {

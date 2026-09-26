@@ -25,6 +25,14 @@ export type Checkpoint = {
   /** Set when a world event matched this node and the judge routed it. */
   conflict?: string;
   booked?: boolean;
+  /** Real trips only: the node behind the row. */
+  node?: {
+    kind: "visit" | "meal" | "transfer" | "stay";
+    placeId: string | null;
+    lonLat: [number, number] | null;
+    startsAt: string;
+    durationMin: number;
+  };
 };
 
 export type Day = {
@@ -41,6 +49,8 @@ export type Day = {
   shape: DaySegment[];
   watch: { tone: Tone; label: string };
   state: "past" | "today" | "future";
+  /** Real trips only: YYYY-MM-DD, Tbilisi. */
+  date?: string;
 };
 
 export type Source = {
