@@ -1,5 +1,10 @@
 import { withTransaction } from "../dal/tx.ts";
-import { lockWatch, saveWatchSettings } from "../dal/watches.ts";
+import {
+  loadWatch,
+  lockWatch,
+  saveWatchSettings,
+  type Watch,
+} from "../dal/watches.ts";
 import { isMute } from "../domain/watch/interrupt.ts";
 import type { QuietHours } from "../domain/watch/route.ts";
 import type { Channel } from "../domain/watch/settings.ts";
@@ -12,7 +17,16 @@ import type { Channel } from "../domain/watch/settings.ts";
 export type WatchSettingsPatch = {
   channels?: readonly Channel[];
   quietHours?: QuietHours | null;
+  mutedSources?: readonly string[];
+  verbosity?: "affecting" | "nearby";
 };
+
+export type { Watch };
+
+/** A trip's watch as the settings screen shows it, or null before it has stops. */
+export function watchSettings(tripId: string): Promise<Watch | null> {
+  return loadWatch(tripId);
+}
 
 /**
  * The traveller's own channels and quiet hours. Push switched off while the
@@ -33,6 +47,8 @@ export async function updateWatchSettings(
       quietHours:
         patch.quietHours === undefined ? watch.quietHours : patch.quietHours,
       muted: isMute({ before: watch.channels, after: channels, now, ...watch }),
+      mutedSources: patch.mutedSources ?? watch.mutedSources,
+      verbosity: patch.verbosity ?? watch.verbosity,
     });
     return true;
   });

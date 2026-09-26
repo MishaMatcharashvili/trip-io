@@ -18,7 +18,10 @@ import {
 import { generateTrip } from "@/bll/trip-generation.ts";
 import { itineraryFile } from "@/bll/trip-screen.ts";
 import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
-import { updateWatchSettings } from "@/bll/watch-settings.ts";
+import {
+  watchSettings as readWatchSettings,
+  updateWatchSettings,
+} from "@/bll/watch-settings.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
@@ -41,8 +44,14 @@ const watchSettings = z
       .object({ start: clockTime, end: clockTime })
       .nullable()
       .optional(),
+    // The detector families that exist; muting one stops it being matched.
+    mutedSources: z
+      .array(z.enum(["weather", "road"]))
+      .max(2)
+      .optional(),
+    verbosity: z.enum(["affecting", "nearby"]).optional(),
   })
-  .refine((s) => s.channels !== undefined || s.quietHours !== undefined, {
+  .refine((s) => Object.values(s).some((v) => v !== undefined), {
     message: "nothing to change",
   });
 
@@ -214,6 +223,14 @@ export const trips = new Hono<SessionEnv>()
     },
   )
 
+  .get("/:id/watch", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    const watch = await readWatchSettings(id);
+    return watch ? c.json({ watch }) : c.json({ error: "not watched" }, 404);
+  })
+
   // Channels and quiet hours. Push switched off mid-trip is recorded as a mute
   // (src/bll/watch-settings.ts) — a kill criterion, not just a preference.
   .patch(
@@ -229,6 +246,10 @@ export const trips = new Hono<SessionEnv>()
       const saved = await updateWatchSettings(id, {
         channels: body.channels ? [...new Set(body.channels)] : undefined,
         quietHours: body.quietHours,
+        mutedSources: body.mutedSources
+          ? [...new Set(body.mutedSources)]
+          : undefined,
+        verbosity: body.verbosity,
       });
       // A trip with no stops has no watch yet: nothing to be reached about.
       return saved ? c.body(null, 204) : c.json({ error: "not watched" }, 409);
