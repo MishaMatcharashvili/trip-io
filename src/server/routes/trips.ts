@@ -16,7 +16,7 @@ import {
   undoLast,
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
-import { itineraryFile } from "@/bll/trip-screen.ts";
+import { itineraryFile, myTrips } from "@/bll/trip-screen.ts";
 import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
 import {
   watchSettings as readWatchSettings,
@@ -104,6 +104,10 @@ const applied = (result: AppendSuccess) => ({
 
 export const trips = new Hono<SessionEnv>()
   .use(requireSession)
+
+  // The traveller's own trips, soonest first: the home list, Explore's "add to
+  // trip", and the phone app's trip list.
+  .get("/", async (c) => c.json({ trips: await myTrips(c.get("userId")) }))
 
   .post("/", zValidator("json", z.object({ trip: tripHeader })), async (c) =>
     c.json(
