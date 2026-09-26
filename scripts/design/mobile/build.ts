@@ -7,6 +7,7 @@ import { active } from "./screens/active.ts";
 import { briefing } from "./screens/briefing.ts";
 import { onboarding } from "./screens/onboarding.ts";
 import { plan } from "./screens/plan.ts";
+import { settings } from "./screens/settings.ts";
 import { trips } from "./screens/trips.ts";
 
 /**
@@ -24,7 +25,7 @@ const OUT = join(
   "../../../design/mobile",
 );
 
-const flows: Flow[] = [onboarding, plan, trips, active, briefing];
+const flows: Flow[] = [onboarding, plan, trips, active, briefing, settings];
 
 rmSync(OUT, { recursive: true, force: true });
 
