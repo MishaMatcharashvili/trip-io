@@ -332,3 +332,36 @@ export async function reassignTrips(
     .set({ userId: toUserId })
     .where(eq(trip.userId, fromUserId));
 }
+
+export type TripListRow = {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  stops: number;
+  /** Interventions the traveller applied: "4 changes handled". */
+  applied: number;
+  createdAt: string;
+};
+
+/** Every trip a user owns, soonest first. The home screen's list. */
+export async function tripsFor(userId: string): Promise<TripListRow[]> {
+  const rows = await db.execute(sql`
+    SELECT t.id, t.title, t.starts_at, t.ends_at, t.created_at,
+           (SELECT count(*)::int FROM trip_node n WHERE n.trip_id = t.id) AS stops,
+           (SELECT count(*)::int FROM intervention i
+             WHERE i.trip_id = t.id AND i.outcome = 'accepted') AS applied
+    FROM trip t
+    WHERE t.user_id = ${userId}
+    ORDER BY t.starts_at
+  `);
+  return rows.rows.map((r) => ({
+    id: r.id as string,
+    title: r.title as string,
+    startsAt: new Date(r.starts_at as string).toISOString(),
+    endsAt: new Date(r.ends_at as string).toISOString(),
+    stops: r.stops as number,
+    applied: r.applied as number,
+    createdAt: new Date(r.created_at as string).toISOString(),
+  }));
+}

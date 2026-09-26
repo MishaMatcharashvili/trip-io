@@ -5,7 +5,10 @@ import {
   areaBySlug,
   type FocusAreaSlug,
 } from "../domain/catalogue/focus-areas.ts";
-import { openingHours } from "../domain/catalogue/opening-hours.ts";
+import {
+  type OpeningHours,
+  openingHours,
+} from "../domain/catalogue/opening-hours.ts";
 import type {
   PlaceInput,
   ReviewInput,
@@ -305,4 +308,56 @@ export async function placeNames(
     SELECT id, name FROM place WHERE id IN (${list(wanted)})
   `);
   return new Map(rows.rows.map((r) => [r.id as string, r.name as string]));
+}
+
+export type PlaceCard = {
+  id: string;
+  name: string;
+  nameKa: string | null;
+  category: string;
+  tier: PlaceInfo["tier"];
+  lonLat: LonLat;
+  openingHours: OpeningHours | null;
+  address: string | null;
+  website: string | null;
+  phone: string | null;
+};
+
+const firstOf = (value: unknown): string | null =>
+  Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
+
+/** What a place screen shows about each place: name, kind, contacts, hours. */
+export async function placeCards(
+  ids: readonly string[],
+): Promise<Map<string, PlaceCard>> {
+  const wanted = lookupable(ids);
+  if (wanted.length === 0) return new Map();
+  const rows = await db.execute(sql`
+    SELECT id, name, name_ka, category, tier, opening_hours, attrs,
+           ST_X(geom::geometry) AS lon, ST_Y(geom::geometry) AS lat
+    FROM place WHERE id IN (${list(wanted)})
+  `);
+  return new Map(
+    rows.rows.map((r) => {
+      const hours = r.opening_hours
+        ? openingHours.safeParse(r.opening_hours)
+        : null;
+      const attrs = (r.attrs ?? {}) as Record<string, unknown>;
+      return [
+        r.id as string,
+        {
+          id: r.id as string,
+          name: r.name as string,
+          nameKa: (r.name_ka as string | null) ?? null,
+          category: r.category as string,
+          tier: r.tier as PlaceInfo["tier"],
+          lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+          openingHours: hours?.success ? hours.data : null,
+          address: typeof attrs.address === "string" ? attrs.address : null,
+          website: firstOf(attrs.websites),
+          phone: firstOf(attrs.phones),
+        },
+      ];
+    }),
+  );
 }
