@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
-import { watchLedger } from "@/data/trip";
+import { headers } from "next/headers";
+import Link from "next/link";
+import { alertsPage } from "@/bll/interventions";
+import { myTrips } from "@/bll/trip-screen";
+import { passesHeldBy } from "@/bll/watch-pass";
+import { money, WATCH_PRICE } from "@/domain/billing/pricing";
+import { dayKey } from "@/domain/trip/document";
 import { TopBar } from "@/features/chrome";
-import { Button } from "@/ui/button";
+import { dateRange } from "@/features/trip-model";
+import { getAuth } from "@/infra/auth";
+import { Button, ButtonLink } from "@/ui/button";
 import { Card, Divider } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
@@ -15,7 +23,7 @@ export const metadata: Metadata = { title: "Plans" };
 const free = [
   { text: "Unlimited trips from a plain sentence", included: true },
   { text: "Map, day-by-day itinerary, budget tracking", included: true },
-  { text: "Ask the assistant anything, any time", included: true },
+  { text: "Ask about your trip, any time", included: true },
   { text: "Re-plan by hand whenever you want", included: true },
   { text: "No monitoring — you find out when you get there", included: false },
 ];
@@ -23,7 +31,7 @@ const free = [
 const pro = [
   {
     lead: "Continuous monitoring",
-    rest: " of weather, roads, transport, opening hours, events and safety along your exact route",
+    rest: " of the weather and roads along your exact route — transport, opening hours and events as they come online",
   },
   {
     lead: "Proactive alerts",
@@ -33,11 +41,7 @@ const pro = [
     lead: "Ready-made replans",
     rest: " you apply or reject in one tap, always revertible",
   },
-  { lead: "Daily briefing", rest: " each morning, by push and email" },
-  {
-    lead: "",
-    rest: "Opportunities nearby — festivals, better weather windows",
-  },
+  { lead: "Daily briefing", rest: " each morning, in the app and by email" },
 ];
 
 function Tick({ included = true }: { included?: boolean }) {
@@ -51,7 +55,40 @@ function Tick({ included = true }: { included?: boolean }) {
   );
 }
 
-export default function PlansPage() {
+export default async function PlansPage() {
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  const [trips, passes] = session
+    ? await Promise.all([
+        myTrips(session.user.id),
+        passesHeldBy(session.user.id),
+      ])
+    : [[], []];
+  const watched = new Set(passes.map((p) => p.tripId));
+  const today = dayKey(new Date());
+  const current = trips.filter((t) => dayKey(t.endsAt) >= today);
+  const unwatched = current.filter((t) => !watched.has(t.id));
+  const firstFree = passes.length === 0;
+
+  // What watching has actually done, across the trips that were watched.
+  const ledgers = await Promise.all(
+    trips.filter((t) => watched.has(t.id)).map((t) => alertsPage(t.id)),
+  );
+  const ledger = [
+    { value: String(watched.size), label: "trips watched" },
+    {
+      value: ledgers.reduce((n, l) => n + l.checks, 0).toLocaleString("en-GB"),
+      label: "checks run",
+    },
+    {
+      value: String(ledgers.reduce((n, l) => n + l.told, 0)),
+      label: "worth telling you",
+    },
+    {
+      value: String(ledgers.reduce((n, l) => n + l.applied, 0)),
+      label: "replans applied",
+    },
+  ];
+
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar watch="none" />
@@ -79,7 +116,9 @@ export default function PlansPage() {
             <div className="flex flex-col gap-1">
               <Eyebrow>Free</Eyebrow>
               <div className="flex items-baseline gap-2">
-                <Display className="text-[29px]">€0</Display>
+                <Display className="text-[29px]">
+                  {money(0, WATCH_PRICE.currency)}
+                </Display>
                 <span className="text-small text-ink-faint">forever</span>
               </div>
               <Prose>Everything you need to plan a trip properly.</Prose>
@@ -107,8 +146,8 @@ export default function PlansPage() {
               ))}
             </div>
             <div className="flex-1" />
-            <Button block size="lg">
-              Your current plan
+            <Button block size="lg" disabled>
+              Always included
             </Button>
           </Card>
 
@@ -119,10 +158,21 @@ export default function PlansPage() {
                 <Dot tone="agent" breathe />
               </div>
               <div className="flex items-baseline gap-2">
-                <Display className="text-[29px]">[YOUR PRICE]</Display>
-                <span className="text-small text-ink-faint">per month</span>
+                <Display className="text-[29px]">
+                  {money(WATCH_PRICE.cents, WATCH_PRICE.currency)}
+                </Display>
+                <Num className="text-small text-ink-faint line-through">
+                  {money(WATCH_PRICE.listCents, WATCH_PRICE.currency)}
+                </Num>
+                <span className="text-small text-ink-faint">
+                  per watched trip
+                </span>
               </div>
-              <Prose>Turn it on per trip, or leave it on all year.</Prose>
+              <Prose>
+                {firstFree
+                  ? "Your first watched trip is free. No subscription, no trial to cancel."
+                  : "One trip at a time. No subscription, nothing to cancel."}
+              </Prose>
             </div>
             <Divider />
             <div className="flex flex-col gap-3">
@@ -139,32 +189,80 @@ export default function PlansPage() {
               ))}
             </div>
             <div className="flex-1" />
-            <Button variant="primary" block size="lg">
-              Turn on the watch layer
-            </Button>
+            {unwatched.length ? (
+              <div className="flex flex-col gap-2">
+                {unwatched.slice(0, 3).map((t) => (
+                  <ButtonLink
+                    key={t.id}
+                    href={`/trips/${t.id}/watch`}
+                    variant="primary"
+                    block
+                    size="lg"
+                  >
+                    Watch {t.title} {firstFree ? "— free" : ""}
+                  </ButtonLink>
+                ))}
+              </div>
+            ) : (
+              <ButtonLink href="/new" variant="primary" block size="lg">
+                {session ? "Plan a trip to watch" : "Plan your first trip"}
+              </ButtonLink>
+            )}
           </Card>
         </div>
 
-        {/* What the subscription has actually done, on the trip you are on. */}
-        <Card className="flex w-full flex-col gap-4 px-[22px] py-[18px] lg:flex-row lg:items-center lg:gap-6">
-          <div className="flex w-[200px] shrink-0 flex-col gap-1">
-            <Eyebrow>On your Georgia trip so far</Eyebrow>
-            <Prose>Three days in</Prose>
-          </div>
-          <div className="flex flex-1 flex-wrap gap-6">
-            {watchLedger.map((stat) => (
-              <div key={stat.label} className="flex flex-col gap-0.5">
-                <Headline as="div">
-                  <Num>{stat.value}</Num>
-                </Headline>
-                <span className="text-mini text-ink-faint">{stat.label}</span>
+        {/* What watching has actually done, on the traveller's own trips. */}
+        {session && trips.length ? (
+          <Card className="flex w-full flex-col gap-4 px-[22px] py-[18px] lg:flex-row lg:items-center lg:gap-6">
+            <div className="flex w-[200px] shrink-0 flex-col gap-1">
+              <Eyebrow>Your trips so far</Eyebrow>
+              <Prose>
+                {trips.length} planned · {watched.size} watched
+              </Prose>
+            </div>
+            <div className="flex flex-1 flex-wrap gap-6">
+              {ledger.map((stat) => (
+                <div key={stat.label} className="flex flex-col gap-0.5">
+                  <Headline as="div">
+                    <Num>{stat.value}</Num>
+                  </Headline>
+                  <span className="text-mini text-ink-faint">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+            <span className="w-[154px] text-mini text-ink-faint">
+              The trips you built stay yours, watched or not.
+            </span>
+          </Card>
+        ) : null}
+
+        {session && current.length ? (
+          <Card className="w-full overflow-hidden">
+            {current.map((t, i) => (
+              <div key={t.id}>
+                {i > 0 ? <Divider /> : null}
+                <Link
+                  href={`/trips/${t.id}/watch`}
+                  className="flex items-center gap-3 px-[22px] py-3 hover:bg-canvas"
+                >
+                  <Dot tone={watched.has(t.id) ? "ok" : "idle"} />
+                  <span className="flex-1 text-small font-medium">
+                    {t.title}
+                  </span>
+                  <span className="text-mini text-ink-faint">
+                    {dateRange(t.startsAt, t.endsAt)} ·{" "}
+                    {watched.has(t.id) ? "watched" : "not watched"}
+                  </span>
+                  <Icon
+                    name="chevronRight"
+                    size={14}
+                    className="text-ink-faint"
+                  />
+                </Link>
               </div>
             ))}
-          </div>
-          <span className="w-[154px] text-mini text-ink-faint">
-            Cancel any time. The trips you built stay yours.
-          </span>
-        </Card>
+          </Card>
+        ) : null}
       </main>
 
       <BottomNav items={homeTabs} active="Profile" />
