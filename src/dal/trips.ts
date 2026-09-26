@@ -120,6 +120,29 @@ export async function insertTrip(
   return rows.rows[0].id as string;
 }
 
+/**
+ * The header columns, from the document at head. A patch may change the title,
+ * the dates, the pace, the budget or the party, and the row must say what the
+ * log says.
+ */
+export async function updateTripHeader(
+  tx: Tx,
+  tripId: string,
+  header: TripDoc["trip"],
+): Promise<void> {
+  await tx.execute(sql`
+    UPDATE trip SET
+      title = ${header.title},
+      starts_at = ${header.startsAt},
+      ends_at = ${header.endsAt},
+      party = ${JSON.stringify(header.party)}::jsonb,
+      pace = ${header.pace},
+      budget = ${header.budget},
+      prefs = ${JSON.stringify(header.prefs)}::jsonb
+    WHERE id = ${tripId}
+  `);
+}
+
 /** Takes the row lock the whole append runs under. Null when there is no such trip. */
 export async function lockTrip(
   tx: Tx,

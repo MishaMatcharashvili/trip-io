@@ -15,6 +15,7 @@ import {
   patchSeq,
   setHead,
   type TripRef,
+  updateTripHeader,
   upsertNode,
 } from "../dal/trips.ts";
 import { type Tx, withTransaction } from "../dal/tx.ts";
@@ -162,6 +163,11 @@ export async function appendPatchIn(
     const node = result.doc.nodes[id];
     if (node) await upsertNode(tx, input.tripId, id, node);
     else await deleteNode(tx, input.tripId, id);
+  }
+  // A header op (dates, title, pace…) is projected too, or the log would say
+  // the trip got longer while every screen read the old row.
+  if (result.change.trip) {
+    await updateTripHeader(tx, input.tripId, result.doc.trip);
   }
 
   await setHead(tx, input.tripId, patchId);
