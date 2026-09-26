@@ -46,6 +46,14 @@ const MEAL_MINUTES: Partial<Record<Slot, number>> = {
   evening: 90,
 };
 
+/**
+ * A visit longer than this ends its slot. The moderate and packed shapes put
+ * two visits in the morning, and a 150-minute walk from 09:00 leaves the second
+ * nowhere to start before noon: the scheduler rejects it, the pipeline drops
+ * that second place and tries again, and every round fails the same way.
+ */
+const LONG_VISIT_MIN = 90;
+
 /** A stay is judged by how much there is to do within this radius of it. */
 const STAY_RADIUS_M = 15_000;
 
@@ -128,14 +136,31 @@ export function fallbackPlan(
     const stay = stayFor.get(area);
     let here: LonLat | null = stay?.lonLat ?? null;
     const stops: PlanStop[] = [];
+    const shape = DAY_SHAPE[c.pace];
 
-    for (const [slot, kind] of DAY_SHAPE[c.pace]) {
+    for (const [index, [slot, kind]] of shape.entries()) {
+      const previous = stops.at(-1);
+      if (
+        kind === "visit" &&
+        previous?.kind === "visit" &&
+        previous.slot === slot &&
+        previous.durationMin > LONG_VISIT_MIN
+      ) {
+        continue;
+      }
+      // Another visit to come in this slot: a short one now keeps room for it.
+      const moreInSlot = shape
+        .slice(index + 1)
+        .some(([s, k]) => s === slot && k === "visit");
+      const long = (p: Candidate) =>
+        (VISIT_MINUTES[p.group] ?? 0) > LONG_VISIT_MIN;
+
       const pick =
         kind === "visit"
           ? nearest(
               here,
               inArea(area).filter((p) => visitable(p) && !usedVisits.has(p.id)),
-              (p) => (liked(p) ? 0 : 1),
+              (p) => (liked(p) ? 0 : 2) + (moreInSlot && long(p) ? 1 : 0),
             )
           : nearest(
               here,

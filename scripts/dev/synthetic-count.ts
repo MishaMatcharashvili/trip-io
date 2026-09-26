@@ -30,6 +30,7 @@ import {
 } from "../../src/bll/trip-document.ts";
 import { db } from "../../src/dal/client.ts";
 import { upsertEvent } from "../../src/dal/events.ts";
+import { insertPass } from "../../src/dal/passes.ts";
 import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import { dedupeKey } from "../../src/domain/watch/event.ts";
 import { detectWeather } from "../../src/domain/watch/weather.ts";
@@ -375,6 +376,15 @@ for (const area of AREAS) {
   for (const window of WEATHER_WINDOWS) {
     const doc = buildTrip(area);
     const tripId = await createTrip(doc.trip, null);
+    // Only a trip holding a pass is watched (src/dal/passes.ts).
+    await insertPass({
+      tripId,
+      userId: null,
+      kind: "free",
+      amountCents: 0,
+      currency: "USD",
+      provider: "script",
+    });
 
     try {
       const patched = await appendPatch({

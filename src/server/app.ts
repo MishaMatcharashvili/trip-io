@@ -4,6 +4,8 @@ import { cron } from "./routes/cron";
 import { curation } from "./routes/curation";
 import { devices } from "./routes/devices";
 import { interventions } from "./routes/interventions";
+import { places } from "./routes/places";
+import { saved } from "./routes/saved";
 import { telegram } from "./routes/telegram";
 import { trips } from "./routes/trips";
 
@@ -19,6 +21,8 @@ const app = new Hono()
   .route("/curation", curation)
   .route("/devices", devices)
   .route("/interventions", interventions)
+  .route("/places", places)
+  .route("/saved", saved)
   .route("/telegram", telegram)
   .route("/trips", trips);
 

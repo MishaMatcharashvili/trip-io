@@ -225,6 +225,7 @@ export async function answerIntervention(
       if (watch) {
         const channels = watch.channels.filter((c) => c !== "push");
         await saveWatchSettings(tx, row.tripId, {
+          ...watch,
           channels,
           quietHours: watch.quietHours,
           muted: isMute({

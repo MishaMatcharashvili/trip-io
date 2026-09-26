@@ -25,6 +25,14 @@ export type Checkpoint = {
   /** Set when a world event matched this node and the judge routed it. */
   conflict?: string;
   booked?: boolean;
+  /** Real trips only: the node behind the row. */
+  node?: {
+    kind: "visit" | "meal" | "transfer" | "stay";
+    placeId: string | null;
+    lonLat: [number, number] | null;
+    startsAt: string;
+    durationMin: number;
+  };
 };
 
 export type Day = {
@@ -41,6 +49,8 @@ export type Day = {
   shape: DaySegment[];
   watch: { tone: Tone; label: string };
   state: "past" | "today" | "future";
+  /** Real trips only: YYYY-MM-DD, Tbilisi. */
+  date?: string;
 };
 
 export type Source = {
@@ -581,6 +591,46 @@ export const watchLedger = [
   { value: "6", label: "worth telling you" },
   { value: "2", label: "replans applied" },
   { value: "1h 20m", label: "delay avoided" },
+];
+
+/**
+ * The fixture trip's stops on the real map, so the reference render shows
+ * MapLibre too. Ids are the day-3 checkpoints the popover opens.
+ */
+export const georgiaMapStops: Array<{
+  id: string;
+  lonLat: [number, number];
+  label: string;
+  state: CheckpointState;
+  disrupted?: boolean;
+}> = [
+  {
+    id: "tbilisi",
+    lonLat: [44.7937, 41.6938],
+    label: "Tbilisi",
+    state: "done",
+  },
+  {
+    id: "ananuri",
+    lonLat: [44.7036, 42.1644],
+    label: "Ananuri",
+    state: "done",
+  },
+  { id: "3a", lonLat: [44.4787, 42.4776], label: "Gudauri", state: "done" },
+  {
+    id: "3b",
+    lonLat: [44.5316, 42.5317],
+    label: "Friendship Monument",
+    state: "done",
+  },
+  { id: "3c", lonLat: [44.6434, 42.6571], label: "Kazbegi", state: "now" },
+  {
+    id: "3e",
+    lonLat: [44.6203, 42.6623],
+    label: "Gergeti hike",
+    state: "upcoming",
+    disrupted: true,
+  },
 ];
 
 export function getTrip(id: string): Trip | undefined {

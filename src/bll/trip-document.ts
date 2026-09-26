@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { placeFacts } from "../dal/places.ts";
 import {
   checkpointAtOrBefore,
@@ -15,12 +16,13 @@ import {
   patchSeq,
   setHead,
   type TripRef,
+  updateTripHeader,
   upsertNode,
 } from "../dal/trips.ts";
 import { type Tx, withTransaction } from "../dal/tx.ts";
 import { refreshWatch } from "../dal/watches.ts";
 import { diffDocs } from "../domain/trip/diff.ts";
-import { placeIdsOf, type TripDoc } from "../domain/trip/document.ts";
+import { dayKey, placeIdsOf, type TripDoc } from "../domain/trip/document.ts";
 import {
   applyOps,
   type PatchOp,
@@ -163,6 +165,11 @@ export async function appendPatchIn(
     if (node) await upsertNode(tx, input.tripId, id, node);
     else await deleteNode(tx, input.tripId, id);
   }
+  // A header op (dates, title, pace…) is projected too, or the log would say
+  // the trip got longer while every screen read the old row.
+  if (result.change.trip) {
+    await updateTripHeader(tx, input.tripId, result.doc.trip);
+  }
 
   await setHead(tx, input.tripId, patchId);
 
@@ -273,6 +280,49 @@ export function createTrip(
   userId: string | null,
 ): Promise<string> {
   return insertTrip(header, userId);
+}
+
+/**
+ * The same trip on new dates: every stop moved by the same number of days,
+ * under new ids, as a new trip the traveller owns. "Plan it again" on Saved.
+ * The copy is validated like any patch — a museum closed on the new weekday
+ * is a warning on the copy, not a reason to refuse it.
+ */
+export async function duplicateTrip(
+  tripId: string,
+  userId: string,
+  startDate: string,
+): Promise<{ ok: true; tripId: string } | AppendFailure> {
+  const source = await loadTrip(tripId);
+  if (!source) return { ok: false, code: "not-found" };
+
+  const from = Date.parse(`${dayKey(source.doc.trip.startsAt)}T00:00:00+04:00`);
+  const shift = Date.parse(`${startDate}T00:00:00+04:00`) - from;
+  const move = (iso: string) => new Date(Date.parse(iso) + shift).toISOString();
+
+  const header = {
+    ...source.doc.trip,
+    startsAt: move(source.doc.trip.startsAt),
+    endsAt: move(source.doc.trip.endsAt),
+  };
+  const nodes = Object.fromEntries(
+    Object.values(source.doc.nodes).map((node) => [
+      randomUUID(),
+      { ...node, startsAt: move(node.startsAt) },
+    ]),
+  );
+
+  const copy = await createTrip(header, userId);
+  const written = await appendPatch({
+    tripId: copy,
+    parentId: null,
+    intent: `Copied from ${source.doc.trip.title}`,
+    ops: addAllOps({ trip: header, nodes }),
+    author: "user",
+    acceptedBy: userId,
+    meta: { copiedFrom: tripId },
+  });
+  return written.ok ? { ok: true, tripId: copy } : written;
 }
 
 /** The whole document as one patch: how a generated plan enters the log. */

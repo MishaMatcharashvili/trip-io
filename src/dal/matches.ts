@@ -10,6 +10,7 @@ import {
 import type { Rejection, Verdict } from "../domain/watch/judge.ts";
 import type { Route, RouteReason } from "../domain/watch/route.ts";
 import { db, type Queryable } from "./client.ts";
+import { passHeld } from "./passes.ts";
 
 // Stage 3, and the load-bearing SQL of the whole system. Every event is
 // compared against every live node in one spatiotemporal join, and only what
@@ -83,7 +84,11 @@ const matchable = sql`
   JOIN trip t ON t.id = n.trip_id
   JOIN trip_watch w ON w.trip_id = t.id
                    AND tstzrange(w.active_from, w.active_to) @> now()
-  WHERE tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
+  WHERE ${passHeld}
+    -- A source the traveller muted for this trip is never matched, so it is
+    -- never judged and never sent.
+    AND NOT (split_part(e.kind, '.', 1) = ANY(w.muted_sources))
+    AND tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
      && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
     AND ${nodeKindAllowed}
     AND e.observed_at > now() - ${staleAfter} * interval '1 hour'
@@ -474,5 +479,85 @@ export async function pairsPerTripDay(
     tripId: r.trip_id as string,
     day: r.day as string,
     pairs: r.pairs as number,
+  }));
+}
+
+export type LiveMatch = {
+  nodeId: string;
+  kind: EventKind;
+  severity: string;
+  route: Route;
+  validFrom: string;
+  validTo: string | null;
+  judgedAt: string;
+};
+
+/**
+ * What the judge said still matters to this trip: pairs routed to a push or a
+ * briefing whose event has not run out. The trip screens mark the stop they
+ * touch — the only coral a map or an itinerary shows.
+ */
+export async function liveMatchesFor(
+  tripId: string,
+  now: Date = new Date(),
+): Promise<LiveMatch[]> {
+  const rows = await db.execute(sql`
+    SELECT m.node_id, e.kind, e.severity, m.route, e.valid_from, e.valid_to, m.judged_at
+    FROM event_match m
+    JOIN world_event e ON e.id = m.event_id
+    WHERE m.trip_id = ${tripId}
+      AND m.route IN ('interrupt', 'briefing')
+      AND (e.valid_to IS NULL OR e.valid_to > ${now.toISOString()})
+    ORDER BY m.judged_at DESC
+  `);
+  return rows.rows.map((r) => ({
+    nodeId: r.node_id as string,
+    kind: r.kind as EventKind,
+    severity: r.severity as string,
+    route: r.route as Route,
+    validFrom: new Date(r.valid_from as string).toISOString(),
+    validTo: r.valid_to ? new Date(r.valid_to as string).toISOString() : null,
+    judgedAt: new Date(r.judged_at as string).toISOString(),
+  }));
+}
+
+/** When the judge last looked at anything on this trip, or null if never. */
+export async function lastCheckFor(tripId: string): Promise<string | null> {
+  const rows = await db.execute(sql`
+    SELECT max(greatest(judged_at, matched_at)) AS at
+    FROM event_match WHERE trip_id = ${tripId}
+  `);
+  const at = rows.rows[0]?.at;
+  return at ? new Date(at as string).toISOString() : null;
+}
+
+export type EventArea = {
+  id: string;
+  kind: EventKind;
+  /** GeoJSON geometry, as PostGIS writes it. */
+  geometry: { type: string; coordinates: unknown };
+};
+
+/**
+ * Where the events behind a trip's live matches are: the weather and road
+ * layers of the trip map. Only events the judge routed to the traveller, so the
+ * map never shows a disruption the itinerary does not.
+ */
+export async function liveEventAreas(
+  tripId: string,
+  now: Date = new Date(),
+): Promise<EventArea[]> {
+  const rows = await db.execute(sql`
+    SELECT DISTINCT e.id, e.kind, ST_AsGeoJSON(e.geom::geometry, 5) AS geometry
+    FROM event_match m
+    JOIN world_event e ON e.id = m.event_id
+    WHERE m.trip_id = ${tripId}
+      AND m.route IN ('interrupt', 'briefing')
+      AND (e.valid_to IS NULL OR e.valid_to > ${now.toISOString()})
+  `);
+  return rows.rows.map((r) => ({
+    id: r.id as string,
+    kind: r.kind as EventKind,
+    geometry: JSON.parse(r.geometry as string),
   }));
 }

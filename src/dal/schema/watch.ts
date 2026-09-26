@@ -75,6 +75,15 @@ export const tripWatch = pgTable(
     // it is usually permanent, which makes it the most informative thing a
     // traveller can do. First one wins: turning push back on does not unsay it.
     mutedAt: timestamp("muted_at", { withTimezone: true }),
+    // Detector families the traveller turned off for this trip ("weather",
+    // "road"). The matcher skips their events, so nothing is judged or sent.
+    mutedSources: text("muted_sources")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    // How much to tell: "affecting" (only what changes the plan, the default)
+    // or "nearby" (findings that need no decision as well).
+    verbosity: text("verbosity").notNull().default("affecting"),
   },
   (t) => [
     index("trip_watch_regions_idx").using("gist", t.regions),

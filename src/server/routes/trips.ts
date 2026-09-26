@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
+import { askAboutTrip } from "@/bll/ask.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -8,6 +9,7 @@ import {
   appendPatch,
   createTrip,
   docAt,
+  duplicateTrip,
   history,
   previewPatch,
   restoreTo,
@@ -15,7 +17,13 @@ import {
   undoLast,
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
-import { updateWatchSettings } from "@/bll/watch-settings.ts";
+import { itineraryFile, myTrips } from "@/bll/trip-screen.ts";
+import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
+import {
+  watchSettings as readWatchSettings,
+  updateWatchSettings,
+} from "@/bll/watch-settings.ts";
+import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
@@ -38,8 +46,14 @@ const watchSettings = z
       .object({ start: clockTime, end: clockTime })
       .nullable()
       .optional(),
+    // The detector families that exist; muting one stops it being matched.
+    mutedSources: z
+      .array(z.enum(["weather", "road"]))
+      .max(2)
+      .optional(),
+    verbosity: z.enum(["affecting", "nearby"]).optional(),
   })
-  .refine((s) => s.channels !== undefined || s.quietHours !== undefined, {
+  .refine((s) => Object.values(s).some((v) => v !== undefined), {
     message: "nothing to change",
   });
 
@@ -92,6 +106,10 @@ const applied = (result: AppendSuccess) => ({
 
 export const trips = new Hono<SessionEnv>()
   .use(requireSession)
+
+  // The traveller's own trips, soonest first: the home list, Explore's "add to
+  // trip", and the phone app's trip list.
+  .get("/", async (c) => c.json({ trips: await myTrips(c.get("userId")) }))
 
   .post("/", zValidator("json", z.object({ trip: tripHeader })), async (c) =>
     c.json(
@@ -211,6 +229,14 @@ export const trips = new Hono<SessionEnv>()
     },
   )
 
+  .get("/:id/watch", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    const watch = await readWatchSettings(id);
+    return watch ? c.json({ watch }) : c.json({ error: "not watched" }, 404);
+  })
+
   // Channels and quiet hours. Push switched off mid-trip is recorded as a mute
   // (src/bll/watch-settings.ts) — a kill criterion, not just a preference.
   .patch(
@@ -226,11 +252,107 @@ export const trips = new Hono<SessionEnv>()
       const saved = await updateWatchSettings(id, {
         channels: body.channels ? [...new Set(body.channels)] : undefined,
         quietHours: body.quietHours,
+        mutedSources: body.mutedSources
+          ? [...new Set(body.mutedSources)]
+          : undefined,
+        verbosity: body.verbosity,
       });
       // A trip with no stops has no watch yet: nothing to be reached about.
       return saved ? c.body(null, 204) : c.json({ error: "not watched" }, 409);
     },
   )
+
+  // The paywall. Planning is free; watching is bought per trip, the first free.
+  .get("/:id/pass", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    return c.json({ offer: await offerFor(id, c.get("userId")) });
+  })
+
+  .post("/:id/pass", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    const result = await startFreeWatch(id, c.get("userId"));
+    return result.ok
+      ? c.json(result, 201)
+      : c.json(
+          { error: result.reason },
+          result.reason === "payment-required" ? 402 : 409,
+        );
+  })
+
+  // Stand-in checkout until Flitt: records a paid pass, charges nobody.
+  .post("/:id/pass/checkout", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    const result = await demoCheckout(id, c.get("userId"));
+    return result.ok
+      ? c.json(result, 201)
+      : c.json({ error: result.reason }, 409);
+  })
+
+  // "Plan it again": the same stops on new dates, as a new trip.
+  .post(
+    "/:id/duplicate",
+    zValidator("param", params),
+    zValidator("json", z.object({ startDate: z.iso.date() })),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const result = await duplicateTrip(
+        id,
+        c.get("userId"),
+        c.req.valid("json").startDate,
+      );
+      if (!result.ok) {
+        const { body, status } = failure(result);
+        return c.json(body, status);
+      }
+      return c.json({ id: result.tripId }, 201);
+    },
+  )
+
+  // A question about the trip, answered from the trip. Read-only.
+  .post(
+    "/:id/ask",
+    zValidator("param", params),
+    zValidator(
+      "json",
+      z.object({ question: z.string().trim().min(2).max(ASK_MAX_CHARS) }),
+    ),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const result = await askAboutTrip(id, c.req.valid("json").question);
+      if (result.ok) {
+        return c.json({ answer: result.answer, grounded: result.grounded });
+      }
+      return result.reason === "not-found"
+        ? c.json({ error: "not found" as const }, 404)
+        : c.json({ error: "unavailable" as const }, 503);
+    },
+  )
+
+  // The itinerary for a calendar app. Downloaded, so it carries a file name.
+  .get("/:id/itinerary.ics", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+
+    const file = await itineraryFile(id);
+    if (!file) return c.json({ error: "not found" }, 404);
+    return c.body(file, 200, {
+      "content-type": "text/calendar; charset=utf-8",
+      "content-disposition": `attachment; filename="trip-${id.slice(0, 8)}.ics"`,
+    });
+  })
 
   .get("/:id/patches", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");

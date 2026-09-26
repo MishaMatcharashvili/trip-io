@@ -1,10 +1,11 @@
 import OpenAI from "openai";
 import type { ResponseFormatTextJSONSchemaConfig } from "openai/resources/responses/responses";
 
-// The OpenAI client, shared by the three calls this product makes: the trip
+// The OpenAI client, shared by the calls this product makes: the trip
 // composer (src/infra/openai-composer.ts), the watch layer's judge
-// (src/infra/openai-judge.ts) and the briefing composer
-// (src/infra/openai-briefing.ts).
+// (src/infra/openai-judge.ts), the briefing composer
+// (src/infra/openai-briefing.ts) and the answer to a traveller's question
+// about their trip (src/infra/openai-ask.ts).
 //
 // The model id lives here rather than in each of them because it is one
 // decision, not three. When it lived in two places and the pinned model was

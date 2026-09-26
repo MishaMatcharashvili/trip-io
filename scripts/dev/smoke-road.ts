@@ -25,6 +25,7 @@ import {
   createTrip,
 } from "../../src/bll/trip-document.ts";
 import { db } from "../../src/dal/client.ts";
+import { insertPass } from "../../src/dal/passes.ts";
 import type { TripNode } from "../../src/domain/trip/document.ts";
 import { MAX_PENDING_PER_REPORTER } from "../../src/domain/watch/road.ts";
 
@@ -123,6 +124,15 @@ try {
     },
   };
   tripId = await createTrip(doc.trip, null);
+  // Only a trip holding a pass is watched (src/dal/passes.ts).
+  await insertPass({
+    tripId,
+    userId: null,
+    kind: "free",
+    amountCents: 0,
+    currency: "USD",
+    provider: "script",
+  });
   const built = await appendPatch({
     tripId,
     parentId: null,

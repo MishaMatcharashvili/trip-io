@@ -71,6 +71,34 @@
       "when": 1790368103380,
       "tag": "0009_road_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790443602263,
+      "tag": "0010_saved_places",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790443652964,
+      "tag": "0011_watch_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790443685169,
+      "tag": "0012_watch_passes",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790443879866,
+      "tag": "0013_watch_pass_owner_optional",
+      "breakpoints": true
     }
   ]
 }

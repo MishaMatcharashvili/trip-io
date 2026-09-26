@@ -64,6 +64,9 @@ export type Watch = WatchSettings & {
   cap: number;
   activeFrom: string;
   activeTo: string;
+  /** Detector families muted for this trip: "weather", "road". */
+  mutedSources: string[];
+  verbosity: "affecting" | "nearby";
 };
 
 // `channels` is selected as `text[]`: an array of a custom enum comes back
@@ -76,11 +79,14 @@ const toWatch = (r: Record<string, unknown>): Watch => ({
   cap: r.cap as number,
   activeFrom: new Date(r.active_from as string).toISOString(),
   activeTo: new Date(r.active_to as string).toISOString(),
+  mutedSources: (r.muted_sources as string[] | null) ?? [],
+  verbosity: r.verbosity === "nearby" ? "nearby" : "affecting",
 });
 
 export async function loadWatch(tripId: string): Promise<Watch | null> {
   const rows = await db.execute(sql`
-    SELECT trip_id, channels::text[] AS channels, quiet_hours, cap, active_from, active_to
+    SELECT trip_id, channels::text[] AS channels, quiet_hours, cap, active_from,
+           active_to, muted_sources, verbosity
     FROM trip_watch WHERE trip_id = ${tripId}
   `);
   return rows.rows[0] ? toWatch(rows.rows[0]) : null;
@@ -127,7 +133,8 @@ export async function lockWatch(
   tripId: string,
 ): Promise<Watch | null> {
   const rows = await conn.execute(sql`
-    SELECT trip_id, channels::text[] AS channels, quiet_hours, cap, active_from, active_to
+    SELECT trip_id, channels::text[] AS channels, quiet_hours, cap, active_from,
+           active_to, muted_sources, verbosity
     FROM trip_watch WHERE trip_id = ${tripId}
     FOR UPDATE
   `);
@@ -146,6 +153,8 @@ export async function saveWatchSettings(
     channels: readonly string[];
     quietHours: QuietHours | null;
     muted: boolean;
+    mutedSources: readonly string[];
+    verbosity: "affecting" | "nearby";
   },
 ): Promise<void> {
   await conn.execute(sql`
@@ -155,6 +164,11 @@ export async function saveWatchSettings(
         sql`, `,
       )}]::delivery_channel[],
       quiet_hours = ${JSON.stringify(settings.quietHours)}::jsonb,
+      muted_sources = ARRAY[${sql.join(
+        settings.mutedSources.map((m) => sql`${m}`),
+        sql`, `,
+      )}]::text[],
+      verbosity = ${settings.verbosity},
       muted_at = ${settings.muted ? sql`COALESCE(muted_at, now())` : sql`muted_at`}
     WHERE trip_id = ${tripId}
   `);

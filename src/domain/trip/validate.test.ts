@@ -172,10 +172,15 @@ describe("tier, by author", () => {
   const withPlace = (placeId: string) =>
     edit(kazbegiDoc(), N.dinner, { placeId });
 
-  test("system may only use curated places", () => {
+  test("system may use curated and verified places, never raw", () => {
     assert.deepEqual(
-      rules(validateDay(withPlace(P.verifiedCafe), DAY, ctx("system"))),
-      ["error:tier"],
+      validateDay(withPlace(P.verifiedCafe), DAY, ctx("system")),
+      [],
+    );
+    assert.ok(
+      rules(validateDay(withPlace(P.rawBar), DAY, ctx("system"))).includes(
+        "error:tier",
+      ),
     );
   });
 
