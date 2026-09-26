@@ -5,8 +5,8 @@ import type {
   Severity,
   WorldEvent,
 } from "../domain/watch/event.ts";
-import { passHeld } from "./passes.ts";
 import { db } from "./client.ts";
+import { passHeld } from "./passes.ts";
 
 // `world_event` and the regions worth sensing.
 //

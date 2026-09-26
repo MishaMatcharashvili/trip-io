@@ -7,8 +7,8 @@ import type {
 import type { EventKind, Severity } from "../domain/watch/event.ts";
 import type { BriefingOffer } from "../domain/watch/interrupt.ts";
 import type { Verdict } from "../domain/watch/judge.ts";
-import { passHeld } from "./passes.ts";
 import { db } from "./client.ts";
+import { passHeld } from "./passes.ts";
 
 // Stage 6's rows: which trips have a morning today, what there is to tell them,
 // and what was told. Policy — how much of it is worth sending, and in what
