@@ -167,10 +167,12 @@ function AddStop({
   date,
   near,
   pending,
+  initialQuery = "",
   onAdd,
   onClose,
 }: {
   date: string;
+  initialQuery?: string;
   near: [number, number] | null;
   pending: boolean;
   onAdd: (
@@ -181,7 +183,7 @@ function AddStop({
   ) => void;
   onClose: () => void;
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [hits, setHits] = useState<Hit[]>([]);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<Hit | null>(null);
@@ -327,6 +329,7 @@ export function DayEditor({
   stops,
   near,
   openAdd = false,
+  initialQuery,
 }: {
   tripId: string;
   head: string | null;
@@ -334,6 +337,8 @@ export function DayEditor({
   stops: Checkpoint[];
   near: [number, number] | null;
   openAdd?: boolean;
+  /** A place to look for as the add panel opens: "add to trip" from Explore. */
+  initialQuery?: string;
 }) {
   const { send, pending, error } = usePatch(tripId, head);
   const [editing, setEditing] = useState<string | null>(null);
@@ -415,6 +420,7 @@ export function DayEditor({
         <AddStop
           date={date}
           near={near}
+          initialQuery={initialQuery}
           pending={pending}
           onClose={() => setAdding(false)}
           onAdd={(hit, kind, time, minutes) => {

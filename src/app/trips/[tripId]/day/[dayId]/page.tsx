@@ -148,7 +148,7 @@ export default async function DayPage({
   searchParams,
 }: PageProps<"/trips/[tripId]/day/[dayId]">) {
   const { tripId, dayId } = await params;
-  const { add } = await searchParams;
+  const { add, q } = await searchParams;
 
   const fixture = getTrip(tripId);
   if (fixture) {
@@ -209,6 +209,7 @@ export default async function DayPage({
         stops={day.checkpoints}
         near={near}
         openAdd={add === "1"}
+        initialQuery={typeof q === "string" ? q : undefined}
       />
     </DayScreen>
   );
