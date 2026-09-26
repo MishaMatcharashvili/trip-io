@@ -49,7 +49,17 @@ Proposing:
 - drop: remove a stop entirely. Use this sparingly; a traveller came to do these things.
 - If moving one stop collides with another stop on the same day, propose the moves for
   both. The traveller sees one diff.
-- Keep meals near mealtimes and do not push an outdoor stop past dusk.`;
+- Keep meals near mealtimes and do not push an outdoor stop past dusk.
+
+Road reports (an event whose "what" starts with "road."):
+- A person reported it on one of Georgia's main roads and we checked it. You only see it
+  against a drive (a transfer) that uses that road. Trust it for its window, no longer.
+- A closure blocks the drive while it lasts. The useful move is usually to shift the drive
+  past the window and shift what follows with it; drop something only if the day cannot
+  hold it otherwise. You cannot reroute — there is no detour move — so never promise one.
+- A restriction (one lane, chains, 4x4 only) or delays degrade the drive. Say what that
+  costs in time, and whether the day still works as planned.
+- The evidence names the source as given ("road-report") and when it was reported.`;
 
 /** Everything the model is shown. Nothing else about the trip reaches it. */
 const userTurn = (input: JudgeInput) =>
