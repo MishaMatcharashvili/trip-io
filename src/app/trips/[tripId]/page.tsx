@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { interventionCard } from "@/bll/interventions";
 import { dayForecast } from "@/bll/trip-screen";
+import { offerFor } from "@/bll/watch-pass";
 import {
   advisory,
   calmStrip,
@@ -97,6 +98,8 @@ function fixtureView(trip: Trip, rawState: string | string[] | undefined) {
       state === "advisory"
         ? ["Is the hike ok for my father?", "Indoor options near Kazbegi"]
         : [],
+    askTripId: null,
+    offer: null,
     nextSweep: "Next full sweep at 15:00",
     calmHeadline: "Today is going to plan",
     calmNote:
@@ -122,8 +125,10 @@ function fixtureView(trip: Trip, rawState: string | string[] | undefined) {
 async function realView(
   { screen, trip, userId }: LoadedTrip,
   wantedDay: string | undefined,
+  ask: string | undefined,
   now: Date,
 ) {
+  const offer = await offerFor(trip.id, userId);
   const day = pickDay(trip, wantedDay) ?? trip.days[trip.currentDay - 1];
   const stops = mapStops(day);
 
@@ -199,7 +204,10 @@ async function realView(
         : null,
     weather: forecast ? weatherView(forecast) : null,
     strip: detectorStrip(screen),
-    suggestions: [],
+    suggestions: ["What is indoors today?", "Which is my longest drive?"],
+    askTripId: trip.id,
+    initialQuestion: ask,
+    offer: offer.kind === "watched" ? null : offer,
     nextSweep: screen.watch
       ? "The weather is checked every hour"
       : "Watching starts once the trip has stops",
@@ -238,7 +246,7 @@ export default async function ActiveTripPage({
   searchParams,
 }: PageProps<"/trips/[tripId]">) {
   const { tripId } = await params;
-  const { state, day } = await searchParams;
+  const { state, day, ask } = await searchParams;
 
   const fixture = getTrip(tripId);
   const { view, stops, cards, events } = fixture
@@ -246,6 +254,7 @@ export default async function ActiveTripPage({
     : await realView(
         await loadTrip(tripId),
         typeof day === "string" ? day : undefined,
+        typeof ask === "string" ? ask.slice(0, 300) : undefined,
         new Date(),
       );
 

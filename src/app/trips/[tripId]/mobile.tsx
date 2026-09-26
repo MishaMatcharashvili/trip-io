@@ -199,6 +199,8 @@ export function ActiveTripMobile({ view }: { view: OverviewView }) {
         </div>
 
         <CommandBar
+          tripId={view.askTripId ?? undefined}
+          initialQuestion={view.initialQuestion}
           compact
           placeholder="Ask about your trip"
           className="mx-4 mb-3.5"

@@ -1,3 +1,4 @@
+import type { WatchOffer } from "@/bll/watch-pass";
 import type { Advisory, Day, Opportunity, Trip } from "@/data/trip";
 import type { ChangeRow } from "@/features/trip-model";
 import type { WeatherHour } from "@/ui/bars";
@@ -41,6 +42,12 @@ export type OverviewView = {
   } | null;
   strip: ReadonlyArray<{ name: string; tone: Tone; count: number }>;
   suggestions: string[];
+  /** A real trip's id makes the command bar answer; the fixture's is inert. */
+  askTripId: string | null;
+  /** Asked as the page opens: "Ask about it" from a stop. */
+  initialQuestion?: string;
+  /** Not watched yet: what the traveller is offered to start. */
+  offer: WatchOffer | null;
   nextSweep: string;
   calmHeadline: string;
   calmNote: string;

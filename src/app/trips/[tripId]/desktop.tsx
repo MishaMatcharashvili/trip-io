@@ -7,6 +7,7 @@ import {
 import { CommandBar } from "@/features/command-bar";
 import { CheckpointList } from "@/features/itinerary";
 import { ConnectionSwitch, UndoButton } from "@/features/trip-actions";
+import { WatchPassCard } from "@/features/watch-pass";
 import { WatchStrip } from "@/features/watch-strip";
 import { WeatherRibbon } from "@/ui/bars";
 import { Button, ButtonLink } from "@/ui/button";
@@ -151,6 +152,9 @@ function RightColumn({ view }: { view: OverviewView }) {
   const { trip, state } = view;
   return (
     <>
+      {view.offer ? (
+        <WatchPassCard tripId={trip.id} offer={view.offer} />
+      ) : null}
       {state === "advisory" && view.advisory ? (
         <AdvisoryCard
           advisory={view.advisory}
@@ -203,6 +207,8 @@ export function ActiveTripDesktop({ view }: { view: OverviewView }) {
         />
 
         <CommandBar
+          tripId={view.askTripId ?? undefined}
+          initialQuestion={view.initialQuestion}
           suggestions={view.suggestions}
           className="absolute bottom-[30px] left-1/2 z-20 w-[520px] -translate-x-1/2"
         />
