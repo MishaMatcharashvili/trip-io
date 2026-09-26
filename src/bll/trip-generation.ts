@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { curatedInArea } from "../dal/places.ts";
+import { candidatesInArea } from "../dal/places.ts";
 import { planCache, recordGeneration } from "../dal/plans.ts";
 import type { FocusAreaSlug } from "../domain/catalogue/focus-areas.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
@@ -34,8 +34,8 @@ import {
 // where it meets the catalogue and the log.
 
 /**
- * Curated places across the requested areas, spread evenly so one dense area
- * can't crowd the others out of the prompt. A place on the boundary of two areas
+ * Places across the requested areas — curated first, verified filling in —
+ * spread evenly so one dense area can't crowd the others out of the prompt. A place on the boundary of two areas
  * comes back once, under the first.
  */
 export async function loadCandidates(
@@ -47,7 +47,7 @@ export async function loadCandidates(
     Math.ceil(limit / Math.max(1, areas.length)),
   );
   const perAreaResults = await Promise.all(
-    areas.map((slug) => curatedInArea(slug, perArea)),
+    areas.map((slug) => candidatesInArea(slug, perArea)),
   );
 
   const seen = new Set<string>();

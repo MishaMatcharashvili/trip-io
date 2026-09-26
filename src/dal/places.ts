@@ -207,21 +207,31 @@ export async function insertCurated(
 }
 
 /**
- * Curated places in one focus area — what trip generation may compose from. The
- * tier filter is what makes "the model cannot name a place it wasn't given" mean
- * something; the validator enforces it again when the plan is written
- * (context/architecture.md, place.tier).
+ * What trip generation may compose from in one focus area: every curated place
+ * first, then verified ones to fill in while the hand-verified catalogue is
+ * still being built. Verified places are dealt round-robin across categories,
+ * most confident first, so a dense category (Tbilisi has hundreds of cafés)
+ * cannot fill the prompt on its own. The validator checks the tier again when
+ * the plan is written (context/architecture.md, place.tier).
  */
-export async function curatedInArea(
+export async function candidatesInArea(
   slug: FocusAreaSlug,
   limit: number,
 ): Promise<Candidate[]> {
   const rows = await db.execute(sql`
-    SELECT p.id, p.name, p.category, p.opening_hours,
-           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
-    FROM place p
-    WHERE p.tier = 'curated' AND ${areaPredicate(areaBySlug(slug).match)}
-    ORDER BY p.name
+    SELECT id, name, category, tier, opening_hours, lon, lat
+    FROM (
+      SELECT p.id, p.name, p.category, p.tier, p.opening_hours,
+             ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
+             row_number() OVER (
+               PARTITION BY p.tier, p.category
+               ORDER BY (p.attrs->>'confidence')::float DESC NULLS LAST, p.name
+             ) AS rank
+      FROM place p
+      WHERE p.tier IN ('curated', 'verified')
+        AND ${areaPredicate(areaBySlug(slug).match)}
+    ) ranked
+    ORDER BY tier = 'curated' DESC, rank, name
     LIMIT ${limit}
   `);
   return rows.rows.map((r) => {
@@ -234,7 +244,7 @@ export async function curatedInArea(
       name: r.name as string,
       category,
       group: categoryGroup[category as keyof typeof categoryGroup],
-      tier: "curated" as const,
+      tier: r.tier as Candidate["tier"],
       lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
       openingHours: parsed?.success ? parsed.data : null,
       outdoor: isOutdoor(category),
