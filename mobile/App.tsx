@@ -13,13 +13,26 @@ export default function App() {
       setStatus("No API configured: EXPO_PUBLIC_API_URL is not set");
       return;
     }
+    let live = true;
     api.api.health
       .$get()
-      .then((res) => res.json())
-      .then((body) => setStatus(`API ${body.status} at ${body.time}`))
-      .catch((error: unknown) =>
-        setStatus(`API unreachable: ${String(error)}`),
+      .then((res) => {
+        // A 5xx, or a captive portal or the wrong port answering 200 with
+        // HTML: name it, rather than surfacing a JSON parse error.
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.headers.get("content-type")?.includes("application/json")) {
+          throw new Error(`HTTP ${res.status}, but not JSON`);
+        }
+        return res.json();
+      })
+      .then((body) => live && setStatus(`API ${body.status} at ${body.time}`))
+      .catch(
+        (error: unknown) =>
+          live && setStatus(`API unreachable: ${String(error)}`),
       );
+    return () => {
+      live = false;
+    };
   }, []);
 
   return (
