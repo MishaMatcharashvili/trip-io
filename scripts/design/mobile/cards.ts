@@ -119,7 +119,7 @@ export function indexPage(flows: Flow[]): string {
   <div class="col" style="gap:10px;margin-bottom:24px">
     <div class="row" style="gap:9px"><span class="t-agent row">${ic("signal", 22)}</span><span class="brand" style="font-size:18px">trip.io</span><span class="chip chip-a" style="margin-left:6px">Mobile · ${count} screens · light + dark</span></div>
     <div class="h1">Every mobile screen, in Mist</div>
-    <div class="sm mut" style="max-width:640px">Concept A, map-first. Each card draws the screen twice: light, then dark. The dark frame overrides the same tokens, with no one-off colours. Copy and data come from the app's fixtures, so every screen is the same Georgia trip on day 3.</div>
+    <div class="sm mut" style="max-width:640px">Concept A, map-first. Each card draws the screen twice: light, then dark. The dark frame overrides the same tokens, with no one-off colours. Copy and data come from the app's fixtures, so every screen follows the same Georgia trip.</div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">${groups}</div>
 </section>`,
