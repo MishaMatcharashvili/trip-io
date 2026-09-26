@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
+import { askAboutTrip } from "@/bll/ask.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -22,6 +23,7 @@ import {
   watchSettings as readWatchSettings,
   updateWatchSettings,
 } from "@/bll/watch-settings.ts";
+import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
@@ -312,6 +314,29 @@ export const trips = new Hono<SessionEnv>()
         return c.json(body, status);
       }
       return c.json({ id: result.tripId }, 201);
+    },
+  )
+
+  // A question about the trip, answered from the trip. Read-only.
+  .post(
+    "/:id/ask",
+    zValidator("param", params),
+    zValidator(
+      "json",
+      z.object({ question: z.string().trim().min(2).max(ASK_MAX_CHARS) }),
+    ),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const result = await askAboutTrip(id, c.req.valid("json").question);
+      if (result.ok) {
+        return c.json({ answer: result.answer, grounded: result.grounded });
+      }
+      return result.reason === "not-found"
+        ? c.json({ error: "not found" as const }, 404)
+        : c.json({ error: "unavailable" as const }, 503);
     },
   )
 
