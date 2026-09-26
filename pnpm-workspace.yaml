@@ -1,3 +1,7 @@
+# The web app is the root package; the Expo app is the only other member.
+packages:
+  - mobile
+
 # pnpm blocks dependency install scripts by default. This is where it reads the
 # decisions from — not package.json's "pnpm" field, which pnpm 12 ignores, and
 # not the `onlyBuiltDependencies` / `ignoredBuiltDependencies` lists that pnpm
