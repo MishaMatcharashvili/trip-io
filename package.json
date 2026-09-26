@@ -36,7 +36,7 @@
     "better-auth": "^1.7.4",
     "drizzle-orm": "^0.45.2",
     "grammy": "^1.46.0",
-    "hono": "^4.13.7",
+    "hono": "catalog:",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",

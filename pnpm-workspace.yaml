@@ -2,6 +2,14 @@
 packages:
   - mobile
 
+# Versions both packages must agree on. The Expo app's typed client is
+# hc<AppType>, and AppType is built from the server's Hono: two Hono versions
+# are two copies of its classes, whose private members make them incompatible,
+# and the phone's client stops compiling. One entry here, `catalog:` in each
+# package.json, and they cannot drift.
+catalog:
+  hono: ^4.13.7
+
 # pnpm blocks dependency install scripts by default. This is where it reads the
 # decisions from — not package.json's "pnpm" field, which pnpm 12 ignores, and
 # not the `onlyBuiltDependencies` / `ignoredBuiltDependencies` lists that pnpm
