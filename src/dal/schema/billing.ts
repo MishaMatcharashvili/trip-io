@@ -24,9 +24,9 @@ export const watchPass = pgTable(
     tripId: uuid("trip_id")
       .primaryKey()
       .references(() => trip.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    // Null for a trip nobody owns yet — the smoke and synthetic runs, which
+    // are watched like any trip. Who paid is on a traveller's own trips.
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
     kind: watchPassKind("kind").notNull(),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").notNull(),
