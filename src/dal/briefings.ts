@@ -7,6 +7,7 @@ import type {
 import type { EventKind, Severity } from "../domain/watch/event.ts";
 import type { BriefingOffer } from "../domain/watch/interrupt.ts";
 import type { Verdict } from "../domain/watch/judge.ts";
+import { passHeld } from "./passes.ts";
 import { db } from "./client.ts";
 
 // Stage 6's rows: which trips have a morning today, what there is to tell them,
@@ -51,7 +52,8 @@ export async function liveTripDays(date: string): Promise<LiveTripDay[]> {
     FROM trip t
     JOIN trip_watch w ON w.trip_id = t.id
     JOIN trip_node n ON n.trip_id = t.id
-    WHERE tstzrange(w.active_from, w.active_to) @> (${date}::date + time '07:30')
+    WHERE ${passHeld}
+      AND tstzrange(w.active_from, w.active_to) @> (${date}::date + time '07:30')
             AT TIME ZONE 'Asia/Tbilisi'
       AND (n.starts_at AT TIME ZONE 'Asia/Tbilisi')::date = ${date}::date
       AND NOT EXISTS (

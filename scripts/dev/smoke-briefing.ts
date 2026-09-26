@@ -30,6 +30,7 @@ import {
 import { briefingBundle, openRate } from "../../src/dal/briefings.ts";
 import { db } from "../../src/dal/client.ts";
 import { upsertEvent } from "../../src/dal/events.ts";
+import { insertPass } from "../../src/dal/passes.ts";
 import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import { dayKey } from "../../src/domain/trip/document.ts";
 import type { Briefer, Mailer } from "../../src/domain/watch/briefing.ts";
@@ -182,6 +183,15 @@ async function buildTrip(
   const outdoorId = randomUUID();
   const doc = plan(title, outdoorId);
   const tripId = await createTrip(doc.trip, owner);
+  // Only a trip holding a pass is watched (src/dal/passes.ts).
+  await insertPass({
+    tripId,
+    userId: owner,
+    kind: "free",
+    amountCents: 0,
+    currency: "USD",
+    provider: "script",
+  });
   written.push(tripId);
   const built = await appendPatch({
     tripId,

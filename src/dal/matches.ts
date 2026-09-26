@@ -10,6 +10,7 @@ import {
 import type { Rejection, Verdict } from "../domain/watch/judge.ts";
 import type { Route, RouteReason } from "../domain/watch/route.ts";
 import { db, type Queryable } from "./client.ts";
+import { passHeld } from "./passes.ts";
 
 // Stage 3, and the load-bearing SQL of the whole system. Every event is
 // compared against every live node in one spatiotemporal join, and only what
@@ -83,7 +84,11 @@ const matchable = sql`
   JOIN trip t ON t.id = n.trip_id
   JOIN trip_watch w ON w.trip_id = t.id
                    AND tstzrange(w.active_from, w.active_to) @> now()
-  WHERE tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
+  WHERE ${passHeld}
+    -- A source the traveller muted for this trip is never matched, so it is
+    -- never judged and never sent.
+    AND NOT (split_part(e.kind, '.', 1) = ANY(w.muted_sources))
+    AND tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
      && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
     AND ${nodeKindAllowed}
     AND e.observed_at > now() - ${staleAfter} * interval '1 hour'

@@ -40,6 +40,7 @@ import { updateWatchSettings } from "../../src/bll/watch-settings.ts";
 import { db } from "../../src/dal/client.ts";
 import { registerDevice } from "../../src/dal/devices.ts";
 import { upsertEvent } from "../../src/dal/events.ts";
+import { insertPass } from "../../src/dal/passes.ts";
 import type { TripDoc, TripNode } from "../../src/domain/trip/document.ts";
 import { dayKey } from "../../src/domain/trip/document.ts";
 import type { Briefer } from "../../src/domain/watch/briefing.ts";
@@ -124,6 +125,15 @@ async function buildTrip(title: string, stops: TripNode[]) {
     nodes: Object.fromEntries(stops.map((s) => [randomUUID(), s])),
   };
   const tripId = await createTrip(doc.trip, userId);
+  // Only a trip holding a pass is watched (src/dal/passes.ts).
+  await insertPass({
+    tripId,
+    userId: userId,
+    kind: "free",
+    amountCents: 0,
+    currency: "USD",
+    provider: "script",
+  });
   written.push(tripId);
   const built = await appendPatch({
     tripId,
