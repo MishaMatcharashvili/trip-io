@@ -63,7 +63,7 @@ p{margin:0}
 .link{color:var(--color-agent);font-weight:500}
 .brand{font-size:16px;font-weight:700;letter-spacing:-.035em}
 
-.card{background:var(--color-surface);border:1px solid var(--color-hairline);border-radius:10px}
+.card{background:var(--color-surface);border:1px solid var(--color-hairline);border-radius:10px;flex-shrink:0}
 .float{background:var(--color-surface);border:1px solid var(--color-hairline-strong);border-radius:13px;box-shadow:var(--shadow-panel)}
 .clip{overflow:hidden}
 .sheet{position:absolute;left:0;right:0;background:var(--color-surface);border-top:1px solid var(--color-hairline);border-radius:18px 18px 0 0;box-shadow:var(--shadow-sheet);display:flex;flex-direction:column;overflow:hidden}
@@ -147,11 +147,40 @@ p{margin:0}
 <body>
 <section class="side" data-theme="light" style="width:880px;padding:32px">
   <div class="col" style="gap:10px;margin-bottom:24px">
-    <div class="row" style="gap:9px"><span class="t-agent row"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><circle cx="12" cy="12" r="2.4"></circle><path d="M12 5.6A6.4 6.4 0 0 1 18.4 12"></path><path d="M12 2.2A9.8 9.8 0 0 1 21.8 12"></path></svg></span><span class="brand" style="font-size:18px">trip.io</span><span class="chip chip-a" style="margin-left:6px">Mobile · 9 screens · light + dark</span></div>
+    <div class="row" style="gap:9px"><span class="t-agent row"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><circle cx="12" cy="12" r="2.4"></circle><path d="M12 5.6A6.4 6.4 0 0 1 18.4 12"></path><path d="M12 2.2A9.8 9.8 0 0 1 21.8 12"></path></svg></span><span class="brand" style="font-size:18px">trip.io</span><span class="chip chip-a" style="margin-left:6px">Mobile · 15 screens · light + dark</span></div>
     <div class="h1">Every mobile screen, in Mist</div>
     <div class="sm mut" style="max-width:640px">Concept A, map-first. Each card draws the screen twice: light, then dark. The dark frame overrides the same tokens, with no one-off colours. Copy and data come from the app's fixtures, so every screen is the same Georgia trip on day 3.</div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+<div class="card col clip">
+  <div class="row" style="padding:12px 16px;gap:10px"><div class="h3 grow">Trips</div><span class="xs mut2">6</span></div>
+  <div class="hr"></div>
+  
+  <div class="row top" style="padding:9px 16px;gap:12px">
+    <div class="sm b5" style="width:170px;flex:none">Trips</div>
+    <div class="xs mut grow">Home. The live trip carries its watch status and any pending decision, so the state of the product shows before you open anything.</div>
+  </div><div class="hr-soft" style="margin:0 16px"></div>
+  <div class="row top" style="padding:9px 16px;gap:12px">
+    <div class="sm b5" style="width:170px;flex:none">Full trip · seven days</div>
+    <div class="xs mut grow">All seven days with a watch status each — where the product stops being a planner. Every row says whether anything moved under it.</div>
+  </div><div class="hr-soft" style="margin:0 16px"></div>
+  <div class="row top" style="padding:9px 16px;gap:12px">
+    <div class="sm b5" style="width:170px;flex:none">Day detail</div>
+    <div class="xs mut grow">One day, expanded: the rain ribbon over the hours you are awake, every stop with its state, and the one conflict marked in coral.</div>
+  </div><div class="hr-soft" style="margin:0 16px"></div>
+  <div class="row top" style="padding:9px 16px;gap:12px">
+    <div class="sm b5" style="width:170px;flex:none">Checkpoint detail</div>
+    <div class="xs mut grow">One stop: what it is, when, the conflict and its fix, what the watch keeps an eye on here specifically, and why it is in the trip at all.</div>
+  </div><div class="hr-soft" style="margin:0 16px"></div>
+  <div class="row top" style="padding:9px 16px;gap:12px">
+    <div class="sm b5" style="width:170px;flex:none">Explore</div>
+    <div class="xs mut grow">The catalogue before you plan: places checked by hand, each saying what was last verified, and the roads as the watch sees them this season.</div>
+  </div><div class="hr-soft" style="margin:0 16px"></div>
+  <div class="row top" style="padding:9px 16px;gap:12px">
+    <div class="sm b5" style="width:170px;flex:none">Saved</div>
+    <div class="xs mut grow">Routes, places and finds you kept. Any of them can start a trip, and each is re-checked before it goes into a plan.</div>
+  </div>
+</div>
 <div class="card col clip">
   <div class="row" style="padding:12px 16px;gap:10px"><div class="h3 grow">Active trip</div><span class="xs mut2">3</span></div>
   <div class="hr"></div>
