@@ -107,7 +107,7 @@ p{margin:0}
 .mt{margin-top:6px}
 
 .tg{width:34px;height:20px;border-radius:99px;background:var(--color-fill-strong);padding:2px;display:flex;flex:none}
-.tg::after{content:"";width:16px;height:16px;border-radius:99px;background:var(--color-knob);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tg::after{content:"";width:16px;height:16px;border-radius:99px;background:var(--color-knob);box-shadow:var(--shadow-card)}
 .tg.on{background:var(--color-agent);justify-content:flex-end}
 .rd{width:17px;height:17px;border-radius:99px;border:1.5px solid var(--color-control);flex:none}
 .rd.on{border:5px solid var(--color-agent);background:var(--color-surface)}
