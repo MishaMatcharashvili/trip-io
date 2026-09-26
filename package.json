@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate && node src/dal/unquote-geography.ts",
     "db:migrate": "node --env-file=.env src/dal/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "seed:trip": "node --env-file=.env scripts/dev/seed-trip.ts",
     "smoke:trip": "node --env-file=.env scripts/dev/smoke-trip.ts",
     "smoke:watch": "node --env-file=.env scripts/dev/smoke-watch.ts",
     "smoke:briefing": "node --env-file=.env scripts/dev/smoke-briefing.ts",

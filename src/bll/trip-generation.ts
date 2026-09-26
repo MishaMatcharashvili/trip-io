@@ -14,6 +14,7 @@ import {
 } from "../domain/trip/generate/constraints.ts";
 import {
   type Attempt,
+  type Composer,
   generate,
   type Source,
   tripHeader as tripHeaderFor,
@@ -80,10 +81,11 @@ export type GenerationFailure =
 export async function generateTrip(
   wanted: Constraints,
   userId: string | null,
+  { compose = composeWithOpenAI }: { compose?: Composer } = {},
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
   const result = await generate(wanted, {
-    compose: composeWithOpenAI,
+    compose,
     cache: planCache,
     candidates: await loadCandidates(wanted.areas),
     travel: straightLineTravel,
