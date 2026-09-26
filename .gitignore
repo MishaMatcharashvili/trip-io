@@ -52,3 +52,6 @@ next-env.d.ts
 
 # trigger.dev
 .trigger
+
+# server declarations for the Expo app (tsc -b tsconfig.api.json)
+/.types
