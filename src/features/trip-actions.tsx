@@ -300,3 +300,51 @@ export function RestoreButton({
     </span>
   );
 }
+
+/** Take one stop out of the plan, then go back to its day. */
+export function RemoveStopButton({
+  tripId,
+  head,
+  nodeId,
+  title,
+  back,
+}: {
+  tripId: string;
+  head: string | null;
+  nodeId: string;
+  title: string;
+  back: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <span className="inline-flex flex-col items-end gap-1">
+      <Button
+        variant="ghost"
+        size="lg"
+        className="px-3"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setError(null);
+            const res = await apiClient.api.trips[":id"].patches.$post({
+              param: { id: tripId },
+              json: {
+                parentId: head,
+                intent: `Removed ${title}`,
+                ops: [{ op: "remove", path: `/nodes/${nodeId}` }],
+              },
+            });
+            if (res.ok) router.push(back);
+            else setError(await refusal(res, "Couldn’t remove it."));
+          })
+        }
+      >
+        {pending ? "Removing…" : "Remove"}
+      </Button>
+      {error ? <span className="text-mini text-alert">{error}</span> : null}
+    </span>
+  );
+}
