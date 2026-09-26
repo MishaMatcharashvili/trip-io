@@ -4,7 +4,6 @@ import {
   loadPair,
   nearbyAlternatives,
   recordVerdict,
-  releaseClaim,
 } from "../dal/matches.ts";
 import { placeFacts } from "../dal/places.ts";
 import { loadWatch, pushLedger } from "../dal/watches.ts";
@@ -20,7 +19,7 @@ import {
 import { placeIdsInProposals } from "../domain/watch/proposal.ts";
 import { type Route, type RouteReason, route } from "../domain/watch/route.ts";
 import { DEFAULT_QUIET_HOURS } from "../domain/watch/settings.ts";
-import { judgeWithGemini } from "../infra/gemini-judge.ts";
+import { judgeWithOpenAI } from "../infra/openai-judge.ts";
 import { INTERRUPT_JOB } from "./interrupt.ts";
 
 // Stages 4 and 5, in the order they happen: assemble the pair, ask the model,
@@ -77,6 +76,7 @@ export async function judgeMatch(
       pair.node.lonLat,
       ALTERNATIVE_RADIUS_M,
       ALTERNATIVE_LIMIT,
+      pair.node.placeId,
     ),
     loadWatch(pair.trip.id),
     pushLedger(pair.trip.id),
@@ -120,15 +120,15 @@ export async function judgeMatch(
     sent: { countSoFar: ledger.sentSoFar, cap, lastSentAt: ledger.lastSentAt },
   };
 
-  let raw: unknown;
-  try {
-    raw = await (deps.judge ?? judgeWithGemini)(input);
-  } catch (error) {
-    // A provider failure is not a verdict. Put the pair back so the job's own
-    // retry gets a fresh claim rather than leaving it queued forever.
-    await releaseClaim(matchId);
-    throw error;
-  }
+  // A provider failure is not a verdict, so it throws and the job retries —
+  // with the queue's backoff, and its give-up at `MAX_ATTEMPTS`. The claim on
+  // the pair is deliberately kept: the retry re-runs this function, which never
+  // looks at `queued_at`, and releasing it would let the next matcher run post
+  // a second job for the same pair while the first is still retrying. During
+  // an outage that multiplies the jobs every run and means a pair is never
+  // given up on. A pair whose job does give up stays queued and unjudged,
+  // which is the record of what the pipeline could not do.
+  const raw = await (deps.judge ?? judgeWithOpenAI)(input);
 
   // Tiers are read from the catalogue, not from the list handed to the model:
   // the guard has to be able to catch an id the model took from somewhere else

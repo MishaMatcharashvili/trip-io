@@ -36,7 +36,7 @@ import {
 } from "../domain/watch/briefing.ts";
 import { briefingOffers } from "../domain/watch/interrupt.ts";
 import { renderBriefingEmail } from "../infra/briefing-email.ts";
-import { briefWithGemini } from "../infra/gemini-briefing.ts";
+import { briefWithOpenAI } from "../infra/openai-briefing.ts";
 import { emailConfigured, sendWithResend } from "../infra/resend.ts";
 
 // Stage 6, in the order it happens: find the mornings, gather what there is to
@@ -47,7 +47,7 @@ import { emailConfigured, sendWithResend } from "../infra/resend.ts";
 // touches no model: it finds the trips and posts one job each, so its runtime
 // is a query however many travellers exist. The model call happens in the
 // drain, where the 240s budget, the backoff and the give-up-at-five already
-// live — and where a Gemini outage at 03:30 costs a retry rather than a day.
+// live — and where a model outage at 03:30 costs the prose rather than a day.
 
 export const BRIEFING_JOB = "briefing";
 
@@ -189,7 +189,7 @@ export async function writeBriefing(
 
     let raw: unknown;
     try {
-      raw = await (deps.brief ?? briefWithGemini)(ask);
+      raw = await (deps.brief ?? briefWithOpenAI)(ask);
     } catch (error) {
       // Thrown on, so the queue's backoff gets to try again — unless there is
       // nothing left to try, in which case the morning gets the plain briefing

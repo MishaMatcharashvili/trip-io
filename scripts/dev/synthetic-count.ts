@@ -458,9 +458,11 @@ if (JUDGE) {
   console.log(
     perTrip < 2
       ? "  below 2: detector expansion is the thesis, not a later nice-to-have"
-      : perTrip > 8
-        ? "  above 8: the judge is too talkative — tighten it before the briefing ships"
-        : "  inside the 4-8 band the kill criteria ask for",
+      : perTrip < 4
+        ? "  between 2 and 4: above the stop line, short of the 4-8 band — Phase 8's detectors have to close the gap"
+        : perTrip > 8
+          ? "  above 8: the judge is too talkative — tighten it before the briefing ships"
+          : "  inside the 4-8 band the kill criteria ask for",
   );
 }
 

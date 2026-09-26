@@ -87,6 +87,9 @@ const matchable = sql`
      && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
     AND ${nodeKindAllowed}
     AND e.observed_at > now() - ${staleAfter} * interval '1 hour'
+    AND NOT EXISTS (
+      SELECT 1 FROM event_match m WHERE m.event_id = e.id AND m.node_id = n.id
+    )
 `;
 
 /**
@@ -97,9 +100,14 @@ const matchable = sql`
  * stopped being forecast. A road report is not refreshed, so its allowance is
  * its longest window instead (`staleAfterHours`).
  *
- * The insert is `ON CONFLICT DO NOTHING` rather than the plan's `NOT EXISTS`.
- * Invocations of a five-minute cron overlap, and a uniqueness constraint
- * settles the race that a NOT EXISTS only narrows.
+ * It needs both the plan's `NOT EXISTS` and `ON CONFLICT DO NOTHING`, for
+ * different reasons. The `LIMIT` applies to the SELECT, before any conflict is
+ * seen, and every live pair keeps satisfying the join for as long as its event
+ * is re-forecast — so without the `NOT EXISTS`, once `limit` pairs had been
+ * matched they would fill every run's quota, conflict, and no new pair would
+ * ever be inserted. Both passes share it through `matchable`. The constraint
+ * is still what settles the race between overlapping invocations, which a
+ * `NOT EXISTS` only narrows.
  *
  * Two passes. The first is the spatial join, and the one that matters for
  * cost: GiST on both sides. The second catches a transfer that names the
@@ -272,14 +280,6 @@ export async function loadRouted(matchId: string): Promise<RoutedPair | null> {
   };
 }
 
-/** Put a pair back in the queue: a transient failure is not a verdict. */
-export async function releaseClaim(matchId: string): Promise<void> {
-  await db.execute(sql`
-    UPDATE event_match SET queued_at = NULL
-    WHERE id = ${matchId} AND judged_at IS NULL
-  `);
-}
-
 export type PairContext = {
   match: MatchedPair;
   judgedAt: string | null;
@@ -409,11 +409,15 @@ export async function loadDay(
  * judge may propose. The tier filter is what makes "the model cannot name a
  * place it did not retrieve" mean something, and the validator checks it again
  * once the verdict comes back.
+ *
+ * The stop's own place is left out: it is always the nearest, so it would take
+ * a slot and invite a swap to itself, which changes nothing.
  */
 export async function nearbyAlternatives(
   lonLat: [number, number],
   radiusM: number,
   limit: number,
+  excludePlaceId: string | null = null,
 ): Promise<
   {
     placeId: string;
@@ -430,6 +434,7 @@ export async function nearbyAlternatives(
     FROM place p
     WHERE p.tier IN ('curated', 'verified')
       AND ST_DWithin(p.geom, ${point}, ${radiusM})
+      ${excludePlaceId ? sql`AND p.id <> ${excludePlaceId}` : sql``}
     ORDER BY p.tier = 'curated' DESC, distance_m
     LIMIT ${limit}
   `);

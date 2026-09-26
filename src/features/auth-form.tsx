@@ -4,16 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { safeNext } from "@/lib/safe-next";
 import { Button } from "@/ui/button";
 import { TextField } from "@/ui/field";
 import { Icon } from "@/ui/icon";
 
 type Mode = "sign-in" | "sign-up";
-
-/** Only same-site paths, so `?next=` can't bounce someone to another origin. */
-export function safeNext(next: string | undefined) {
-  return next?.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
 
 /** Better Auth's messages are written for developers; these are for travellers. */
 function describe(error: { status?: number; code?: string; message?: string }) {

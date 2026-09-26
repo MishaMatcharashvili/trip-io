@@ -21,7 +21,7 @@ import {
 import type { Candidate } from "../domain/trip/generate/plan.ts";
 import { straightLineTravel } from "../domain/trip/travel.ts";
 import type { Violation } from "../domain/trip/validate.ts";
-import { composeWithGemini } from "../infra/gemini-composer.ts";
+import { composeWithOpenAI } from "../infra/openai-composer.ts";
 import {
   type AppendFailure,
   addAllOps,
@@ -83,7 +83,7 @@ export async function generateTrip(
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
   const result = await generate(wanted, {
-    compose: composeWithGemini,
+    compose: composeWithOpenAI,
     cache: planCache,
     candidates: await loadCandidates(wanted.areas),
     travel: straightLineTravel,

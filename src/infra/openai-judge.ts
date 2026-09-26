@@ -1,7 +1,7 @@
-import { z } from "zod";
+import { zodTextFormat } from "openai/helpers/zod";
 import type { Judge, JudgeInput } from "../domain/watch/judge.ts";
 import { verdict } from "../domain/watch/judge.ts";
-import { generate, MODEL } from "./gemini.ts";
+import { generateJson } from "./openai.ts";
 
 // The only model call in the watch pipeline, and the only one that runs per
 // matched pair rather than per region. Everything in the architecture upstream
@@ -93,23 +93,15 @@ const userTurn = (input: JudgeInput) =>
     alternatives: input.alternatives,
   });
 
-export const judgeWithGemini: Judge = async (input) => {
-  const response = await generate({
-    model: MODEL,
-    contents: [{ role: "user", parts: [{ text: userTurn(input) }] }],
-    config: {
-      systemInstruction: SYSTEM,
-      responseMimeType: "application/json",
-      responseJsonSchema: z.toJSONSchema(verdict, { io: "output" }),
-      // Low, not zero: this is a judgement, and the eval harness is what keeps
-      // it honest rather than a temperature that hides variance.
-      temperature: 0.2,
-    },
-  });
+const FORMAT = zodTextFormat(verdict, "verdict");
 
-  const text = response.text;
-  if (!text) throw new Error("the judge returned no content");
-  // Parsed, not checked: `readVerdict` in the domain applies the guards, so a
-  // rejection is recorded with its reason instead of thrown away here.
-  return JSON.parse(text);
-};
+export const judgeWithOpenAI: Judge = (input) =>
+  generateJson({
+    instructions: SYSTEM,
+    input: [{ role: "user", content: userTurn(input) }],
+    format: FORMAT,
+    // Medium, not low: this is the call that decides whether anyone hears
+    // about anything, and the one the eval harness scores. The composers only
+    // write, and run on less.
+    effort: "medium",
+  });
