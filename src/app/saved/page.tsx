@@ -4,7 +4,7 @@ import Link from "next/link";
 import { savedPlaces } from "@/bll/saved";
 import { myTrips } from "@/bll/trip-screen";
 import { TopBar } from "@/features/chrome";
-import { SaveToggle } from "@/features/place-row";
+import { SaveToggle } from "@/features/save-toggle";
 import { PlanAgainButton } from "@/features/trip-actions";
 import { dateRange } from "@/features/trip-model";
 import { getAuth } from "@/infra/auth";

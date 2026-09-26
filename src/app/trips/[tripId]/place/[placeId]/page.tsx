@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { savedPlaceIds } from "@/bll/saved";
 import { type Checkpoint, type Day, getTrip, type Trip } from "@/data/trip";
 import { summariseHours } from "@/domain/catalogue/opening-hours";
-import { SaveToggle } from "@/features/place-row";
+import { SaveToggle } from "@/features/save-toggle";
 import { RemoveStopButton } from "@/features/trip-actions";
 import { duration, mapStops } from "@/features/trip-model";
 import { Button, ButtonLink } from "@/ui/button";

@@ -10,7 +10,7 @@ import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
 import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { Eyebrow, Headline, Prose, Title } from "@/ui/text";
-import { SaveToggle } from "./place-row";
+import { SaveToggle } from "./save-toggle";
 
 // Explore: the catalogue searched live, on the map as it is filtered. The map
 // and the list share one state, so a pin and its row are always the same
