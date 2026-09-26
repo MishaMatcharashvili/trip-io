@@ -1,4 +1,8 @@
-import type { LiveMatch, TripScreen } from "../bll/trip-screen.ts";
+import type {
+  ForecastHour,
+  LiveMatch,
+  TripScreen,
+} from "../bll/trip-screen.ts";
 import type { Checkpoint, Day, Source, Trip } from "../data/trip.ts";
 import type { LonLat } from "../domain/geo.ts";
 import { diffDays } from "../domain/trip/diff.ts";
@@ -10,7 +14,7 @@ import {
 } from "../domain/trip/document.ts";
 import { addDays } from "../domain/trip/generate/schedule.ts";
 import { at, kindLabel } from "../domain/watch/briefing.ts";
-import type { DaySegment } from "../ui/bars.tsx";
+import type { DaySegment, WeatherHour } from "../ui/bars.tsx";
 import type { MapStop } from "../ui/map/trip-map.tsx";
 
 // A real trip in the shapes the screens were drawn against (src/data/trip.ts).
@@ -119,7 +123,7 @@ const PLANNED_DETECTORS = [
 ];
 
 function sources(screen: TripScreen, now: Date): Source[] {
-  const checked = ago(screen.lastCheck, now);
+  const checked = screen.lastCheck ? ` · ${ago(screen.lastCheck, now)}` : "";
   return [
     ...LIVE_DETECTORS.map(({ prefix, name }): Source => {
       const hits = screen.matches.filter((m) => m.kind.startsWith(prefix));
@@ -128,13 +132,13 @@ function sources(screen: TripScreen, now: Date): Source[] {
         ? {
             name,
             tone: "alert",
-            status: `${stops} stop${stops === 1 ? "" : "s"} affected · ${checked}`,
+            status: `${stops} stop${stops === 1 ? "" : "s"} affected${checked}`,
           }
         : {
             name,
             tone: screen.watch ? "ok" : "idle",
             status: screen.watch
-              ? `Nothing on your stops · ${checked}`
+              ? `Nothing on your stops${checked || " yet"}`
               : "Starts when the trip has stops",
           };
     }),
@@ -350,4 +354,56 @@ export function changeRows(before: TripDoc, after: TripDoc): ChangeRow[] {
     }
   }
   return rows;
+}
+
+/** Rain worth drawing, in mm in the hour. Below it a bar stays grey. */
+const WET_MM = 0.2;
+/** Less than this over the whole window is a shower, not news: no coral. */
+const RAIN_WORTH_SAYING_MM = 1;
+/** The rain that fills a bar: 4 mm in an hour is a downpour on a walk. */
+const HEAVY_MM = 4;
+
+const hourOf = (instant: string) => at(instant).slice(0, 2);
+
+/**
+ * The forecast as the ribbon draws it: the waking hours only (08–21), a bar
+ * per hour, and a caption naming the wet window — or saying it is dry, in
+ * a neutral voice, because dry is not news.
+ */
+export function weatherView(forecast: readonly ForecastHour[]): {
+  hours: WeatherHour[];
+  caption: string;
+  captionTone: "alert" | "neutral";
+} | null {
+  const waking = forecast.filter((h) => {
+    const hour = Number(hourOf(h.at));
+    return hour >= 8 && hour <= 21;
+  });
+  if (waking.length < 2) return null;
+
+  const hours = waking.map((h) => ({
+    hour: hourOf(h.at),
+    intensity: Math.min(1, h.precipitation / HEAVY_MM),
+  }));
+  const wet = waking.filter((h) => h.precipitation >= WET_MM);
+  if (wet.length) {
+    const first = hourOf(wet[0].at);
+    const last = Number(hourOf(wet[wet.length - 1].at)) + 1;
+    const mm = wet.reduce((sum, h) => sum + h.precipitation, 0);
+    const amount = `${mm.toFixed(mm < 10 ? 1 : 0)} mm`;
+    return mm < RAIN_WORTH_SAYING_MM
+      ? { hours, caption: `Light showers · ${amount}`, captionTone: "neutral" }
+      : {
+          hours,
+          caption: `Rain ${first}:00–${String(last).padStart(2, "0")}:00 · ${amount}`,
+          captionTone: "alert",
+        };
+  }
+  const temps = waking
+    .map((h) => h.apparentTemperature)
+    .filter((t): t is number => t !== null);
+  const range = temps.length
+    ? ` · ${Math.round(Math.min(...temps))}–${Math.round(Math.max(...temps))}°C`
+    : "";
+  return { hours, caption: `Dry${range}`, captionTone: "neutral" };
 }

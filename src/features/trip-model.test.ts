@@ -15,6 +15,7 @@ import {
   mapStops,
   partyLine,
   tripModel,
+  weatherView,
 } from "./trip-model.ts";
 
 // The fixture Kazbegi day, as the trip screen's read model would hand it over.
@@ -143,5 +144,32 @@ describe("changeRows", () => {
       { from: "16:00 Gergeti Trinity hike", to: "11:30 Gergeti Trinity hike" },
       { from: "19:30 Dinner · Cafe 5047m", to: "Removed" },
     ]);
+  });
+});
+
+describe("weatherView", () => {
+  const hour = (hhmm: string, precipitation: number) => ({
+    at: at(DAY, hhmm),
+    precipitation,
+    apparentTemperature: 14,
+  });
+
+  test("names the wet window in coral", () => {
+    const view = weatherView([
+      hour("07:00", 3),
+      hour("14:00", 0),
+      hour("15:00", 1.5),
+      hour("16:00", 4.5),
+      hour("17:00", 0),
+    ]);
+    assert.equal(view?.hours.length, 4);
+    assert.equal(view?.caption, "Rain 15:00–17:00 · 6.0 mm");
+    assert.equal(view?.captionTone, "alert");
+  });
+
+  test("dry is said plainly", () => {
+    const view = weatherView([hour("09:00", 0), hour("10:00", 0.1)]);
+    assert.equal(view?.caption, "Dry · 14–14°C");
+    assert.equal(view?.captionTone, "neutral");
   });
 });
