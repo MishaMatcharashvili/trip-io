@@ -1,8 +1,9 @@
-import { type PlaceHit, searchPlaces } from "../dal/places.ts";
+import { countInArea, type PlaceHit, searchPlaces } from "../dal/places.ts";
 import type { CategoryGroup } from "../domain/catalogue/categories.ts";
 import {
   areaBySlug,
   type FocusAreaSlug,
+  focusAreas,
 } from "../domain/catalogue/focus-areas.ts";
 import type { LonLat } from "../domain/geo.ts";
 
@@ -25,4 +26,20 @@ export function searchCatalogue(query: CatalogueQuery): Promise<PlaceHit[]> {
     groups: query.groups,
     limit: Math.min(query.limit ?? 20, 50),
   });
+}
+
+export type AreaCount = {
+  slug: FocusAreaSlug;
+  curated: number;
+  verified: number;
+};
+
+/** What each focus area holds that a plan may use: Explore's region chips. */
+export function catalogueByArea(): Promise<AreaCount[]> {
+  return Promise.all(
+    focusAreas.map(async (a) => ({
+      slug: a.slug,
+      ...(await countInArea(a.match)),
+    })),
+  );
 }

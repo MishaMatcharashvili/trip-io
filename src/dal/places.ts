@@ -438,3 +438,19 @@ export async function searchPlaces(search: PlaceSearch): Promise<PlaceHit[]> {
     };
   });
 }
+
+/** How many places the catalogue holds in one area, by tier a plan may use. */
+export async function countInArea(
+  match: AreaMatch,
+): Promise<{ curated: number; verified: number }> {
+  const rows = await db.execute(sql`
+    SELECT count(*) FILTER (WHERE p.tier = 'curated')::int AS curated,
+           count(*) FILTER (WHERE p.tier = 'verified')::int AS verified
+    FROM place p WHERE ${areaPredicate(match)}
+  `);
+  const r = rows.rows[0] ?? {};
+  return {
+    curated: (r.curated as number) ?? 0,
+    verified: (r.verified as number) ?? 0,
+  };
+}
