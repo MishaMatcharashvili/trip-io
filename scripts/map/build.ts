@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { list, put } from "@vercel/blob";
 import { GEORGIA_BBOX } from "../../src/domain/geo.ts";
-import { MAP_ASSETS, MAP_TILES } from "../../src/ui/map/source.ts";
+import { MAP_ASSETS, MAP_TILES, MAP_WORKER } from "../../src/ui/map/source.ts";
 
 // Phase 6's basemap: one Georgia `.pmtiles` file plus the fonts and sprites
 // its style needs, in the public Vercel Blob store. MapLibre reads the tiles
@@ -97,6 +97,19 @@ async function assetUploads(dir: string): Promise<Upload[]> {
   return uploads;
 }
 
+/** MapLibre's worker pair, from the installed package. */
+async function workerUploads(): Promise<Upload[]> {
+  const dir = "node_modules/maplibre-gl";
+  const { version } = JSON.parse(
+    await readFile(join(dir, "package.json"), "utf8"),
+  ) as { version: string };
+  return MAP_WORKER.files.map((name) => ({
+    pathname: `${MAP_WORKER.prefix(version)}/${name}`,
+    file: join(dir, "dist", name),
+    contentType: "text/javascript",
+  }));
+}
+
 /** Every pathname already in the store under a prefix. */
 async function published(prefix: string): Promise<Set<string>> {
   const seen = new Set<string>();
@@ -142,7 +155,7 @@ async function inBatches<T>(
  * readable from another origin. A store that ignored `Range` would send the
  * whole file for every tile.
  */
-async function verify(tilesUrl: string) {
+async function verify(tilesUrl: string, workerUrl: string) {
   const res = await fetch(tilesUrl, {
     headers: { Range: "bytes=0-126", Origin: "https://example.com" },
   });
@@ -150,10 +163,20 @@ async function verify(tilesUrl: string) {
     new Uint8Array(await res.arrayBuffer()).slice(0, 7),
   );
   const cors = res.headers.get("access-control-allow-origin");
+  // The worker is imported as a module from another origin, which the browser
+  // only allows for a script type with CORS.
+  const worker = await fetch(workerUrl, {
+    headers: { Origin: "https://example.com" },
+  });
+  const workerCors = worker.headers.get("access-control-allow-origin");
   const checks = {
     "range request answered with 206": res.status === 206,
     "archive starts with the PMTiles magic": magic === "PMTiles",
     "readable cross-origin": cors === "*" || cors === "https://example.com",
+    "worker served as JavaScript, cross-origin":
+      worker.ok &&
+      (worker.headers.get("content-type") ?? "").includes("javascript") &&
+      (workerCors === "*" || workerCors === "https://example.com"),
   };
   for (const [check, ok] of Object.entries(checks)) {
     console.log(`${ok ? "ok  " : "FAIL"} ${check}`);
@@ -163,6 +186,7 @@ async function verify(tilesUrl: string) {
 
 const tiles = extractTiles();
 const assets = await assetUploads(fetchAssets());
+const workers = await workerUploads();
 const tilesUpload: Upload = {
   pathname: `map/${MAP_TILES.file}`,
   file: tiles,
@@ -173,11 +197,14 @@ console.log(
   `tiles   ${MAP_TILES.file}  ${(statSync(tiles).size / 1e6).toFixed(0)} MB`,
 );
 console.log(`assets  ${assets.length} files under ${MAP_ASSETS.prefix}/`);
+console.log(`worker  ${workers.map((w) => w.pathname).join(", ")}`);
 
 if (args["dry-run"]) process.exit(0);
 
 const have = await published("map/");
-const missing = [tilesUpload, ...assets].filter((u) => !have.has(u.pathname));
+const missing = [tilesUpload, ...assets, ...workers].filter(
+  (u) => !have.has(u.pathname),
+);
 console.log(
   `upload  ${missing.length} missing, ${have.size} already published`,
 );
@@ -192,7 +219,7 @@ await inBatches(
 // The store's public origin, read back rather than configured twice.
 const [first] = (await list({ prefix: tilesUpload.pathname, limit: 1 })).blobs;
 if (!first) throw new Error("the tiles are not in the store after upload");
-await verify(first.url);
-
 const origin = new URL(first.url).origin;
+await verify(first.url, `${origin}/${workers[0].pathname}`);
+
 console.log(`\nNEXT_PUBLIC_MAP_BASE_URL=${origin}/map`);

@@ -30,3 +30,14 @@ export const MAP_ASSETS = {
     return `map/assets-${this.commit.slice(0, 7)}`;
   },
 } as const;
+
+/**
+ * MapLibre's web worker, served from the store beside the tiles. Next bundles
+ * the library but not the worker it spawns, so the worker is published at a
+ * path carrying the installed version: upgrading `maplibre-gl` means running
+ * `npm run map:build` again before deploying, or the map finds no worker.
+ */
+export const MAP_WORKER = {
+  files: ["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"],
+  prefix: (version: string) => `map/maplibre-${version}`,
+} as const;
