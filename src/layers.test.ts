@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { describe, test } from "node:test";
+import { importsIn, sourceFiles } from "../scripts/test-support/imports.ts";
 
 // The dependency rule, as a test rather than a paragraph in a document.
 //
@@ -66,30 +66,21 @@ const layerOf = (path: string): Layer | null => {
   }
 };
 
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return entry.name === "migrations" ? [] : sourceFiles(path);
-    }
-    if (![".ts", ".tsx"].includes(extname(entry.name))) return [];
-    return entry.name.endsWith(".test.ts") ? [] : [path];
-  });
-}
-
-const importPattern = /(?:from|import)\s*["']([^"']+)["']/g;
-
 /** Every module a file imports, as a path relative to src, or a package name. */
 function importsOf(path: string): string[] {
-  const body = readFileSync(path, "utf8");
-  return [...body.matchAll(importPattern)].map(([, specifier]) => {
+  // Type-only imports count too: a layer that knows another's types knows it.
+  return importsIn(path).map(({ specifier }) => {
     if (specifier.startsWith("@/")) return specifier.slice(2);
     if (!specifier.startsWith(".")) return specifier;
     return relative(SRC, resolve(path, "..", specifier));
   });
 }
 
-const files = sourceFiles(SRC);
+const files = sourceFiles(SRC, {
+  extensions: [".ts", ".tsx"],
+  skipDirs: new Set(["migrations"]),
+  skipFile: (name) => name.endsWith(".test.ts"),
+});
 
 describe("layers", () => {
   test("the source tree is laid out in the layers we think it is", () => {
