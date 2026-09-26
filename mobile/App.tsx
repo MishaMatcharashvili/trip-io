@@ -9,6 +9,10 @@ export default function App() {
   const [status, setStatus] = useState("checking the API…");
 
   useEffect(() => {
+    if (!api) {
+      setStatus("No API configured: EXPO_PUBLIC_API_URL is not set");
+      return;
+    }
     api.api.health
       .$get()
       .then((res) => res.json())
