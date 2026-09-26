@@ -2,11 +2,13 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { api } from "./src/api";
+import { usePalette } from "./src/theme";
 
 // A placeholder screen: it proves the app reaches the API through the typed
 // client. The real shell (Phase 7) replaces it.
 export default function App() {
   const [status, setStatus] = useState("checking the API…");
+  const palette = usePalette();
 
   useEffect(() => {
     if (!api) {
@@ -36,8 +38,8 @@ export default function App() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Text>{status}</Text>
+    <View style={[styles.container, { backgroundColor: palette.canvas }]}>
+      <Text style={{ color: palette.ink }}>{status}</Text>
       <StatusBar style="auto" />
     </View>
   );
@@ -46,7 +48,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
   },
