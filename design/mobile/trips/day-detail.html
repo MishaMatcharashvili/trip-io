@@ -1,0 +1,244 @@
+<!-- @dsCard group="Trips" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Day detail · trip.io mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+<style>
+:root,[data-theme="light"]{color-scheme:light;--color-canvas:#f7f9fb;--color-surface:#ffffff;--color-background:var(--color-surface);--color-foreground:var(--color-ink);--color-surface-subtle:#fbfcfd;--color-fill:#eaeff3;--color-fill-strong:#dce4ea;--color-track:#eff2f5;--color-track-pill:#edf1f4;--color-hairline:#e7ecf0;--color-hairline-strong:#e1e7ec;--color-control:#d6dee5;--color-ink:#1d232a;--color-ink-muted:#616c77;--color-ink-faint:#939da6;--color-ink-idle:#c6d0d8;--color-agent:#4a63e7;--color-agent-hover:#3a4fcc;--color-agent-soft:#c9d0f7;--color-agent-line:#d8ddfb;--color-agent-tint:#eef0fe;--color-alert:#c8492c;--color-alert-bright:#e2664a;--color-alert-soft:#f3c0b0;--color-alert-line:#f6d9d0;--color-alert-tint:#fdf0ec;--color-ok:#1d7a57;--color-ok-line:#cfe9df;--color-ok-tint:#eaf6f1;--color-on-accent:#ffffff;--color-knob:#ffffff;--color-backdrop:#e8edf2;--color-map-ground:#edf2f6;--color-map-band-1:#e7edf2;--color-map-band-2:#dfe7ed;--color-map-band-3:#d6e0e8;--color-map-band-4:#cbd7e1;--color-map-band-5:#bfcdda;--color-map-band-6:#b2c2d1;--color-map-contour:#9fb0c0;--color-map-contour-strong:#a7b2be;--color-map-hatch:#93a5b6;--color-map-wood:#c9dccd;--color-map-snow:#fcfdfe;--color-map-water:#bdd3e0;--color-map-road:#ffffff;--color-map-road-casing:#c2ccd6;--color-map-pin:#ffffff;--color-map-label:#5a6670;--color-map-label-strong:#1d232a;--text-micro:10px;--text-micro--line-height:1.4;--text-mini:11.5px;--text-mini--line-height:1.45;--text-small:12.5px;--text-small--line-height:1.45;--text-body:14px;--text-body--line-height:1.45;--text-title:14.5px;--text-title--line-height:1.35;--text-headline:19px;--text-headline--line-height:1.22;--text-display:28px;--text-display--line-height:1.14;--radius-control:8px;--radius-card:10px;--radius-panel:12px;--radius-sheet:18px;--shadow-card:0 1px 2px rgba(29, 35, 42, 0.04);--shadow-panel:0 1px 2px rgba(29, 35, 42, 0.04), 0 14px 34px rgba(29, 35, 42, 0.09);--shadow-lifted:0 1px 2px rgba(20, 26, 33, 0.04), 0 14px 40px rgba(20, 26, 33, 0.06);--shadow-agent:0 1px 2px rgba(29, 35, 42, 0.04), 0 16px 38px rgba(74, 99, 231, 0.1);--shadow-sheet:0 -10px 30px rgba(29, 35, 42, 0.07);--shadow-chip:0 2px 8px rgba(29, 35, 42, 0.06);--shadow-notification:0 6px 20px rgba(29, 35, 42, 0.1)}
+[data-theme="dark"]{color-scheme:dark;--color-canvas:#0f1318;--color-surface:#171c22;--color-surface-subtle:#1b2129;--color-fill:#232a33;--color-fill-strong:#2d3640;--color-track:#212830;--color-track-pill:#1c232b;--color-hairline:#262e37;--color-hairline-strong:#2c353f;--color-control:#3a4450;--color-ink:#e6eaee;--color-ink-muted:#a3adb7;--color-ink-faint:#7a8591;--color-ink-idle:#4a5561;--color-agent:#8a9bf7;--color-agent-hover:#a2b0f9;--color-agent-soft:#3a4580;--color-agent-line:#333d6e;--color-agent-tint:#1c2240;--color-alert:#f08a70;--color-alert-bright:#f0876b;--color-alert-soft:#6b3326;--color-alert-line:#4d2c24;--color-alert-tint:#2a1b18;--color-ok:#5cc79a;--color-ok-line:#1f4a39;--color-ok-tint:#13261f;--color-on-accent:#0f1318;--color-knob:#e6eaee;--color-backdrop:#0b0f13;--color-map-ground:#131a21;--color-map-band-1:#151d25;--color-map-band-2:#18212a;--color-map-band-3:#1b252f;--color-map-band-4:#1f2a35;--color-map-band-5:#232f3b;--color-map-band-6:#283441;--color-map-contour:#344150;--color-map-contour-strong:#3d4a58;--color-map-hatch:#4a5866;--color-map-wood:#1a2a24;--color-map-snow:#2e3a46;--color-map-water:#1e3342;--color-map-road:#2a333d;--color-map-road-casing:#3a4450;--color-map-pin:#171c22;--color-map-label:#8f9ca8;--color-map-label-strong:#e6eaee;--shadow-card:0 1px 2px rgba(0, 0, 0, 0.3);--shadow-panel:0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 34px rgba(0, 0, 0, 0.45);--shadow-lifted:0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 40px rgba(0, 0, 0, 0.4);--shadow-agent:0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 38px rgba(138, 155, 247, 0.12);--shadow-sheet:0 -10px 30px rgba(0, 0, 0, 0.45);--shadow-chip:0 2px 8px rgba(0, 0, 0, 0.35);--shadow-notification:0 6px 20px rgba(0, 0, 0, 0.5)}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;background:var(--color-backdrop);color:var(--color-ink)}
+p{margin:0}
+.board{display:flex;width:max-content}
+.side{padding:18px 24px 26px;background:var(--color-backdrop);color:var(--color-ink)}
+.side-cap{display:flex;align-items:center;gap:8px;height:22px;margin-bottom:10px;font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--color-ink-faint)}
+.side-cap b{color:var(--color-ink);letter-spacing:-.01em;text-transform:none;font-size:13px}
+.phone{width:390px;height:844px;position:relative;overflow:hidden;background:var(--color-canvas);color:var(--color-ink);border-radius:28px;box-shadow:0 0 0 1px var(--color-hairline-strong),var(--shadow-lifted)}
+.phone.short{height:auto;min-height:0}
+
+.status{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:center;justify-content:space-between;padding:4px 26px 0 34px;font-size:15px;font-weight:600;letter-spacing:-.01em;z-index:20}
+.status .sig{display:flex;gap:6px;align-items:center}
+.status .dim{opacity:.3}
+.home-ind{position:absolute;bottom:8px;left:50%;width:134px;height:5px;margin-left:-67px;border-radius:99px;background:var(--color-ink);z-index:30}
+
+.tabs{position:absolute;left:0;right:0;bottom:0;height:82px;background:var(--color-surface);border-top:1px solid var(--color-hairline);display:flex;padding:9px 8px 24px;z-index:15}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--color-ink-faint);font-size:10.5px;position:relative}
+.tab.on{color:var(--color-agent);font-weight:600}
+.tab .badge{position:absolute;top:-1px;left:calc(50% + 5px);width:8px;height:8px;border-radius:99px;background:var(--color-alert);box-shadow:0 0 0 2px var(--color-surface)}
+
+.row{display:flex;flex-direction:row;align-items:center}
+.col{display:flex;flex-direction:column}
+.top{align-items:flex-start}
+.grow{flex:1;min-width:0}
+.abs{position:absolute}
+.fill{position:absolute;inset:0}
+.wrap{flex-wrap:wrap}
+.between{justify-content:space-between}
+.center{justify-content:center}
+.shrink-0{flex-shrink:0}
+
+.eyebrow{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--color-ink-faint)}
+.h1{font-size:28px;font-weight:600;letter-spacing:-.03em;line-height:1.14}
+.h2{font-size:19px;font-weight:600;letter-spacing:-.024em;line-height:1.22}
+.h3{font-size:14.5px;font-weight:600;letter-spacing:-.014em;line-height:1.35}
+.h1,.h2{text-wrap:balance}
+.body{font-size:14px}
+.sm{font-size:12.5px}
+.xs{font-size:11.5px}
+.b5{font-weight:500}
+.b6{font-weight:600}
+.mut{color:var(--color-ink-muted)}
+.mut2{color:var(--color-ink-faint)}
+.t-agent{color:var(--color-agent)}
+.t-alert{color:var(--color-alert)}
+.t-ok{color:var(--color-ok)}
+.strike{text-decoration:line-through;color:var(--color-ink-faint)}
+.link{color:var(--color-agent);font-weight:500}
+.brand{font-size:16px;font-weight:700;letter-spacing:-.035em}
+
+.card{background:var(--color-surface);border:1px solid var(--color-hairline);border-radius:10px;flex-shrink:0}
+.float{background:var(--color-surface);border:1px solid var(--color-hairline-strong);border-radius:13px;box-shadow:var(--shadow-panel)}
+.clip{overflow:hidden}
+.sheet{position:absolute;left:0;right:0;background:var(--color-surface);border-top:1px solid var(--color-hairline);border-radius:18px 18px 0 0;box-shadow:var(--shadow-sheet);display:flex;flex-direction:column;overflow:hidden}
+.grab{display:flex;justify-content:center;padding:8px 0 4px}
+.grab::after{content:"";width:36px;height:4px;border-radius:99px;background:var(--color-control)}
+.appbar{position:absolute;top:0;padding-top:48px;left:0;right:0;background:var(--color-surface);border-bottom:1px solid var(--color-hairline);z-index:5}
+.hr{height:1px;background:var(--color-hairline);flex:none}
+.hr-soft{border-top:1px solid var(--color-track)}
+.well{background:var(--color-surface-subtle)}
+.tint-a{background:var(--color-agent-tint);border-color:var(--color-agent-line)}
+.tint-w{background:var(--color-alert-tint);border-color:var(--color-alert-line)}
+.tint-o{background:var(--color-ok-tint);border-color:var(--color-ok-line)}
+.line-a{border-color:var(--color-agent-line)}
+.line-w{border-color:var(--color-alert-line)}
+.line-o{border-color:var(--color-ok-line)}
+.canvas{background:var(--color-canvas)}
+.wash{position:absolute;inset:0;background:linear-gradient(180deg,color-mix(in srgb,var(--color-canvas) 20%,transparent),color-mix(in srgb,var(--color-canvas) 92%,transparent) 70%)}
+.veil{position:absolute;inset:0;background:color-mix(in srgb,var(--color-canvas) 45%,transparent)}
+.map{position:absolute;inset:0;overflow:hidden}
+.map svg{width:100%;height:100%;display:block}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 15px;border-radius:9px;font-size:13px;font-weight:500;border:1px solid transparent;white-space:nowrap}
+.btn-p{background:var(--color-agent);color:var(--color-on-accent)}
+.btn-s{background:var(--color-surface);border-color:var(--color-control);color:var(--color-ink)}
+.btn-g{background:transparent;color:var(--color-ink-muted)}
+.btn-lg{height:48px;font-size:14.5px;border-radius:11px;width:100%}
+.btn-sm{height:32px;font-size:12px;padding:0 11px;border-radius:8px}
+.btn-icon{width:38px;height:38px;padding:0;border-radius:10px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:99px;border:1px solid var(--color-hairline);background:var(--color-surface);font-size:11.5px;color:var(--color-ink-muted);white-space:nowrap}
+.chip-sm{height:20px;font-size:10px;padding:0 8px}
+.chip-a{background:var(--color-agent-tint);border-color:var(--color-agent-line);color:var(--color-agent)}
+.chip-w{background:var(--color-alert-tint);border-color:var(--color-alert-line);color:var(--color-alert)}
+.chip-o{background:var(--color-ok-tint);border-color:var(--color-ok-line);color:var(--color-ok)}
+.chip-on{background:var(--color-ink);border-color:var(--color-ink);color:var(--color-canvas)}
+
+.dot{width:6px;height:6px;border-radius:99px;flex:none;background:var(--color-ink-idle)}
+.dot.lg{width:8px;height:8px}
+.d-agent{background:var(--color-agent)}
+.d-alert{background:var(--color-alert)}
+.d-ok{background:var(--color-ok)}
+.d-ring{background:var(--color-surface);border:1.5px solid var(--color-ink-idle)}
+.d-ring-w{background:var(--color-surface);border:1.5px solid var(--color-alert-bright)}
+.mt{margin-top:6px}
+
+.tg{width:34px;height:20px;border-radius:99px;background:var(--color-fill-strong);padding:2px;display:flex;flex:none}
+.tg::after{content:"";width:16px;height:16px;border-radius:99px;background:var(--color-knob);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tg.on{background:var(--color-agent);justify-content:flex-end}
+.rd{width:17px;height:17px;border-radius:99px;border:1.5px solid var(--color-control);flex:none}
+.rd.on{border:5px solid var(--color-agent);background:var(--color-surface)}
+.seg{display:flex;gap:2px;padding:3px;background:var(--color-track-pill);border-radius:10px}
+.seg>div{flex:1;height:30px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;font-size:12.5px;color:var(--color-ink-muted)}
+.seg>.on{background:var(--color-surface);color:var(--color-ink);font-weight:500;box-shadow:var(--shadow-card)}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.label{font-size:12.5px;font-weight:500}
+.input{height:46px;border:1px solid var(--color-control);border-radius:10px;background:var(--color-surface);padding:0 13px;display:flex;align-items:center;gap:8px;font-size:14px}
+.input.ph{color:var(--color-ink-faint)}
+.input.focus{border-color:var(--color-agent);box-shadow:0 0 0 3px var(--color-agent-tint)}
+.caret{display:inline-block;width:1.5px;height:17px;background:var(--color-agent);margin-left:2px;vertical-align:-3px}
+
+.rule{display:flex;align-items:center;gap:10px}
+.rule::after{content:"";flex:1;height:1px;background:var(--color-hairline)}
+.skel{height:8px;border-radius:4px;background:var(--color-fill)}
+.icon-tile{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--color-canvas);border:1px solid var(--color-hairline);color:var(--color-ink-muted)}
+.icon-tile.a{background:var(--color-agent-tint);border-color:var(--color-agent-line);color:var(--color-agent)}
+.bars{display:flex;gap:3px;align-items:flex-end}
+.bars>div{flex:1;border-radius:2px;background:var(--color-fill-strong)}
+.bars>.w1{background:var(--color-alert-soft)}
+.bars>.w2{background:var(--color-alert-bright)}
+.shape{display:flex;gap:2px;height:8px}
+.shape>div{border-radius:2px;background:var(--color-fill-strong)}
+.shape>.empty{background:var(--color-track)}
+.shape>.agent{background:var(--color-agent)}
+.shape>.agent-soft{background:var(--color-agent-soft)}
+.shape>.alert{background:var(--color-alert-bright)}
+.pad{padding:0 16px}
+
+</style>
+</head>
+<body>
+<div class="board">
+<section class="side" data-theme="light">
+  <div class="side-cap"><b>Day detail</b><span>· light</span></div>
+  <div class="phone">
+<div class="status"><span>10:48</span><span class="sig"><svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg><svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 2.2c2.2 0 4.2.8 5.7 2.2l1.1-1.2A10 10 0 0 0 7.5.5 10 10 0 0 0 .7 3.2l1.1 1.2a8.3 8.3 0 0 1 5.7-2.2z"/><path d="M7.5 5.4c1.3 0 2.5.5 3.4 1.3l1.1-1.2a6.6 6.6 0 0 0-9 0l1.1 1.2c.9-.8 2.1-1.3 3.4-1.3z"/><path d="M9.5 8 7.5 10.4 5.5 8a3 3 0 0 1 4 0z"/></svg><svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg></span></div>
+<div class="appbar col">
+  <div class="row" style="padding:8px 16px 10px;gap:10px">
+    <span class="mut row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M15 6l-6 6 6 6"></path></svg></span>
+    <div class="col grow" style="gap:1px"><div class="h3" style="font-size:16px">Wednesday 16 Sep</div><div class="eyebrow">Day 3 of 7 · Gudauri → Kazbegi</div></div>
+    <span class="chip">2/6 done</span>
+  </div>
+  <div class="col" style="padding:0 16px 12px;gap:6px">
+    <div class="bars" style="height:22px"><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="w1" style="height:12px"></div><div class="w2" style="height:21px"></div><div class="w2" style="height:19px"></div><div class="w1" style="height:13px"></div><div class="" style="height:10px"></div><div class="" style="height:8px"></div></div>
+    <div class="row between"><span class="eyebrow">09</span><span class="eyebrow t-alert">Rain 15:30–19:00</span><span class="eyebrow">21</span></div>
+  </div>
+</div>
+<div class="abs col" style="top:160px;left:0;right:0;bottom:150px;padding:12px 16px 0;overflow:hidden">
+  <div class="card col clip">
+    <div class="row top" style="padding:11px 14px;gap:12px;opacity:.55">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">09:00</div><span class="dot mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Breakfast · Rooms Gudauri</div><div class="xs mut2">45 min</div></div>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;opacity:.55">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">10:15</div><span class="dot mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Friendship Monument viewpoint</div><div class="xs mut2">40 min · 12 km from Gudauri</div></div>
+</div><div class="hr"></div><div class="row top tint-a" style="padding:11px 14px;gap:12px;">
+  <div class="xs t-agent b6" style="width:38px;flex:none;padding-top:2px">Now</div><span class="dot d-agent mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b6">Driving to Kazbegi</div><div class="xs t-agent">Arrives 11:20 · 24 km left · route clear</div></div>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">12:30</div><span class="dot d-ring mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Lunch · Zeta Camp</div><div class="xs mut2">Booked · free cancellation</div></div><span class="mut2 row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;border-left:2px solid var(--color-alert-bright)">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">16:00</div><span class="dot d-ring-w mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Gergeti Trinity hike</div><div class="xs t-alert">2h 40m · 400 m ascent · inside the rain window</div></div><span class="t-alert row"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M7 15a4 4 0 0 1 .6-7.96 5.5 5.5 0 0 1 10.6 1.7A3.5 3.5 0 0 1 17.5 15z"></path><path d="M8 18.4l-1 2M12 18.4l-1 2M16 18.4l-1 2"></path></svg></span>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">19:30</div><span class="dot d-ring mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Dinner · Cafe 5047m</div><div class="xs mut2">Table for 2 · booked</div></div><span class="mut2 row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+</div>
+  </div>
+  <div class="row" style="padding:12px 0 0;gap:9px"><span class="btn btn-s grow" style="height:40px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M12 5v14M5 12h14"></path></svg>Add a stop</span><span class="btn btn-s grow" style="height:40px">Reorder</span></div>
+</div>
+<div class="abs card row tint-a" style="left:16px;right:16px;bottom:96px;z-index:6;padding:10px 12px;gap:11px;box-shadow:var(--shadow-agent)">
+  <span class="t-agent row"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M12 3.6l2.1 6.3 6.3 2.1-6.3 2.1L12 20.4l-2.1-6.3L3.6 12l6.3-2.1z"></path></svg></span>
+  <div class="sm b5 grow">1 change recommended for today</div>
+  <span class="btn btn-p btn-sm">Review</span>
+</div>
+<nav class="tabs"><div class="tab on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"></rect><path d="M8 2.8v3.4M16 2.8v3.4M3.5 9.5h17"></path></svg><span>Today</span></div><div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M9 3.5L3.5 6v14.5L9 18l6 2.5 5.5-2.5V3.5L15 6z"></path><path d="M9 3.5V18M15 6v14.5"></path></svg><span>Map</span></div><div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M5 4.5h14M5 12h14M5 19.5h9"></path></svg><span>Trip</span></div><div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M12 3.6l2.1 6.3 6.3 2.1-6.3 2.1L12 20.4l-2.1-6.3L3.6 12l6.3-2.1z"></path></svg><span>AI</span><span class="badge"></span></div></nav>
+<div class="home-ind"></div></div>
+</section>
+<section class="side" data-theme="dark">
+  <div class="side-cap"><b>Day detail</b><span>· dark</span></div>
+  <div class="phone">
+<div class="status"><span>10:48</span><span class="sig"><svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg><svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 2.2c2.2 0 4.2.8 5.7 2.2l1.1-1.2A10 10 0 0 0 7.5.5 10 10 0 0 0 .7 3.2l1.1 1.2a8.3 8.3 0 0 1 5.7-2.2z"/><path d="M7.5 5.4c1.3 0 2.5.5 3.4 1.3l1.1-1.2a6.6 6.6 0 0 0-9 0l1.1 1.2c.9-.8 2.1-1.3 3.4-1.3z"/><path d="M9.5 8 7.5 10.4 5.5 8a3 3 0 0 1 4 0z"/></svg><svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg></span></div>
+<div class="appbar col">
+  <div class="row" style="padding:8px 16px 10px;gap:10px">
+    <span class="mut row"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M15 6l-6 6 6 6"></path></svg></span>
+    <div class="col grow" style="gap:1px"><div class="h3" style="font-size:16px">Wednesday 16 Sep</div><div class="eyebrow">Day 3 of 7 · Gudauri → Kazbegi</div></div>
+    <span class="chip">2/6 done</span>
+  </div>
+  <div class="col" style="padding:0 16px 12px;gap:6px">
+    <div class="bars" style="height:22px"><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="" style="height:8px"></div><div class="w1" style="height:12px"></div><div class="w2" style="height:21px"></div><div class="w2" style="height:19px"></div><div class="w1" style="height:13px"></div><div class="" style="height:10px"></div><div class="" style="height:8px"></div></div>
+    <div class="row between"><span class="eyebrow">09</span><span class="eyebrow t-alert">Rain 15:30–19:00</span><span class="eyebrow">21</span></div>
+  </div>
+</div>
+<div class="abs col" style="top:160px;left:0;right:0;bottom:150px;padding:12px 16px 0;overflow:hidden">
+  <div class="card col clip">
+    <div class="row top" style="padding:11px 14px;gap:12px;opacity:.55">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">09:00</div><span class="dot mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Breakfast · Rooms Gudauri</div><div class="xs mut2">45 min</div></div>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;opacity:.55">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">10:15</div><span class="dot mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Friendship Monument viewpoint</div><div class="xs mut2">40 min · 12 km from Gudauri</div></div>
+</div><div class="hr"></div><div class="row top tint-a" style="padding:11px 14px;gap:12px;">
+  <div class="xs t-agent b6" style="width:38px;flex:none;padding-top:2px">Now</div><span class="dot d-agent mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b6">Driving to Kazbegi</div><div class="xs t-agent">Arrives 11:20 · 24 km left · route clear</div></div>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">12:30</div><span class="dot d-ring mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Lunch · Zeta Camp</div><div class="xs mut2">Booked · free cancellation</div></div><span class="mut2 row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;border-left:2px solid var(--color-alert-bright)">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">16:00</div><span class="dot d-ring-w mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Gergeti Trinity hike</div><div class="xs t-alert">2h 40m · 400 m ascent · inside the rain window</div></div><span class="t-alert row"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M7 15a4 4 0 0 1 .6-7.96 5.5 5.5 0 0 1 10.6 1.7A3.5 3.5 0 0 1 17.5 15z"></path><path d="M8 18.4l-1 2M12 18.4l-1 2M16 18.4l-1 2"></path></svg></span>
+</div><div class="hr"></div><div class="row top" style="padding:11px 14px;gap:12px;">
+  <div class="xs mut2" style="width:38px;flex:none;padding-top:2px">19:30</div><span class="dot d-ring mt"></span>
+  <div class="col grow" style="gap:1px"><div class="sm b5">Dinner · Cafe 5047m</div><div class="xs mut2">Table for 2 · booked</div></div><span class="mut2 row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+</div>
+  </div>
+  <div class="row" style="padding:12px 0 0;gap:9px"><span class="btn btn-s grow" style="height:40px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M12 5v14M5 12h14"></path></svg>Add a stop</span><span class="btn btn-s grow" style="height:40px">Reorder</span></div>
+</div>
+<div class="abs card row tint-a" style="left:16px;right:16px;bottom:96px;z-index:6;padding:10px 12px;gap:11px;box-shadow:var(--shadow-agent)">
+  <span class="t-agent row"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M12 3.6l2.1 6.3 6.3 2.1-6.3 2.1L12 20.4l-2.1-6.3L3.6 12l6.3-2.1z"></path></svg></span>
+  <div class="sm b5 grow">1 change recommended for today</div>
+  <span class="btn btn-p btn-sm">Review</span>
+</div>
+<nav class="tabs"><div class="tab on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"></rect><path d="M8 2.8v3.4M16 2.8v3.4M3.5 9.5h17"></path></svg><span>Today</span></div><div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M9 3.5L3.5 6v14.5L9 18l6 2.5 5.5-2.5V3.5L15 6z"></path><path d="M9 3.5V18M15 6v14.5"></path></svg><span>Map</span></div><div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M5 4.5h14M5 12h14M5 19.5h9"></path></svg><span>Trip</span></div><div class="tab"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 "><path d="M12 3.6l2.1 6.3 6.3 2.1-6.3 2.1L12 20.4l-2.1-6.3L3.6 12l6.3-2.1z"></path></svg><span>AI</span><span class="badge"></span></div></nav>
+<div class="home-ind"></div></div>
+</section></div>
+</body>
+</html>
