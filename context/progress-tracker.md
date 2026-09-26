@@ -108,7 +108,7 @@ matters most).
 | Interventions per trip worth sending | 4–8 | < 2 | **2.2** on 24 synthetic weather-only trips — above stop, short of the band |
 | False-positive rate, hand-audited | < 15% | > 35% | **10–20%** on the 30-fixture eval (two runs) — a proxy until real verdicts are hand-audited |
 | Pairs per trip-day (cost input, not a kill line) | ≤ 12 | — | **0.8** measured; 3.4 worst case |
-| Would pay €5/mo (post-trip survey) | ≥ 25% | < 8% | — |
+| Would pay $5 per watched trip (post-trip survey) | ≥ 25% | < 8% | — |
 
 **Earliest and most important read**: the Phase 3 synthetic-trip count, now measured in full.
 `npm run kill:count` builds 24 synthetic trips across the four focus areas, lays six real weeks of
@@ -138,7 +138,10 @@ From `docs/implementation-plan.md` §13:
 3. ~~**Who may submit road reports**~~ — **decided 2026-09-25: anyone, moderated.** Operators publish
    at once at confidence 0.9; everyone else's reports wait for an operator's approval and publish at
    0.8.
-4. **Subscription mechanics** (trial length, first trip watched free?) — needed by Phase 6.
+4. ~~**Subscription mechanics**~~ — **decided 2026-09-26: per trip, first trip free.** Planning
+   stays free. Watching is bought one trip at a time — $5 at the early-adopter price, shown against a
+   $50 list price — and a traveller's first watched trip costs nothing. No subscription and no trial:
+   the free first trip is the trial. Payments through Flitt.
 
 ## Log
 
@@ -255,6 +258,10 @@ above gets resolved. Keep entries short — this is a log, not a report.
   twice (false positives 10% and 20%), a briefing composed by `gpt-5.4-mini`, and **2.2
   interventions worth sending per synthetic 7-day trip** — above stop, short of the 4–8 band.
   `kill:count` had been printing "inside the 4-8 band" for anything from 2 to 8; fixed.
+- **2026-09-26** — Open question #4 decided: watching is paid per trip, not by subscription — $5 at
+  an early-adopter price against a $50 list price — and a traveller's first trip is watched free.
+  Flitt takes the payments (one-off checkout orders). The post-trip survey now asks about the price
+  actually charged, so its kill line reads "would pay $5 per watched trip".
 - **2026-09-20** — Neon live; migrations `0000`–`0002` applied and `catalogue:load` run (64 regions,
   12 corridors, 13,338 places). Phase 2 finished in code: patch log with stored inverses, the
   coherent-day validator, generation (candidates → Gemini → schedule → validate → retry → template

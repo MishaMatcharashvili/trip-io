@@ -85,8 +85,8 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [ ] Itinerary view
 - [ ] Checkpoint/undo UI
 - [ ] Settings: channels, quiet hours, frequency
-- [ ] Subscription paywall: free plans, paid watches
-- [ ] Decide: trial length, whether first trip is watched free (open question #4)
+- [ ] Paywall: free plans, paid watches — per trip, first trip free
+- [x] Decide: trial length, whether first trip is watched free (open question #4) — first trip free, then $5 per trip, no trial
 
 ## Phase 7 — native shell
 
