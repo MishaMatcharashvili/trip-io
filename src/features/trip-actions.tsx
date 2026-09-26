@@ -214,3 +214,89 @@ export function ConnectionSwitch({
     />
   );
 }
+
+/** One more day at the end of the trip: the header's end moves by 24 hours. */
+export function AddDayButton({
+  tripId,
+  head,
+  endsAt,
+}: {
+  tripId: string;
+  head: string | null;
+  endsAt: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <span className="inline-flex flex-col gap-1">
+      <Button
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setError(null);
+            const res = await apiClient.api.trips[":id"].patches.$post({
+              param: { id: tripId },
+              json: {
+                parentId: head,
+                intent: "Added a day at the end",
+                ops: [
+                  {
+                    op: "replace",
+                    path: "/trip/endsAt",
+                    value: new Date(
+                      Date.parse(endsAt) + 86_400_000,
+                    ).toISOString(),
+                  },
+                ],
+              },
+            });
+            if (!res.ok) setError(await refusal(res, "Couldn’t add a day."));
+            router.refresh();
+          })
+        }
+      >
+        <Icon name="plus" size={14} />
+        {pending ? "Adding…" : "Add a day"}
+      </Button>
+      {error ? <span className="text-mini text-alert">{error}</span> : null}
+    </span>
+  );
+}
+
+/** Go back to an earlier version. An append: the log is never rewritten. */
+export function RestoreButton({
+  tripId,
+  patchId,
+}: {
+  tripId: string;
+  patchId: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <span className="inline-flex flex-col items-end gap-1">
+      <Button
+        size="sm"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setError(null);
+            const res = await apiClient.api.trips[":id"].restore.$post({
+              param: { id: tripId },
+              json: { patchId },
+            });
+            if (!res.ok) setError(await refusal(res, "Couldn’t restore that."));
+            router.refresh();
+          })
+        }
+      >
+        {pending ? "Restoring…" : "Restore this version"}
+      </Button>
+      {error ? <span className="text-mini text-alert">{error}</span> : null}
+    </span>
+  );
+}
