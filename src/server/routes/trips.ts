@@ -17,6 +17,7 @@ import {
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
 import { itineraryFile } from "@/bll/trip-screen.ts";
+import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
 import { updateWatchSettings } from "@/bll/watch-settings.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
@@ -233,6 +234,38 @@ export const trips = new Hono<SessionEnv>()
       return saved ? c.body(null, 204) : c.json({ error: "not watched" }, 409);
     },
   )
+
+  // The paywall. Planning is free; watching is bought per trip, the first free.
+  .get("/:id/pass", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    return c.json({ offer: await offerFor(id, c.get("userId")) });
+  })
+
+  .post("/:id/pass", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    const result = await startFreeWatch(id, c.get("userId"));
+    return result.ok
+      ? c.json(result, 201)
+      : c.json(
+          { error: result.reason },
+          result.reason === "payment-required" ? 402 : 409,
+        );
+  })
+
+  // Stand-in checkout until Flitt: records a paid pass, charges nobody.
+  .post("/:id/pass/checkout", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    const result = await demoCheckout(id, c.get("userId"));
+    return result.ok
+      ? c.json(result, 201)
+      : c.json({ error: result.reason }, 409);
+  })
 
   // "Plan it again": the same stops on new dates, as a new trip.
   .post(
