@@ -14,6 +14,7 @@ import {
   sortedNodes,
   type TripDoc,
 } from "../domain/trip/document.ts";
+import { toIcs } from "../domain/trip/ics.ts";
 import { openMeteo } from "../infra/open-meteo.ts";
 import { type AlertsPage, alertsPage } from "./interventions.ts";
 import { docAt, history, type TripView, tripView } from "./trip-document.ts";
@@ -132,4 +133,17 @@ export async function dayForecast(
   } catch {
     return null;
   }
+}
+
+/** The trip as an iCalendar file, one event per stop. Access is the caller's. */
+export async function itineraryFile(tripId: string): Promise<string | null> {
+  const view = await tripView(tripId);
+  if (!view) return null;
+  const places = await placeCards(placeIdsOf(view.doc));
+  const positions: Record<string, LonLat> = {};
+  for (const [id, node] of Object.entries(view.doc.nodes)) {
+    const at = node.placeId ? places.get(node.placeId)?.lonLat : node.lonLat;
+    if (at) positions[id] = at;
+  }
+  return toIcs(tripId, view.doc, positions, new Date());
 }

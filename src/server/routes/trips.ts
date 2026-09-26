@@ -15,6 +15,7 @@ import {
   undoLast,
 } from "@/bll/trip-document.ts";
 import { generateTrip } from "@/bll/trip-generation.ts";
+import { itineraryFile } from "@/bll/trip-screen.ts";
 import { updateWatchSettings } from "@/bll/watch-settings.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
@@ -231,6 +232,20 @@ export const trips = new Hono<SessionEnv>()
       return saved ? c.body(null, 204) : c.json({ error: "not watched" }, 409);
     },
   )
+
+  // The itinerary for a calendar app. Downloaded, so it carries a file name.
+  .get("/:id/itinerary.ics", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+
+    const file = await itineraryFile(id);
+    if (!file) return c.json({ error: "not found" }, 404);
+    return c.body(file, 200, {
+      "content-type": "text/calendar; charset=utf-8",
+      "content-disposition": `attachment; filename="trip-${id.slice(0, 8)}.ics"`,
+    });
+  })
 
   .get("/:id/patches", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");
