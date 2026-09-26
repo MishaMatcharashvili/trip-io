@@ -16,12 +16,23 @@ Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
 npx expo start              # start the dev server
 npx expo lint               # lint
-npx tsc --noEmit            # typecheck
+pnpm typecheck              # tsc -b: builds the server's types first
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
 ```
 
 Run lint and typecheck before declaring any task done.
+
+## This app lives inside the trip.io web repo
+
+`mobile/` is a pnpm workspace package; the Next.js web app and its API are the root package.
+The app's API client is `hc<AppType>()` in `src/api.ts`, typed by the server's own routes.
+
+- Import from the web package with `import type` only. Anything else would bundle server code into
+  the phone app; `src/mobile-boundary.test.ts` in the root package fails on it.
+- `@/` is the web package's alias. Use `~/` for this app's own modules.
+- Type-check with `pnpm typecheck`, never `tsc --noEmit`: the server's declarations come from
+  `../tsconfig.api.json` through a project reference, and only `tsc -b` builds them.
 
 ## Navigation & Routing
 
