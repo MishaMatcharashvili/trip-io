@@ -35,7 +35,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 - [x] `trip`, `trip_node`, `trip_patch`, `checkpoint_log` tables + JSON Patch application (migration 0002; restricted path grammar, inverse stored per patch)
 - [x] Append-only patch log, checkpoint every 20 patches (and at patch 1). Undo and restore both append
 - [x] Coherent-day validator (test-first): no overlapping nodes, travel time respected, nothing scheduled into darkness, opening hours honoured — re-validates the **whole day** after any patch
-- [x] Trip generation pipeline: constraints → candidate retrieval from `curated` → LLM composition → validator → patch set. **Cannot produce a trip until the 600 exist** — 0 curated places means candidate retrieval returns nothing
+- [x] Trip generation pipeline: constraints → candidate retrieval (`curated` first, `verified` filling in) → LLM composition → validator → patch set. Curation is optional since 2026-09-26: the 600 improve trips but no longer gate them
 - [x] Warm-start cache on coarse constraint hash (`plan_cache`, untimed plans, re-validated per date)
 - [x] Invented-place-id handling: reject → retry once with rejection as feedback → template fallback; never render an unvalidated plan
 
