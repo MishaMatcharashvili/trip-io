@@ -11,6 +11,13 @@ import type { QuietHours } from "./route.ts";
  */
 export const DEFAULT_QUIET_HOURS: QuietHours = { start: "22:00", end: "08:00" };
 
+/** Every way a watch can reach someone. Mirrors `delivery_channel`. */
+export const channels = ["push", "email", "briefing"] as const;
+export type Channel = (typeof channels)[number];
+
+/** "HH:MM", 24-hour, Tbilisi — the only clock the product tells time on. */
+export const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 /**
  * The one channel that exists until Phase 4, and the one that stays safe after
  * it: the briefing costs the traveller nothing to receive.

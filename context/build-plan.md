@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–4 built; Phase 5 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–5 built; Phase 6 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -69,12 +69,13 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 5 — interrupts, budget enforcer, road form
 
-- [ ] Budget ledger: per-trip cap 3–5 for a 7-day trip, quiet hours, two-hour-horizon test
-- [ ] Interrupt path + push delivery
-- [ ] Telegram bot (grammY) + road-report form against the 12 corridors
-- [ ] Intervention UI: coherent-day diff, accept/reject as a unit, evidence/source always visible, opportunity framing
-- [ ] `intervention.outcome` write path — same commit as the accept/dismiss button
-- [ ] Decide: who may submit road reports (open question #3 in implementation-plan.md)
+- [x] Budget ledger: per-trip cap 3–5 for a 7-day trip, quiet hours, two-hour-horizon test — the router decides at judging time, and delivery asks again at send time under a row lock on the watch, where reserved pushes count against the cap so two jobs cannot both take the last slot
+- [x] Interrupt path + push delivery — `interrupt` jobs, Expo push, one interrupt per event (unique index), a failed push handed to the briefing on its last attempt. **Nothing can reach it**: `INTERRUPT_ELIGIBLE` is empty until a detector has a hand-audited briefing-only week, and no phone can register before Phase 7
+- [x] Telegram bot (grammY) + road-report form against the 12 corridors — stateless button form, moderation for non-operators, road events that meet transfers only. **Never met Telegram**: needs `TELEGRAM_BOT_TOKEN`; `npm run smoke:telegram` drives the real handlers with the API captured
+- [x] Intervention UI: coherent-day diff, accept/reject as a unit, evidence/source always visible, opportunity framing — `/trips/{id}/alerts/{interventionId}`, also where a briefing's recommended change is reviewed; the trust screen lists everything told and what came of it
+- [x] `intervention.outcome` write path — same commit as the accept/dismiss button (`ae72821`): patch and outcome in one transaction, mute switches push off and stamps `muted_at`, `ignored` written hourly by `/api/cron/outcomes`
+- [x] Decide: who may submit road reports — **anyone, moderated**. Operators (`TELEGRAM_OPERATOR_IDS`) publish at once; everyone else's reports wait for an operator's approval, three at most per reporter, and are kept whatever happens to them
+- [ ] Graduate the weather detector into `INTERRUPT_ELIGIBLE` — after a week of its verdicts audited by hand, which needs a Gemini plan first; road reports follow on the same terms
 
 ## Phase 6 — web client
 

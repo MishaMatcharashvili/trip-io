@@ -1,3 +1,4 @@
+import { enqueue } from "../dal/jobs.ts";
 import {
   loadDay,
   loadPair,
@@ -6,8 +7,9 @@ import {
   releaseClaim,
 } from "../dal/matches.ts";
 import { placeFacts } from "../dal/places.ts";
-import { loadWatch, spentBudget } from "../dal/watches.ts";
+import { loadWatch, pushLedger } from "../dal/watches.ts";
 import type { PlaceTier } from "../domain/catalogue/tier.ts";
+import type { EventKind } from "../domain/watch/event.ts";
 import {
   type Judge,
   type JudgeInput,
@@ -19,14 +21,16 @@ import { placeIdsInProposals } from "../domain/watch/proposal.ts";
 import { type Route, type RouteReason, route } from "../domain/watch/route.ts";
 import { DEFAULT_QUIET_HOURS } from "../domain/watch/settings.ts";
 import { judgeWithGemini } from "../infra/gemini-judge.ts";
+import { INTERRUPT_JOB } from "./interrupt.ts";
 
 // Stages 4 and 5, in the order they happen: assemble the pair, ask the model,
 // refuse the answer if it breaks a guard, route what survives, write all of it
 // down — including the drops and the refusals.
 //
-// Phase 3 delivers nothing. A verdict lands in `event_match` and is read by
-// hand, which is the point: the system gets to be watched for a week before it
-// is allowed to speak.
+// A verdict routed to `briefing` waits in `event_match` for 07:30. One routed to
+// `interrupt` is posted to the queue for delivery (src/bll/interrupt.ts), which
+// asks the router's question again at send time and spends the budget. Nothing
+// reaches that path until a detector graduates into `INTERRUPT_ELIGIBLE`.
 
 /**
  * How far the judge may look for a replacement. Wide enough to reach the next
@@ -50,6 +54,11 @@ export type JudgeOutcome =
 export type JudgeDeps = {
   judge?: Judge;
   now?: () => Date;
+  /**
+   * Overrides `INTERRUPT_ELIGIBLE`. Only the smoke run passes it: the interrupt
+   * path has to be exercised end to end before any detector has earned it.
+   */
+  interruptEligible?: ReadonlySet<EventKind>;
 };
 
 export async function judgeMatch(
@@ -62,7 +71,7 @@ export async function judgeMatch(
   // the one mistake in this pipeline that costs money.
   if (pair.judgedAt) return { ok: false, matchId, reason: "already-judged" };
 
-  const [day, alternatives, watch, sentSoFar] = await Promise.all([
+  const [day, alternatives, watch, ledger] = await Promise.all([
     loadDay(pair.trip.id, pair.node.startsAt),
     nearbyAlternatives(
       pair.node.lonLat,
@@ -70,7 +79,7 @@ export async function judgeMatch(
       ALTERNATIVE_LIMIT,
     ),
     loadWatch(pair.trip.id),
-    spentBudget(pair.trip.id),
+    pushLedger(pair.trip.id),
   ]);
 
   const cap = watch?.cap ?? 0;
@@ -108,7 +117,7 @@ export async function judgeMatch(
       })),
     },
     alternatives,
-    sent: { countSoFar: sentSoFar, cap, lastSentAt: null },
+    sent: { countSoFar: ledger.sentSoFar, cap, lastSentAt: ledger.lastSentAt },
   };
 
   let raw: unknown;
@@ -152,12 +161,15 @@ export async function judgeMatch(
     verdict: read.verdict,
     kind: pair.event.kind,
     eventConfidence: pair.event.confidence,
-    ledger: { sentSoFar, cap },
+    ledger: { sentSoFar: ledger.sentSoFar, cap },
     watch: {
       channels: watch?.channels ?? [],
-      quietHours: watch?.quietHours ?? DEFAULT_QUIET_HOURS,
+      // Null is an answer, not a gap: the traveller switched quiet hours off.
+      // The default is for a trip with no watch row at all.
+      quietHours: watch ? watch.quietHours : DEFAULT_QUIET_HOURS,
     },
     now: deps.now?.() ?? new Date(),
+    interruptEligible: deps.interruptEligible,
   });
 
   await recordVerdict(matchId, {
@@ -166,6 +178,13 @@ export async function judgeMatch(
     reason: routing.reason,
     rejections: [],
   });
+
+  if (routing.route === "interrupt") {
+    // Posted at the epoch so it sorts ahead of everything the drain has not
+    // reached yet: an interrupt passed a two-hour test to get here, and waiting
+    // behind a backlog of judge calls would spend that time for nothing.
+    await enqueue(INTERRUPT_JOB, { matchId }, new Date(0));
+  }
 
   return {
     ok: true,

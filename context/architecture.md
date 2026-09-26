@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 0–4 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+Status: Phases 0–5 built (see `context/progress-tracker.md`). Reflects the decisions of record in
 `docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
 update it when an architectural decision changes; don't let it drift from the code.
 
@@ -51,11 +51,11 @@ is moving the code one layer further left.
 
 | Directory | What lives there | Rule |
 |---|---|---|
-| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router and the briefing document | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
-| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
-| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`) |
-| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, the Gemini briefer, Open-Meteo, Resend, Better Auth | Implements a port the domain declares. The only files that name an external provider |
-| `src/server` | The Hono app, its routers and the session middleware | Validation, status codes, nothing else. Imports use cases, never a repository |
+| `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router, the briefing document, the interrupt budget's delivery rules and the road-report vocabulary | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
+| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts`, `interventions.ts`, `devices.ts`, `road-reports.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
+| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts`, `interrupt.ts`, `interventions.ts`, `watch-settings.ts`, `devices.ts`, `road-report.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`, `interventionCard`, `alertsPage`) |
+| `src/infra` | Outbound adapters: the Gemini composer, the Gemini judge, the Gemini briefer, Open-Meteo, Resend, Expo push, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/server` | The Hono app, its routers, the session middleware, and the road-report bot behind the Telegram webhook | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 
 Two consequences worth stating, because they are what the layering buys:
@@ -79,16 +79,17 @@ entry file changes.
 * * * * *    /api/cron/drain           claim N jobs SKIP LOCKED, stop at 240s      built
 0 3 * * *    /api/cron/briefing        07:30 Tbilisi; one job per live trip-day    built
 */30 * * * * /api/cron/sense-news      RSS + extraction                            Phase 8
-POST         /api/telegram/webhook     road reports → world_event                  Phase 5
+POST         /api/telegram/webhook     road reports → world_event                  built
 0 6 * * 1    /api/cron/sense-rail      weekly manual-check reminder                Phase 8
-0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     Phase 5
+0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     built
 ```
 
-The four built handlers are written and behind `CRON_SECRET`. They are **not on Vercel cron**:
+The five built cron handlers are written and behind `CRON_SECRET`; the Telegram webhook is behind
+Telegram's own secret-token header instead. They are **not on Vercel cron**:
 Hobby runs once per day and rejects a sub-daily expression at deploy time — a `vercel.json` carrying
 these schedules fails the build outright, which is what happened when Phase 3 first tried to ship
 one. The clock is Trigger.dev instead (`src/trigger/watch-pipeline.ts`), one hourly task calling the
-three sense/match/drain handlers in order over HTTP: free at that cadence against $20/mo for Vercel
+sense/match/drain/outcomes handlers in order over HTTP: free at that cadence against $20/mo for Vercel
 Pro, and hourly is what the design calls for while the finer schedules below are throughput settings
 for scale. Trigger.dev is the clock only — the work, the queue and the drain stay here.
 
@@ -155,7 +156,9 @@ world_event    id, source, kind, severity, confidence, geom geography,
                valid_from, valid_to, observed_at, dedupe_key, payload jsonb
 
 trip_watch     trip_id, active_from, active_to, regions geography,
-               channels[], quiet_hours, cap
+               channels[], quiet_hours, cap, muted_at
+               -- muted_at: the first time push was switched off while the
+               -- watch was awake — the settings half of a kill criterion
 
 event_match    id, event_id, trip_id, node_id, matched_at, score,
                queued_at, judged_at, delivered_at, verdict jsonb,
@@ -165,10 +168,25 @@ event_match    id, event_id, trip_id, node_id, matched_at, score,
                -- pipeline: matched, queued, judged, delivered
 
 intervention   id, trip_id, event_id, channel(push|email|briefing),
-               sent_at, patch_id,
+               sent_at, patch_id, offer jsonb, expires_at,
                outcome(accepted|dismissed|ignored|muted), outcome_at
                -- one row per event per delivery, not per matched pair: the
-               -- same rain over two stops is one thing the traveller was told
+               -- same rain over two stops is one thing the traveller was told.
+               -- (trip_id, event_id) is unique for channel = 'push': one
+               -- interrupt per event, ever. sent_at is null while a push is
+               -- reserved and not yet sent. offer is a snapshot of what was
+               -- shown, because the match it came from cascades with its stop
+
+device         id, user_id, token unique, platform(ios|android),
+               created_at, last_seen_at, disabled_at, disabled_reason
+
+road_report    id, corridor_id, condition(closed|restricted|delays|hazard|
+               reopened), hazard, valid_from, valid_to, reported_at,
+               reporter_id, reporter_name, chat_id,
+               status(pending|published|rejected|expired),
+               reviewed_by, reviewed_at, event_id
+               -- never deleted: each report with its outcome is a label for
+               -- Phase 8's road-automation spike
 
 briefing       id, trip_id, day date, day_index, quiet, document jsonb,
                composed_at, email_to, email_sent_at, email_error, opened_at
@@ -205,21 +223,32 @@ municipalities and self-governing cities of Georgia, excluding Abkhazia and Sout
 sense    src/bll/sense.ts        one forecast per region with a live trip
 detect   src/domain/watch/weather.ts   our own thresholds; a spell is one event
 store    src/dal/events.ts       dedupe_key collapses the hourly re-forecast
-match    src/dal/matches.ts      ST_DWithin x window overlap, radiusFor(kind)
+match    src/dal/matches.ts      ST_DWithin x window overlap; radius, freshness
+                                 and which stops, all per kind
 queue    src/dal/jobs.ts         SKIP LOCKED; cron never calls a model
 judge    src/bll/judge.ts        the only model call, on matched pairs only
 guard    src/domain/watch/judge.ts     four validators; a refusal is logged
 route    src/domain/watch/route.ts     interrupt / briefing / drop, with a reason
 brief    src/bll/briefing.ts           one trip-day's bundle, once, at 07:30
 deliver  src/infra/resend.ts           email; the in-app copy is already stored
+budget   src/bll/interrupt.ts          the router's question asked again at send
+                                       time, under a lock; a slot reserved first
+push     src/infra/expo-push.ts        APNs and FCM through Expo
+answer   src/bll/interventions.ts      accept / dismiss / mute, patch and outcome
+                                       in one transaction; `ignored` by the clock
 ```
 
-Interrupts are not delivered — `INTERRUPT_ELIGIBLE` is empty, so nothing can wake anyone up. The
-briefing is the one channel that does deliver, and it ships first on purpose: it costs the traveller
-nothing to receive, so the system gets watched for a week before it is allowed to interrupt.
+The interrupt path is built end to end and nothing uses it: `INTERRUPT_ELIGIBLE` is still empty, so
+nothing can wake anyone up. A detector graduates by being added to that set after a week of
+hand-audited briefing-only verdicts, and the judge has not produced one yet. The briefing remains the
+one channel that delivers, by design: it costs the traveller nothing to receive, so the system gets
+watched before it is allowed to interrupt.
 
 `npm run smoke:watch` exercises stages 1–5 against the real database with the judge stubbed;
 `npm run smoke:briefing` does the same for stage 6 with the composer and the mailer stubbed;
+`npm run smoke:interrupt` walks the interrupt path, the card's answers and the sweep, with the judge
+and the push service stubbed; `npm run smoke:road` and `npm run smoke:telegram` do the same for road
+reports, the second through the bot's real handlers with Telegram's API captured;
 `npm run kill:count` runs the matcher over synthetic trips and archived weather; `npm run judge:eval`
 scores the model against the thirty fixtures.
 
@@ -240,8 +269,50 @@ Tuesday, when the traveller can still move something; beyond two days the foreca
 item stays undelivered and is offered again as its day approaches.
 
 `intervention.outcome` is the product's only defensibility claim — a record of which world-changes
-actually moved a traveller's plan. The write path ships in the same commit as the accept/dismiss
+actually moved a traveller's plan. The write path shipped in the same commit as the accept/dismiss
 button; `ignored` is produced by a cron sweep, not left to the client.
+
+### Interrupts and outcomes, as built
+
+A verdict the router sends to `interrupt` is posted as an `interrupt` job, at the epoch so it sorts
+ahead of an unjudged backlog. `deliverInterrupt` then asks the router's question again, because by
+send time the answer can have changed: `checkDelivery` in `src/domain/watch/interrupt.ts` drops an
+event that is over or a stop that has ended, marks a pair `covered` if the same event already
+interrupted this trip over another stop, and sends anything the budget, quiet hours, a switched-off
+push, a missing phone or an incoherent proposal turns away to the briefing, where it is free. A stop
+in progress can still be interrupted — a road closing forty minutes into a drive is what the channel
+is for.
+
+The budget is spent by a reservation, not a send. Under `SELECT … FOR UPDATE` on the trip's watch the
+ledger — reserved plus sent pushes — is counted and a slot reserved in one step; only after that
+commits is Expo called, and only an accepted push is stamped `sent_at`. A push service that is down
+throws for the queue's backoff; on the last attempt the slot is given back and the verdict goes to
+the briefing.
+
+Every intervention stores its `offer`: the sentence, the evidence, and the moves as absolute ops
+computed against the day when it was offered, so accepting later cannot move a stop twice. The card
+at `/trips/{id}/alerts/{interventionId}` shows Changed, Affects and I suggest, then every stop the
+change moves, previewed against the trip as it is now. Accept appends the ops as an `intervention`
+patch accepted by the traveller and records `accepted` with the patch id in one transaction, under
+locks on the intervention and the trip; mute records `muted` and switches push off for the trip. A
+briefing's nominated change is an offer on the same card. `ignored` is written hourly for anything
+unanswered past `expires_at` — a push's horizon, a briefing item's stop — and a late answer from the
+traveller overrules it.
+
+### Road reports, as built
+
+Detector #2 is a form in Telegram (`src/server/telegram`), stateless: every button carries the
+answers so far. Anyone may report; a report from `TELEGRAM_OPERATOR_IDS` is published at once, and
+anyone else's waits as `pending` for an operator to approve or reject from Telegram, with at most
+three waiting per reporter. Publishing ends every road event still open on the corridor — the newest
+report about a road is the truth about it — and writes a new one over the corridor's buffered line,
+unless the report is a reopening, which writes none. Approved after its window closed, a report is
+`expired`, not published. The matcher runs as soon as a report is published.
+
+Road events match transfers only, by distance or by a transfer's `meta.corridorSlug`, and stay
+matchable for their window rather than the six hours a forecast gets. An operator's report is
+trusted at 0.9 and an approved stranger's at 0.8. The corridors' seasonal-risk notes are not cited
+anywhere yet: they are seed knowledge, still to be verified.
 
 ## Hard invariants (validator rules, not guidelines)
 
@@ -252,7 +323,8 @@ no list.
 - **Never auto-apply.** `trip_patch.author = 'intervention'` requires a non-null `accepted_by`.
   *Enforced twice:* the `trip_patch_intervention_accepted` CHECK constraint (migration `0002`) and a
   guard at the top of `appendPatch`, before the transaction opens. *Tested:*
-  `src/bll/trip-document.test.ts`.
+  `src/bll/trip-document.test.ts`; the one path that writes such a patch, accepting an intervention,
+  is exercised by `npm run smoke:interrupt`.
 - **No hallucinated places.** Every `place_id` a patch introduces is checked against the tiers its
   author may use — `system` composes only from `curated`, `intervention` may also use `verified`.
   *Enforced:* `allowedTiers` in `src/domain/trip/validate.ts`, run over every affected day on every
@@ -282,8 +354,29 @@ no list.
   *Enforced:* `checkDraft`. *Tested:* `briefing.test.ts`.
 - **New detectors enter briefing-only.** A detector may not route to `interrupt` until it has run one
   week on briefing-only and been hand-audited. *Enforced:* `INTERRUPT_ELIGIBLE` in
-  `src/domain/watch/route.ts`, which is empty — nothing built so far can wake anyone up. A detector
-  graduates by being added to that set, deliberately. *Tested:* `route.test.ts`.
+  `src/domain/watch/route.ts`, which is empty — the interrupt path is built and nothing can reach it.
+  Road reports entered on the same terms. A detector graduates by being added to that set,
+  deliberately. *Tested:* `route.test.ts`.
+- **The interrupt budget cannot be raced.** The ledger counts reserved pushes as well as sent ones,
+  and is counted and spent under a row lock on the watch. *Enforced:* `deliverInterrupt` in
+  `src/bll/interrupt.ts`; `checkDelivery` never delivers at or over the cap. *Tested:* as an
+  invariant in `interrupt.test.ts`; two concurrent deliveries for one slot in `smoke:interrupt`.
+- **One event is one interrupt.** However many of a trip's stops an event touches, it wakes the
+  traveller once. *Enforced:* a partial unique index on `intervention (trip_id, event_id)` for
+  `channel = 'push'` (migration `0007`), and `covered` in `checkDelivery`. *Tested:*
+  `interrupt.test.ts`, `smoke:interrupt`.
+- **An interrupt carries a working action or none.** A proposal that would break the day, or names a
+  stop the trip no longer has, is never pushed. *Enforced:* `checkDelivery` and `makeOffer`.
+  *Tested:* `interrupt.test.ts`.
+- **An accepted intervention is its patch.** The outcome and the patch it applied are written in one
+  transaction, or neither is. *Enforced:* `answerIntervention` via `appendPatchIn`. *Tested:*
+  `smoke:interrupt` (needs a database).
+- **Silence is an outcome.** An intervention nobody answered becomes `ignored` at its expiry, written
+  by the hourly sweep; only the traveller's own answer may overwrite it. *Enforced:* `sweepIgnored`
+  and `mayRecord`. *Tested:* `interrupt.test.ts`, `smoke:interrupt`.
+- **A stranger's road report is reviewed before anyone sees it.** *Enforced:* `submitRoadReport`
+  publishes only an operator's report; `moderateReport` locks the report and decides it once.
+  *Tested:* `smoke:road`, `smoke:telegram`.
 
 ### Structural invariants
 
@@ -314,7 +407,7 @@ no list.
 | # | Detector | Source | Cadence | Build phase | Confidence |
 |---|---|---|---|---|---|
 | 1 | weather-vs-activity | Open-Meteo, commercial tier | hourly | 3 — **built** | high |
-| 2 | road-corridor | Telegram form, manual | on submit | 5 | high |
+| 2 | road-corridor | Telegram form, anyone, moderated | on submit | 5 — **built** | 0.9 operator / 0.8 approved |
 | 3 | events & festivals | local pages + extraction | 6h | 8 | medium |
 | 4 | protests & safety | Georgian news RSS + extraction | 30 min | 8 | low → gated |
 | 5 | opening-hours | user reports + catalogue drift | on submit | 8 | medium |

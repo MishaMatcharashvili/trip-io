@@ -32,8 +32,11 @@ export const INTERRUPT_MIN_CONFIDENCE = 0.7;
  * process rule, because a process rule is what gets forgotten the week a new
  * detector looks like it is working.
  *
- * Phase 3 delivers nothing at all, so this is empty by construction: the
- * weather detector graduates by being added here, deliberately, in Phase 5.
+ * Still empty after Phase 5 built the interrupt path, and on purpose: the
+ * condition is a week of briefing-only verdicts, hand-audited, and the judge
+ * has not yet produced one (context/running-the-pipeline.md). The weather
+ * detector graduates by being added here, deliberately, once it has; road
+ * reports enter on the same terms as any new detector.
  */
 export const INTERRUPT_ELIGIBLE: ReadonlySet<EventKind> = new Set();
 

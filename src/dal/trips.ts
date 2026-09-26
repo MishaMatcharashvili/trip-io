@@ -269,6 +269,20 @@ export async function patchSeq(
   return rows.rows.length === 0 ? null : Number(rows.rows[0].seq);
 }
 
+/**
+ * The patch a patch was written on top of. What an applied intervention is
+ * shown against: the document before it and the document after it.
+ */
+export async function patchParent(
+  tripId: string,
+  patchId: string,
+): Promise<string | null> {
+  const rows = await db.execute(sql`
+    SELECT parent_id FROM trip_patch WHERE id = ${patchId} AND trip_id = ${tripId}
+  `);
+  return (rows.rows[0]?.parent_id as string | null | undefined) ?? null;
+}
+
 /** The latest checkpoint at or before a sequence number. */
 export async function checkpointAtOrBefore(
   tripId: string,

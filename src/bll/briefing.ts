@@ -12,12 +12,15 @@ import {
   stopsOn,
   unresolvedStops,
 } from "../dal/briefings.ts";
+import { briefingOfferFor } from "../dal/interventions.ts";
 import { enqueue } from "../dal/jobs.ts";
 import { placeNames } from "../dal/places.ts";
+import { loadTrip } from "../dal/trips.ts";
 import { dayKey } from "../domain/trip/document.ts";
 import {
   type Briefer,
   type Briefing,
+  type BriefingItem,
   type BriefingRejection,
   brieferInput,
   bundle,
@@ -31,6 +34,7 @@ import {
   quietBriefing,
   readDraft,
 } from "../domain/watch/briefing.ts";
+import { briefingOffers } from "../domain/watch/interrupt.ts";
 import { renderBriefingEmail } from "../infra/briefing-email.ts";
 import { briefWithGemini } from "../infra/gemini-briefing.ts";
 import { emailConfigured, sendWithResend } from "../infra/resend.ts";
@@ -218,12 +222,19 @@ async function finish(
   input: ComposeInput,
   briefing: Briefing,
   rejections: BriefingRejection[],
-  taken: readonly { eventId: string }[],
+  taken: readonly BriefingItem[],
   overflow: readonly unknown[],
   deps: BriefingDeps,
 ): Promise<WriteOutcome> {
   const { tripId } = input;
   const date = input.day.date;
+
+  // The change's moves become absolute against the day as it stands now, so
+  // accepting it tomorrow cannot move a stop twice. Only read when there is a
+  // change to translate — most mornings have none.
+  const clocks = briefing.change
+    ? new Map(Object.entries((await loadTrip(tripId))?.doc.nodes ?? {}))
+    : new Map();
 
   const emailTo = await recipientFor(tripId);
   const saved = await saveBriefing({
@@ -236,7 +247,12 @@ async function finish(
     matchIds: briefing.matchIds,
     // One per event, not per pair: the same rain over two stops is one thing
     // the traveller was told (src/dal/briefings.ts).
-    eventIds: [...new Set(taken.map((i) => i.eventId))],
+    offers: briefingOffers({
+      items: taken,
+      change: briefing.change,
+      clocks,
+      now: input.now,
+    }),
   });
 
   if (!saved) {
@@ -311,8 +327,16 @@ export async function briefingView(
 
 export type BriefingPage = {
   briefing: StoredBriefing;
-  /** The before-and-after of the recommended change, already resolved. */
-  change: { sentence: string; rows: ChangeRow[] } | null;
+  /**
+   * The before-and-after of the recommended change, already resolved, and the
+   * intervention it was recorded as — where it is accepted or dismissed, on the
+   * same card a push opens. Null on a briefing written before offers were.
+   */
+  change: {
+    sentence: string;
+    rows: ChangeRow[];
+    interventionId: string | null;
+  } | null;
 };
 
 /**
@@ -334,14 +358,17 @@ export async function briefingPage(
   if (!change) return { briefing, change: null };
 
   const ids = changePlaceIds(change);
-  const names =
-    ids.length > 0 ? await placeNames(ids) : new Map<string, string>();
+  const [names, interventionId] = await Promise.all([
+    ids.length > 0 ? placeNames(ids) : new Map<string, string>(),
+    briefingOfferFor(tripId, change.matchId),
+  ]);
 
   return {
     briefing,
     change: {
       sentence: change.sentence,
       rows: changePreview(change, briefing.document.day.stops, names),
+      interventionId,
     },
   };
 }

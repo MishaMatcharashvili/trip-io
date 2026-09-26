@@ -1,19 +1,25 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { alertsPage } from "@/bll/interventions.ts";
+import { accessTrip } from "@/bll/trip-document.ts";
 import { alertHistory, getTrip, watchLedger } from "@/data/trip";
-import { TopBar } from "@/features/chrome";
-import { Card, SectionRule } from "@/ui/card";
-import { Chip } from "@/ui/chip";
-import { cx } from "@/ui/cx";
-import { Dot } from "@/ui/dot";
-import { Icon } from "@/ui/icon";
-import { BottomNav, tripTabs } from "@/ui/nav";
-import { Eyebrow, Num, Title } from "@/ui/text";
+import { dayKey } from "@/domain/trip/document";
+import { at } from "@/domain/watch/briefing";
+import type { Outcome } from "@/domain/watch/interrupt";
+import { type AlertRowView, AlertsScreen } from "@/features/alerts";
+import { getAuth } from "@/infra/auth.ts";
+import type { Tone } from "@/ui/cx";
 
 export const metadata: Metadata = { title: "Everything I have told you" };
 
-const outcomeLabels = {
+/**
+ * The trust screen. Real trips list their `intervention` rows — pushes and
+ * briefing items alike, each with what the traveller did about it — and the
+ * fixture trip keeps the canvas's reference render for `/design`.
+ */
+
+const fixtureOutcomes = {
   accepted: { label: "Applied", tone: "agent" as const },
   dismissed: { label: "Kept plan", tone: "neutral" as const },
   ignored: { label: "No answer", tone: "neutral" as const },
@@ -21,125 +27,118 @@ const outcomeLabels = {
   resolved: { label: "Resolved", tone: "neutral" as const },
 };
 
+const outcomeLabels: Record<Outcome | "open", { label: string; tone: Tone }> = {
+  accepted: { label: "Applied", tone: "agent" },
+  dismissed: { label: "Kept plan", tone: "neutral" },
+  ignored: { label: "No answer", tone: "neutral" },
+  muted: { label: "Muted", tone: "neutral" },
+  open: { label: "Open", tone: "agent" },
+};
+
+const shortDate = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Tbilisi",
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+
+/** "Today", "Yesterday", or the date — on Tbilisi's calendar. */
+const dayLabel = (instant: string, now: Date) => {
+  const day = dayKey(instant);
+  if (day === dayKey(now)) return "Today";
+  if (day === dayKey(now.getTime() - 86_400_000)) return "Yesterday";
+  return shortDate.format(new Date(instant));
+};
+
 export default async function AlertsPage({
   params,
 }: PageProps<"/trips/[tripId]/alerts">) {
   const { tripId } = await params;
-  const trip = getTrip(tripId);
-  if (!trip) notFound();
 
-  const groups = ["Today", "Yesterday"] as const;
+  const fixture = getTrip(tripId);
+  if (fixture) {
+    return (
+      <AlertsScreen
+        view={{
+          tripId: fixture.id,
+          trip: fixture,
+          eyebrow: `${fixture.title.split(" · ")[0]} · ${fixture.currentDay} days in`,
+          stats: [
+            { value: "6", label: "Told you" },
+            { value: "4", label: "Applied", tone: "agent" },
+            { value: "2", label: "Kept your plan" },
+            { value: "4,310", label: "Checks run" },
+          ],
+          groups: (["Today", "Yesterday"] as const).map((label) => ({
+            label,
+            alerts: alertHistory
+              .filter((alert) => alert.day === label)
+              .map((alert) => ({
+                id: alert.id,
+                time: alert.time,
+                title: alert.title,
+                detail: alert.detail,
+                tone: alert.tone,
+                outcome: fixtureOutcomes[alert.outcome],
+                dim: alert.outcome === "dismissed",
+                urgent: alert.tone === "alert" && alert.day === "Today",
+              })),
+          })),
+          footer: `${watchLedger[0].value} checks run · ${watchLedger[1].value} worth telling you`,
+        }}
+      />
+    );
+  }
+
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  if (!session) notFound();
+  const access = await accessTrip(tripId, session.user.id);
+  if (!access.ok) notFound();
+
+  const page = await alertsPage(tripId);
+  const now = new Date();
+
+  const groups: { label: string; alerts: AlertRowView[] }[] = [];
+  for (const alert of page.alerts) {
+    const label = dayLabel(alert.sentAt, now);
+    let group = groups.find((g) => g.label === label);
+    if (!group) {
+      group = { label, alerts: [] };
+      groups.push(group);
+    }
+    group.alerts.push({
+      id: alert.id,
+      time: at(alert.sentAt),
+      title: alert.title,
+      detail:
+        alert.channel === "briefing"
+          ? `${alert.detail} · in the morning briefing`
+          : alert.detail,
+      tone: alert.tone,
+      outcome: outcomeLabels[alert.outcome ?? "open"],
+      dim: alert.outcome === "dismissed",
+      urgent:
+        alert.tone === "alert" &&
+        alert.outcome === null &&
+        alert.channel === "push" &&
+        label === "Today",
+    });
+  }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopBar trip={trip} tabs={tripTabs(trip.id)} active="AI" />
-
-      {/*
-        The trust screen. Every alert, what you did about it, and the raw check
-        count behind them — which is also the renewal argument.
-      */}
-      <div className="border-b border-hairline bg-surface lg:border-0 lg:bg-transparent">
-        <div className="mx-auto w-full max-w-[720px] px-4 pb-3 pt-2.5 lg:pt-8">
-          <div className="flex items-center gap-2.5 pb-3">
-            <div className="flex-1">
-              <Title className="text-[16px] lg:text-headline">
-                Everything I have told you
-              </Title>
-              <Eyebrow>
-                {trip.title.split(" · ")[0]} · {trip.currentDay} days in
-              </Eyebrow>
-            </div>
-            <button
-              type="button"
-              aria-label="Filter"
-              className="p-1 text-ink-muted"
-            >
-              <Icon name="filter" size={20} />
-            </button>
-          </div>
-
-          <div className="flex">
-            {[
-              { value: "6", label: "Told you", tone: "" },
-              { value: "4", label: "Applied", tone: "text-agent" },
-              { value: "2", label: "Kept your plan", tone: "" },
-              { value: "4,310", label: "Checks run", tone: "" },
-            ].map((stat) => (
-              <div key={stat.label} className="flex flex-1 flex-col gap-0.5">
-                <Num className={cx("text-[17px] font-semibold", stat.tone)}>
-                  {stat.value}
-                </Num>
-                <Eyebrow>{stat.label}</Eyebrow>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <main className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3.5 px-4 pb-28 pt-3.5 lg:pb-10">
-        {groups.map((group) => (
-          <section key={group} className="flex flex-col gap-2.5">
-            <SectionRule>{group}</SectionRule>
-            {alertHistory
-              .filter((alert) => alert.day === group)
-              .map((alert) => {
-                const outcome = outcomeLabels[alert.outcome];
-                return (
-                  <Link
-                    key={alert.id}
-                    href={`/trips/${trip.id}/alerts/${alert.id}`}
-                  >
-                    <Card
-                      accent={
-                        alert.tone === "alert" && alert.day === "Today"
-                          ? "alert"
-                          : "none"
-                      }
-                      className={cx(
-                        "flex items-start gap-3 px-3.5 py-3 transition-colors hover:bg-canvas",
-                        alert.outcome === "dismissed" && "opacity-70",
-                      )}
-                    >
-                      <Dot tone={alert.tone} className="mt-1.5" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-small font-semibold">
-                          {alert.title}
-                        </div>
-                        <div className="text-mini text-ink-muted">
-                          {alert.detail}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Num className="text-mini text-ink-faint">
-                          {alert.time}
-                        </Num>
-                        <Chip
-                          size="sm"
-                          tone={outcome.tone}
-                          className="h-5 text-micro"
-                        >
-                          {outcome.label}
-                        </Chip>
-                      </div>
-                    </Card>
-                  </Link>
-                );
-              })}
-          </section>
-        ))}
-
-        <div className="flex flex-col items-center gap-2 pt-1">
-          <button type="button" className="text-small font-medium text-agent">
-            Earlier in this trip
-          </button>
-          <span className="text-mini text-ink-faint">
-            {watchLedger[0].value} checks run · {watchLedger[1].value} worth
-            telling you
-          </span>
-        </div>
-      </main>
-
-      <BottomNav items={tripTabs(trip.id)} active="AI" />
-    </div>
+    <AlertsScreen
+      view={{
+        tripId,
+        eyebrow: page.title,
+        stats: [
+          { value: String(page.told), label: "Told you" },
+          { value: String(page.applied), label: "Applied", tone: "agent" },
+          { value: String(page.kept), label: "Kept your plan" },
+          { value: page.checks.toLocaleString("en-GB"), label: "Checks run" },
+        ],
+        groups,
+        footer: `${page.checks.toLocaleString("en-GB")} checks run · ${page.told} worth telling you`,
+      }}
+    />
   );
 }

@@ -147,7 +147,13 @@ export default async function BriefingPage({
             detail: line.detail,
             evidence: line.evidence,
           })),
-          change,
+          change: change && {
+            sentence: change.sentence,
+            rows: change.rows,
+            href: change.interventionId
+              ? `/trips/${tripId}/alerts/${change.interventionId}`
+              : undefined,
+          },
           dayHref: `/trips/${tripId}`,
           sourceCount: doc.sources,
           watchTone,

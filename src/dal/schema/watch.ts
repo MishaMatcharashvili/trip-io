@@ -69,6 +69,12 @@ export const tripWatch = pgTable(
     channels: deliveryChannel("channels").array().notNull(),
     quietHours: jsonb("quiet_hours").notNull(),
     cap: integer("cap").notNull(),
+    // The first time push was switched off while the watch was awake.
+    // "Notifications disabled during trip" is a kill criterion (continue below
+    // 10%, stop above 25%), and in a proactive product a mute is not a dip —
+    // it is usually permanent, which makes it the most informative thing a
+    // traveller can do. First one wins: turning push back on does not unsay it.
+    mutedAt: timestamp("muted_at", { withTimezone: true }),
   },
   (t) => [
     index("trip_watch_regions_idx").using("gist", t.regions),
@@ -154,18 +160,38 @@ export const intervention = pgTable(
       .notNull()
       .references(() => worldEvent.id, { onDelete: "restrict" }),
     channel: deliveryChannel("channel").notNull(),
-    sentAt: tstz("sent_at"),
+    // Null while a push is reserved and not yet sent. The interrupt budget is
+    // spent by the reservation, under a lock on the watch, so two deliveries
+    // racing for the last slot cannot both win it; the stamp says it arrived.
+    sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow(),
     patchId: uuid("patch_id").references(() => tripPatch.id, {
       onDelete: "set null",
     }),
     outcome: interventionOutcome("outcome"),
     outcomeAt: timestamp("outcome_at", { withTimezone: true }),
+    // What the traveller was offered, as it was offered: the sentence, the
+    // evidence and the moves (src/domain/watch/interrupt.ts, `Offer`). A
+    // snapshot rather than a pointer, because the match it came from cascades
+    // away with its stop — and accepting a proposal that drops the stop is
+    // exactly what deletes it. An outcome is only evidence of anything if what
+    // it was an answer to is still recoverable.
+    offer: jsonb("offer"),
+    // When un-actioned becomes `ignored`: the end of the verdict's horizon for
+    // a push, the start of the stop for a briefing item. The hourly sweep reads
+    // it, and without that sweep the acceptance denominator is wrong.
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
   },
   (t) => [
     index("intervention_trip_id_idx").on(t.tripId),
     index("intervention_event_id_idx").on(t.eventId),
     // The hourly sweep marks un-actioned interventions `ignored`.
     index("intervention_outcome_idx").on(t.outcome, t.sentAt),
+    // One interrupt per event per trip, ever. The same rain over two stops is
+    // one thing to be woken for, and a constraint is what settles two judge
+    // jobs for those two stops finishing in the same drain.
+    uniqueIndex("intervention_push_event_idx")
+      .on(t.tripId, t.eventId)
+      .where(sql`${t.channel} = 'push'`),
   ],
 );
 

@@ -32,8 +32,24 @@ export const weatherKinds = [
 ] as const;
 export type WeatherKind = (typeof weatherKinds)[number];
 
-export const eventKinds = [...weatherKinds] as const;
+/**
+ * Detector #2: what a road report says about one of the 12 corridors. A
+ * reopening is not a kind — it ends the events already open on the corridor
+ * (src/domain/watch/road.ts).
+ */
+export const roadKinds = [
+  "road.closure",
+  "road.restriction",
+  "road.delay",
+  "road.hazard",
+] as const;
+export type RoadKind = (typeof roadKinds)[number];
+
+export const eventKinds = [...weatherKinds, ...roadKinds] as const;
 export type EventKind = (typeof eventKinds)[number];
+
+export const isRoadKind = (kind: string): kind is RoadKind =>
+  (roadKinds as readonly string[]).includes(kind);
 
 const isoInstant = z.iso.datetime({ offset: true });
 
@@ -91,8 +107,39 @@ export const radiusFor = (kind: EventKind): number => {
     case "weather.heat":
     case "weather.cold":
       return 25_000;
+    // A road event's geometry is already the corridor's own buffer. This is the
+    // slop past it for a transfer located at its destination: Juta sits a few
+    // kilometres off the Military Road it is reached by.
+    case "road.closure":
+    case "road.restriction":
+    case "road.delay":
+    case "road.hazard":
+      return 5_000;
   }
 };
+
+/**
+ * How long an event stays matchable after it was last observed.
+ *
+ * The weather is re-forecast every hour, so a spell the sense loop has stopped
+ * re-reporting has stopped being forecast, and six hours without a sighting
+ * means it is gone. A road report is observed once, when it is sent; nothing
+ * re-reports it, and its own validity window — or a later report on the same
+ * road — is what says it is over. Seventy-two hours is the longest window the
+ * form offers, so the backstop never cuts a live report short.
+ */
+export const staleAfterHours = (kind: EventKind): number =>
+  isRoadKind(kind) ? 72 : 6;
+
+/**
+ * Which stops an event may match, when not all of them. A road report is about
+ * a drive, so it matches transfers and nothing else: a closure on the Military
+ * Road does not affect lunch in Stepantsminda, it affects getting there — the
+ * promise the watch settings screen already makes ("only on roads you will
+ * actually drive"). Null means every kind of stop.
+ */
+export const nodeKindsFor = (kind: EventKind): readonly string[] | null =>
+  isRoadKind(kind) ? ["transfer"] : null;
 
 /**
  * Bucket width for `dedupe_key`. The sense loop runs hourly and re-forecasts

@@ -15,8 +15,12 @@ import { logger, schedules, task } from "@trigger.dev/sdk";
 // ever is made, `judgeMatch(matchId)` is already a plain function these tasks
 // could call directly — which is what the layering was for.
 
-/** In order. Each one's output is the next one's input. */
-const STAGES = ["sense-weather", "match", "drain"] as const;
+/**
+ * In order. Each one's output is the next one's input — except `outcomes`,
+ * which reads nothing the others write and goes last only so an hour's
+ * deliveries have had their chance to be answered before it looks.
+ */
+const STAGES = ["sense-weather", "match", "drain", "outcomes"] as const;
 
 /**
  * The morning pass. `briefing` finds the trip-days that have one and posts a

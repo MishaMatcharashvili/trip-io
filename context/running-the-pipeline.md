@@ -1,7 +1,9 @@
 # Running the watch pipeline
 
-Status: written 2026-09-21 when Phase 3 landed, updated the same day when Phase 4 did. Phase 3 built
-the whole pipeline and switched none of it on; Phase 4 added the one channel that delivers. This
+Status: written 2026-09-21 when Phase 3 landed, updated the same day when Phase 4 did, and again on
+2026-09-26 for Phase 5. Phase 3 built the whole pipeline and switched none of it on; Phase 4 added
+the one channel that delivers; Phase 5 built the interrupt path and the road form, and switched
+neither on — the first waits on an audited detector, the second on a bot token. This
 file is the list of switches — what is off, why, what turning each one on unblocks, and in what
 order. Update it as each switch flips; delete it when they all have.
 
@@ -78,7 +80,8 @@ To switch it on:
 4. `npm run trigger:dev` registers the tasks against the development environment and keeps them
    running locally; `npm run trigger:deploy` publishes them.
 
-Four tasks are exported. `watch-pipeline` is the hourly schedule — sense, match, drain — and
+Four tasks are exported. `watch-pipeline` is the hourly schedule — sense, match, drain, then the
+outcomes sweep — and
 `morning-briefing` runs `briefing` then `drain` at 07:30 Asia/Tbilisi, written in Tbilisi's zone
 rather than as 03:30 UTC. `run-watch-pipeline` and `run-morning-briefing` do the same passes on
 demand; trigger them from the dashboard when you want a cycle now rather than at seven minutes past,
@@ -111,6 +114,12 @@ make on evidence, not in passing: the queue is built, tested and exercised, and 
 budget fits Vercel's 300s ceiling comfortably. If it is ever taken, `judgeMatch(matchId)` is already
 a plain function a task could call directly — which is what the layering was for.
 
+Revisited in Phase 5 and still not taken. The interrupt path leans on the queue rather than around
+it: delivery is its own job so a push outage retries without re-judging, and its last-attempt
+fallback — give the slot back, send the verdict to the briefing — reads the job's attempt count.
+Nothing Phase 5 added comes near the 240s budget. What would change the answer is the next item's
+latency, not throughput.
+
 ### 3. `RESEND_API_KEY` + `BRIEFING_FROM` — the briefing is written but not posted
 
 The briefing composes, stores and renders without them; only the send is skipped, and
@@ -135,16 +144,72 @@ verified, every alternative it can propose today is a place nobody has hand-chec
 holds — an intervention may name a `verified` place by design — but the quality of what it proposes
 is the quality of Overture's data until the curation queue at `/curate` has run.
 
+### 6. The road-report bot — `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_OPERATOR_IDS`
+
+Detector #2 is built and has never met Telegram. Without the token and the secret the webhook
+answers 503, and nothing else changes. To switch it on:
+
+1. Create the bot with @BotFather and put its token in `TELEGRAM_BOT_TOKEN`. Choose any long random
+   string for `TELEGRAM_WEBHOOK_SECRET` — Telegram sends it back on every update, and the route
+   refuses updates without it, because the URL is public.
+2. Put your own numeric Telegram id (ask @userinfobot) in `TELEGRAM_OPERATOR_IDS`, plus anyone else
+   you trust to approve reports, comma-separated. Operators' reports publish at once; everyone
+   else's come to them to approve. **Each operator has to open a chat with the bot once**, or it
+   cannot message them — their reports still wait in /queue.
+3. Set all three on Vercel, deploy, then run `npm run telegram:webhook` with the same values and the
+   deployed `APP_URL` in `.env`. It registers the webhook, the secret and the command menu, and
+   prints Telegram's last delivery error if there is one.
+
+Then add `"road-report"` to `WATCHED_SOURCES` in `src/domain/watch/briefing.ts`. The quiet briefing
+says how many sources watched overnight and must say the true number — so not before reports are
+actually arriving.
+
+Decided on the way (open question 3): **anyone may report, moderated.** Reports from people who are
+not operators are held for review, three at most per reporter, and every report is kept whatever
+happened to it, because each is a label for Phase 8's automation spike. The corridors' seasonal-risk
+notes are still not cited to anyone — they are seed values to verify first.
+
+### 7. Push — nothing to switch until the native shell exists
+
+The Expo adapter needs no secret: APNs and FCM credentials live in EAS, which is Phase 7, along with
+the app that registers a device at `POST /api/devices`. Until a phone is registered and a trip's
+watch has `push` among its channels (`PATCH /api/trips/{id}/watch`), every interrupt is sent to the
+briefing as `no-device` or `no-interrupt-channel`. `EXPO_ACCESS_TOKEN` is optional hardening, for
+after "enhanced push security" is enabled on the Expo project.
+
+### 8. Graduating a detector — the switch that lets anything wake anyone
+
+`INTERRUPT_ELIGIBLE` in `src/domain/watch/route.ts` is empty, and the whole interrupt path behind it
+is built and rehearsed. A detector graduates by being added to that set, by hand, after **a week of
+its briefing-only verdicts audited by hand** — which for weather needs switch 1 first, since the
+judge has never produced a verdict. Road reports enter on the same terms.
+
+Before the first graduation, look at the clock. On the hourly Trigger.dev pass a verdict routed to
+`interrupt` can wait up to an hour to be judged and sent, against a two-hour horizon — and a
+published road report is matched at once but judged at the next drain. That is the evidence that
+would justify the $10 tier and a finer match/drain cadence.
+
 ## Checking it without switching anything on
 
-These three work today, against the live database, and none of them costs a model call:
+These work today, against the live database, and none of them costs a model call:
 
 ```
-npm test                # 269 tests; the watch layer's are in src/domain/watch/
+npm test                # 321 tests; the watch layer's are in src/domain/watch/
 npm run smoke:watch     # trip → watch → sense → match → queue → drain, judge stubbed
 npm run smoke:briefing  # bundle → compose → store → email → opened, composer and mailer stubbed
+npm run smoke:interrupt # route → budget → push → card → accept/dismiss/mute → sweep, all stubbed
+                        # at the edges; includes two deliveries racing for one slot
+npm run smoke:road      # report → moderation → corridor event → matcher → the next report
+npm run smoke:telegram  # the bot's real handlers, Telegram's API captured instead of called
 npm run kill:count      # pairs per trip-day over synthetic trips and archived weather
 ```
+
+`smoke:interrupt` is the one to run after touching the budget, the card or the sweep. It found two
+bugs on its first runs that no unit test could see: switched-off quiet hours reading back as the
+defaults, and a watch's channels arriving from Postgres as the string `{push,briefing}`. It runs
+with quiet hours off and indoor stops, so it does not depend on the hour. `smoke:road` and
+`smoke:telegram` write on the Military Road, where a published report ends every open road event,
+so each refuses to run while a live one it did not write exists.
 
 `smoke:watch` is the one to run after touching anything in the pipeline. It proves the three things
 unit tests cannot: that one trip in Tbilisi makes exactly one region worth polling, that the matcher
@@ -186,5 +251,15 @@ about delivery.
 - A pair routed to `briefing` whose stop passes before a briefing ever covers it keeps
   `delivered_at` NULL for ever. Harmless — it can never match the bundle filter again — and
   deliberate: "judged, never delivered" is a truer row than one backdated to look sent.
-- `intervention.outcome` is NULL on every briefing row. The accept/dismiss path ships in Phase 5
-  with the patch it applies, and the sweep that marks the rest `ignored` ships with it.
+- Briefing interventions written before Phase 5 carry no `offer`, so their card is a 404 and the
+  trust screen leaves them out. Only smoke data is affected; nothing real was briefed before.
+- Expo's push *receipts* are not read. A ticket marked ok means Expo accepted the push, not that
+  APNs delivered it; APNs rejections surface only in the receipts, fifteen minutes later.
+- The judge records a verdict and then posts the interrupt job, in two statements. A crash between
+  them leaves a pair routed `interrupt` that nothing delivers — rare, and visible as
+  `route = 'interrupt' AND delivered_at IS NULL`.
+- A road report nobody reviews stays `pending` after its window closes. It stops counting against
+  the reporter and drops out of /queue, but nothing marks it `expired`.
+- The newest road report on a corridor ends every other one. Right for status updates on one road;
+  wrong for two hazards at opposite ends of the Military Road at once. Revisit if real reports show
+  it.

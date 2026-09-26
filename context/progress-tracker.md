@@ -1,11 +1,18 @@
 # Progress tracker
 
-Last updated: 2026-09-21 (Phase 4).
+Last updated: 2026-09-26 (Phase 5).
 
 `context/running-the-pipeline.md` is the switch list: what is still switched off, why, and what
 turning each one on unblocks.
 
-## Current status: Phase 4 built and exercised on the live database; blocked on a Gemini plan, on Resend, and on the 600
+## Current status: Phase 5 built and rehearsed on the live database; nothing in it is switched on
+
+Phase 5 built the interrupt path, the budget enforced at send time, the intervention card with its
+outcomes, and the road-report bot — and switched none of it on, deliberately. `INTERRUPT_ELIGIBLE` is
+still empty: its rule is a week of hand-audited briefing-only verdicts, and the judge has never
+produced one (the Gemini quota below). The bot needs a Telegram token, and push needs the Phase 7
+app to register a phone. Everything between those edges is rehearsed against Neon by
+`smoke:interrupt`, `smoke:road` and `smoke:telegram`, which found three real bugs on the way.
 
 Phases 3 and 4 are built end to end and have run against the real database: sense → match → queue →
 drain → brief. The briefing is the first thing this system delivers to anyone, and it ships before
@@ -33,12 +40,14 @@ OAuth + `CURATOR_EMAILS`.
 | Dependencies | + `hono`, `@hono/zod-validator`, `zod`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `better-auth`, `@google/genai`, `@trigger.dev/sdk`, `resend`. Phase 1: + `@duckdb/node-api` (dev). Still not installed: MapLibre (Phase 6), Expo (Phase 7) |
 | Design system | `src/ui/` — Mist tokens in `app/globals.css` (`@theme`), primitives (button, card, chip, dot, controls, nav, bars, sheet, 28-glyph icon set) and composites in `src/features/`. Reference page at `/design` |
 | Screens | 17 screens under `src/app` (see `/design`). Layout and states are final; no MapLibre — maps are the canvas's schematic charts in `src/ui/map/`. All fixture-backed except `/trips/{id}/briefing`, which reads the database for a real trip and the fixtures for the design one |
-| Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0006` applied; `0005` adds the `briefing` table (one per trip-day, unique on `(trip_id, day)`), `0006` adds `event_match.delivered_at`. `0003` adds `event_match.route_reason`/`rejections` and makes the event/node pair unique, `0004` adds `queued_at`. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
-| Detectors | **1 of 7 built**: weather-vs-activity, hourly, thresholds derived here (no Georgian warning feed exists). Open-Meteo on the free tier — commercial key still to buy. No detector has graduated out of briefing-only: `INTERRUPT_ELIGIBLE` is empty, so nothing the system builds can wake anyone up |
-| Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job`, `briefing` all live. Cron at `/api/cron/{sense-weather,match,drain,briefing}` behind `CRON_SECRET`. The clock is `src/trigger/watch-pipeline.ts` — `watch-pipeline` hourly, `morning-briefing` at 07:30 Asia/Tbilisi — and there is no Trigger.dev account yet. 269 tests (`npm test`) |
+| Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0009` applied; `0007` adds `intervention.offer`/`expires_at` and one push per event, `0008` adds `device` and `trip_watch.muted_at`, `0009` adds `road_report`; `0005` adds the `briefing` table (one per trip-day, unique on `(trip_id, day)`), `0006` adds `event_match.delivered_at`. `0003` adds `event_match.route_reason`/`rejections` and makes the event/node pair unique, `0004` adds `queued_at`. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
+| Detectors | **2 of 7 built**: weather-vs-activity, hourly, thresholds derived here (no Georgian warning feed exists), Open-Meteo on the free tier — commercial key still to buy; and road-corridor, a Telegram form (anyone reports, operators approve), never connected to Telegram. No detector has graduated out of briefing-only: `INTERRUPT_ELIGIBLE` is empty, so nothing the system builds can wake anyone up |
+| Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job`, `briefing` all live. Cron at `/api/cron/{sense-weather,match,drain,briefing}` behind `CRON_SECRET`. The clock is `src/trigger/watch-pipeline.ts` — `watch-pipeline` hourly, `morning-briefing` at 07:30 Asia/Tbilisi — and there is no Trigger.dev account yet. 321 tests (`npm test`) |
 | Judge | Prompt, guards and router written and unit-tested; the four validators enforce evidence, tier, no-empty-helpful and the confidence floor. **The model itself has never been called** |
 | Briefing | Built end to end and **run against Gemini** (2026-09-24): bundle (48h lookahead) → compose → guards → store → email → open tracking. Quiet days, refused drafts and an unreachable model are all written without a model call. In-app view reads the database; email renders in HTML and text with evidence beside every claim. **Nothing has been emailed** (`RESEND_API_KEY` unset) |
 | Catalogue | **Loaded**: 64 sense regions, 12 corridors, 13,338 places (11,590 `verified`, 1,748 `raw`). Per focus area: Tbilisi core 4,008, Kakheti 830, Kazbegi corridor 730, Svaneti 301. **0 / 600 curated** |
+| Interrupts | Built and rehearsed, unreachable: `interrupt` jobs → `deliverInterrupt` (budget, quiet hours, lateness and coherence re-checked under a lock; a slot reserved before Expo is called) → the card at `/trips/{id}/alerts/{interventionId}` → accept / dismiss / mute → `ignored` by the hourly sweep. No detector is eligible and no phone is registered |
+| Road reports | Built and rehearsed, not connected: `/api/telegram/webhook` answers 503 until `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` are set. 0 reports |
 | Recruiting | Not started |
 
 ### Phase 0 procurement checklist (blocks on you, not on code)
@@ -78,7 +87,7 @@ be updated as phases close, not item-by-item.
 | 2 | Trip document + patch log | Built and running against Neon. Generation is untestable end to end until curated places exist; the Gemini call has never run (free-tier quota) |
 | 3 | Pipeline, weather only | Built and exercised on Neon. Judge never called (free-tier quota), so the eval harness and half the kill-criteria check are unrun |
 | 4 | Daily briefing | Built, exercised on Neon end to end, and composed once by Gemini. Email never sent (Resend unset); not yet in front of the three travellers — the only item left |
-| 5 | Interrupts, budget, road form | Not started |
+| 5 | Interrupts, budget, road form | Built and rehearsed on Neon. Nothing switched on: no detector graduated, no bot token, no phone registered |
 | 6 | Web client | Screens built against fixtures; nothing wired to the API or to MapLibre |
 | 7 | Native shell | Not started |
 | 8 | Detector expansion + road spike | Not started |
@@ -122,8 +131,9 @@ From `docs/implementation-plan.md` §13:
 1. **Domain** — parked. `roamline.io` is the best free option found; `wandr.ai` is brokered. Confirm
    at a registrar + trademark search before any design spend.
 2. **Road automation** — decided in Phase 8 on evidence from real manual events; no action needed yet.
-3. **Who may submit road reports** (self only / trusted locals / any user) — needed by Phase 5, affects
-   `world_event.confidence` and moderation design.
+3. ~~**Who may submit road reports**~~ — **decided 2026-09-25: anyone, moderated.** Operators publish
+   at once at confidence 0.9; everyone else's reports wait for an operator's approval and publish at
+   0.8.
 4. **Subscription mechanics** (trial length, first trip watched free?) — needed by Phase 6.
 
 ## Log
@@ -204,6 +214,20 @@ above gets resolved. Keep entries short — this is a log, not a report.
   enqueues rather than composing, so the model call sits behind the queue that already has a budget,
   a backoff and a give-up. Measured nothing new — the composer has never produced a draft, because
   `GEMINI_API_KEY` turns out to be a free-tier key capped at twenty calls a day.
+
+- **2026-09-26** — Phase 5 built: the budget enforcer, the interrupt path, Expo push, the
+  intervention card and its outcomes, the `ignored` sweep, device registration and watch settings,
+  and the road-report bot. Decisions made along the way: road reports are open to anyone and
+  moderated, with operators publishing directly; the budget is spent by a reservation under a lock
+  rather than by a send, so it cannot be raced; one event is one interrupt, held by a unique index;
+  an interrupt carries a working action or none, so a proposal that breaks the day goes to the
+  briefing; an offer stores its moves as absolute ops so accepting later cannot move a stop twice;
+  a late answer overrules the sweep's `ignored`; road events meet transfers only and stay matchable
+  for their window; the newest report about a road ends the others. Not done on purpose: no detector
+  graduated into `INTERRUPT_ELIGIBLE`, because the judge has never produced the week of audited
+  verdicts that requires. The rehearsals found three bugs no unit test could: switched-off quiet
+  hours read back as the defaults, a watch's channels arrived as the string `{push,briefing}`, and an
+  offer with nothing to apply could not be read back.
 
 - **2026-09-20** — Neon live; migrations `0000`–`0002` applied and `catalogue:load` run (64 regions,
   12 corridors, 13,338 places). Phase 2 finished in code: patch log with stored inverses, the

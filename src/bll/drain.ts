@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { claim, complete, fail, type Job, MAX_ATTEMPTS } from "../dal/jobs.ts";
 import { BRIEFING_JOB, writeBriefing } from "./briefing.ts";
+import { deliverInterrupt, INTERRUPT_JOB } from "./interrupt.ts";
 import { judgeMatch } from "./judge.ts";
 import { JUDGE_JOB } from "./match.ts";
 
@@ -36,6 +37,19 @@ export const handlers: Record<string, Handler> = {
       throw new Error("judge job has no matchId");
     }
     return judgeMatch(matchId);
+  },
+
+  // Posted by the judge when the router says wake them. Delivery asks again —
+  // budget, quiet hours, whether it is still true — and on the last attempt a
+  // push that cannot get through is handed to the briefing instead of lost.
+  [INTERRUPT_JOB]: async (payload, job) => {
+    const { matchId } = payload as { matchId?: string };
+    if (typeof matchId !== "string") {
+      throw new Error("interrupt job has no matchId");
+    }
+    return deliverInterrupt(matchId, {
+      lastChance: job.attempts >= MAX_ATTEMPTS,
+    });
   },
 
   // Posted by the 03:30 cron, one per trip-day. It is here rather than in the

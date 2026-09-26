@@ -282,7 +282,10 @@ export type Briefing = {
   composedAt: string;
 };
 
-const KIND_LABELS: Record<string, string> = { weather: "Weather" };
+const KIND_LABELS: Record<string, string> = {
+  weather: "Weather",
+  road: "Roads",
+};
 
 /** The detector a kind belongs to, as a word rather than a namespace. */
 export const kindLabel = (kind: EventKind): string =>

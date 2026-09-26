@@ -50,6 +50,27 @@
       "when": 1790005539180,
       "tag": "0006_match_delivered",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790365274021,
+      "tag": "0007_intervention_offer",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790365342012,
+      "tag": "0008_push_devices",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790368103380,
+      "tag": "0009_road_reports",
+      "breakpoints": true
     }
   ]
 }
