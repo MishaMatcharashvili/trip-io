@@ -1,0 +1,27 @@
+{
+  // The server's types, built on their own so the Expo app can read AppType
+  // without type-checking server code under React Native's globals, where
+  // Node's and React Native's declarations of process, require and fetch
+  // collide and turn process.env into `any`. mobile/tsconfig.json references
+  // this project; `tsc -b` there builds it first. Next never reads this file.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": ".types/api",
+    "tsBuildInfoFile": ".types/api.tsbuildinfo",
+    "plugins": []
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/dal/**/*.ts",
+    "src/bll/**/*.ts",
+    "src/infra/**/*.ts",
+    "src/server/**/*.ts",
+    "src/lib/**/*.ts"
+  ],
+  "exclude": ["node_modules", "src/**/*.test.ts"]
+}

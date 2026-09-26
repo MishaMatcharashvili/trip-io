@@ -35,7 +35,7 @@ schema and cron design this section summarizes.
 | Email | Resend | daily briefing |
 | Push | expo-notifications + EAS | APNs + FCM; credential setup starts week 1, latency doesn't compress |
 | Telegram | grammY, webhook | manual road-corridor report form (detector #2) |
-| Native | Expo, sharing the Hono client via `hc<AppType>()` | thin shell — trip list, intervention card, push registration, settings; heavy UI (map, editing) stays on web |
+| Native | Expo in `mobile/`, a pnpm workspace package, sharing the Hono client via `hc<AppType>()` | thin shell — trip list, intervention card, push registration, settings; heavy UI (map, editing) stays on web. It reads `AppType` as declarations built by `tsconfig.api.json`, and imports this package's types only (`src/mobile-boundary.test.ts`) |
 
 ## Layers
 

@@ -1,0 +1,15 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    // "@/" is the web package's alias. It must resolve here because AppType's
+    // declarations import each other through it; the app's own code uses "~/".
+    "paths": {
+      "@/*": ["../src/*"],
+      "~/*": ["./src/*"]
+    }
+  },
+  // Server code is type-checked in its own project, under Node's globals, and
+  // read here only as declarations. `tsc -b` builds it first.
+  "references": [{ "path": "../tsconfig.api.json" }]
+}
