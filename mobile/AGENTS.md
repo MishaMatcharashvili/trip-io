@@ -15,13 +15,15 @@ Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 ```bash
 npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
 npx expo start              # start the dev server
-npx expo lint               # lint
 pnpm typecheck              # tsc -b: builds the server's types first
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
 ```
 
-Run lint and typecheck before declaring any task done.
+Lint with the repo's Biome (`pnpm lint` from the root), not `npx expo lint`: that scaffolds an
+ESLint config the repo does not use. From the root, `pnpm typecheck` checks this app and the web app
+together — run it, with `pnpm lint` and `pnpm test`, before declaring any task done. CI runs all
+three on every pull request.
 
 ## This app lives inside the trip.io web repo
 
@@ -36,9 +38,16 @@ The app's API client is `hc<AppType>()` in `src/api.ts`, typed by the server's o
 
 ## Navigation & Routing
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+There is no router yet. `index.ts` registers `App.tsx` with `registerRootComponent`, and that one
+screen is a placeholder proving the typed API client works. Choosing navigation is Phase 7's job; if
+it is Expo Router, install it with `npx expo install expo-router`, move the entry point to it, and
+rewrite this section — until then, a file under `src/app/` is not a screen, because nothing mounts it.
+
+## Colours and dark mode
+
+The app follows the system theme (`userInterfaceStyle: "automatic"`). Take every colour from
+`usePalette()` in `src/theme.ts`, never inline: those are Mist's tokens mirrored from the web app's
+`globals.css`, and `src/mobile-palette.test.ts` in the root package fails if they drift.
 
 ## Building with EAS
 
