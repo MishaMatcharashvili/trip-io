@@ -593,6 +593,46 @@ export const watchLedger = [
   { value: "1h 20m", label: "delay avoided" },
 ];
 
+/**
+ * The fixture trip's stops on the real map, so the reference render shows
+ * MapLibre too. Ids are the day-3 checkpoints the popover opens.
+ */
+export const georgiaMapStops: Array<{
+  id: string;
+  lonLat: [number, number];
+  label: string;
+  state: CheckpointState;
+  disrupted?: boolean;
+}> = [
+  {
+    id: "tbilisi",
+    lonLat: [44.7937, 41.6938],
+    label: "Tbilisi",
+    state: "done",
+  },
+  {
+    id: "ananuri",
+    lonLat: [44.7036, 42.1644],
+    label: "Ananuri",
+    state: "done",
+  },
+  { id: "3a", lonLat: [44.4787, 42.4776], label: "Gudauri", state: "done" },
+  {
+    id: "3b",
+    lonLat: [44.5316, 42.5317],
+    label: "Friendship Monument",
+    state: "done",
+  },
+  { id: "3c", lonLat: [44.6434, 42.6571], label: "Kazbegi", state: "now" },
+  {
+    id: "3e",
+    lonLat: [44.6203, 42.6623],
+    label: "Gergeti hike",
+    state: "upcoming",
+    disrupted: true,
+  },
+];
+
 export function getTrip(id: string): Trip | undefined {
   return id === georgia.id ? georgia : undefined;
 }

@@ -4,6 +4,7 @@ import {
   advisory,
   calmStrip,
   georgia,
+  georgiaMapStops,
   opportunity,
   todayWeather,
 } from "@/data/trip";
@@ -18,7 +19,7 @@ import { Chip, WatchChip } from "@/ui/chip";
 import { RadioRow, Toggle } from "@/ui/control";
 import { Dot } from "@/ui/dot";
 import { Icon, type IconName } from "@/ui/icon";
-import { type MapStop, TripMap } from "@/ui/map/trip-map";
+import { TripMap } from "@/ui/map/trip-map";
 import { PillNav } from "@/ui/nav";
 import { Display, Eyebrow, Headline, Num, Prose, Title } from "@/ui/text";
 import { ThemeSegmented } from "@/ui/theme";
@@ -151,34 +152,6 @@ const screens = [
 ];
 
 /** Day 3 of the fixture trip, on the real map. */
-const mapStops: MapStop[] = [
-  {
-    id: "tbilisi",
-    lonLat: [44.7937, 41.6938],
-    label: "Tbilisi",
-    state: "done",
-  },
-  {
-    id: "ananuri",
-    lonLat: [44.7036, 42.1644],
-    label: "Ananuri",
-    state: "done",
-  },
-  { id: "gudauri", lonLat: [44.4787, 42.4776], label: "Gudauri", state: "now" },
-  {
-    id: "kazbegi",
-    lonLat: [44.6434, 42.6571],
-    label: "Kazbegi",
-    state: "upcoming",
-  },
-  {
-    id: "gergeti",
-    lonLat: [44.6203, 42.6623],
-    label: "Gergeti hike",
-    state: "upcoming",
-    disrupted: true,
-  },
-];
 
 function Spec({
   title,
@@ -418,7 +391,7 @@ export default function DesignSystemPage() {
             agent watches; coral marks the one stop something real happened to.
           </Prose>
           <Card className="overflow-hidden p-0">
-            <TripMap stops={mapStops} className="h-[420px] w-full" />
+            <TripMap stops={georgiaMapStops} className="h-[420px] w-full" />
           </Card>
         </section>
 
