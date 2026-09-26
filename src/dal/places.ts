@@ -1,5 +1,10 @@
 import { sql } from "drizzle-orm";
-import { categoryGroup, isOutdoor } from "../domain/catalogue/categories.ts";
+import {
+  type CategoryGroup,
+  categoryGroup,
+  categoryGroups,
+  isOutdoor,
+} from "../domain/catalogue/categories.ts";
 import {
   type AreaMatch,
   areaBySlug,
@@ -360,4 +365,76 @@ export async function placeCards(
       ];
     }),
   );
+}
+
+export type PlaceHit = {
+  id: string;
+  name: string;
+  nameKa: string | null;
+  category: string;
+  group: CategoryGroup;
+  tier: PlaceInfo["tier"];
+  lonLat: LonLat;
+  outdoor: boolean;
+  /** From `near`, when one was given. */
+  distanceM: number | null;
+};
+
+export type PlaceSearch = {
+  /** Matched against the name in either script; empty browses. */
+  q?: string;
+  near?: LonLat;
+  area?: AreaMatch;
+  groups?: readonly CategoryGroup[];
+  limit: number;
+};
+
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/**
+ * The catalogue as a traveller searches it: adding a stop, browsing a region.
+ * Every tier is searchable (a traveller may add any place); curated places
+ * come first, then names that start with the query, then the nearest.
+ */
+export async function searchPlaces(search: PlaceSearch): Promise<PlaceHit[]> {
+  const q = search.q?.trim() ?? "";
+  const pattern = `%${escapeLike(q)}%`;
+  const prefix = `${escapeLike(q)}%`;
+  const near = search.near
+    ? sql`ST_SetSRID(ST_MakePoint(${search.near[0]}, ${search.near[1]}), 4326)::geography`
+    : null;
+  const categories = search.groups?.flatMap(
+    (g) => categoryGroups[g] as readonly string[],
+  );
+
+  const rows = await db.execute(sql`
+    SELECT p.id, p.name, p.name_ka, p.category, p.tier,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
+           ${near ? sql`ST_Distance(p.geom, ${near})` : sql`NULL`} AS distance_m
+    FROM place p
+    WHERE TRUE
+      ${q ? sql`AND (p.name ILIKE ${pattern} OR p.name_ka ILIKE ${pattern})` : sql``}
+      ${search.area ? sql`AND ${areaPredicate(search.area)}` : sql``}
+      ${categories?.length ? sql`AND p.category IN (${list(categories)})` : sql``}
+    ORDER BY CASE p.tier WHEN 'curated' THEN 0 WHEN 'verified' THEN 1 ELSE 2 END,
+             ${q ? sql`(p.name ILIKE ${prefix}) DESC,` : sql``}
+             ${near ? sql`ST_Distance(p.geom, ${near}),` : sql``}
+             (p.attrs->>'confidence')::float DESC NULLS LAST,
+             p.name
+    LIMIT ${search.limit}
+  `);
+  return rows.rows.map((r) => {
+    const category = r.category as string;
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      nameKa: (r.name_ka as string | null) ?? null,
+      category,
+      group: categoryGroup[category as keyof typeof categoryGroup],
+      tier: r.tier as PlaceInfo["tier"],
+      lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+      outdoor: isOutdoor(category),
+      distanceM: r.distance_m === null ? null : Number(r.distance_m),
+    };
+  });
 }
