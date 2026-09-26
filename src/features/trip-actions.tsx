@@ -348,3 +348,59 @@ export function RemoveStopButton({
     </span>
   );
 }
+
+/** The same trip on new dates, as a new trip: "Plan it again" on Saved. */
+export function PlanAgainButton({ tripId }: { tripId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState("");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  if (!open) {
+    return (
+      <Button size="sm" onClick={() => setOpen(true)}>
+        Plan it again
+      </Button>
+    );
+  }
+
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => {
+          setError(null);
+          const res = await apiClient.api.trips[":id"].duplicate.$post({
+            param: { id: tripId },
+            json: { startDate: date },
+          });
+          if (res.ok) {
+            const { id } = (await res.json()) as { id: string };
+            router.push(`/trips/${id}/trip`);
+          } else {
+            setError(await refusal(res, "Couldn’t copy the trip."));
+          }
+        });
+      }}
+    >
+      <input
+        type="date"
+        required
+        aria-label="New start date"
+        value={date}
+        min={new Date().toISOString().slice(0, 10)}
+        onChange={(e) => setDate(e.target.value)}
+        className="h-[30px] rounded-control border border-control bg-surface px-2 text-small"
+      />
+      <Button type="submit" variant="primary" size="sm" disabled={pending}>
+        {pending ? "Copying…" : "Copy to these dates"}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+        Cancel
+      </Button>
+      {error ? <span className="text-mini text-alert">{error}</span> : null}
+    </form>
+  );
+}
