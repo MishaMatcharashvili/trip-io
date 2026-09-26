@@ -1,13 +1,20 @@
 "use client";
 
 import type {
+  ExpressionSpecification,
   GeoJSONSource,
   GeoJSONSourceSpecification,
   Map as MapLibreMap,
   Marker,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import {
+  type Ref,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { cx } from "../cx.ts";
 import { MAP_WORKER } from "./source.ts";
@@ -34,9 +41,37 @@ export type MapStop = {
   disrupted?: boolean;
 };
 
+/**
+ * A world event behind one of the trip's live matches, as GeoJSON. The map
+ * draws it in coral: it is a real disruption, the one thing coral means.
+ */
+export type MapEvent = {
+  id: string;
+  kind: string;
+  geometry: { type: string; coordinates: unknown };
+};
+
+/** Which of the trip's own layers are drawn. */
+export type MapLayers = { route: boolean; weather: boolean; roads: boolean };
+
+export const defaultLayers: MapLayers = {
+  route: true,
+  weather: true,
+  roads: true,
+};
+
+/** What the map's own controls (zoom, recentre) drive. */
+export type TripMapHandle = {
+  zoomIn(): void;
+  zoomOut(): void;
+  recentre(): void;
+};
+
 const BASE_URL = process.env.NEXT_PUBLIC_MAP_BASE_URL;
 
 const ROUTE_SOURCE = "trip-route";
+const EVENT_SOURCE = "trip-events";
+const EVENT_LAYERS = ["events-fill", "events-line", "events-point"] as const;
 
 type Theme = "light" | "dark";
 
@@ -73,13 +108,76 @@ function routeData(
   };
 }
 
-/** The route sits above the roads and below the place labels. */
-function addRoute(map: MapLibreMap, route: readonly LonLat[]) {
-  const agent = getComputedStyle(document.documentElement)
-    .getPropertyValue("--color-agent")
-    .trim();
-  map.addSource(ROUTE_SOURCE, { type: "geojson", data: routeData(route) });
+function eventData(
+  events: readonly MapEvent[],
+): GeoJSONSourceSpecification["data"] {
+  return {
+    type: "FeatureCollection",
+    features: events.map((e) => ({
+      type: "Feature",
+      id: e.id,
+      properties: { family: e.kind.split(".")[0] },
+      geometry: e.geometry as never,
+    })),
+  };
+}
+
+const token = (name: string) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/**
+ * The trip's own layers, above the roads and below the place labels: the
+ * route, and the areas of the events that touch it.
+ */
+function addTripLayers(
+  map: MapLibreMap,
+  route: readonly LonLat[],
+  events: readonly MapEvent[],
+) {
+  const agent = token("--color-agent");
+  const alert = token("--color-alert-bright");
   const firstLabel = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+
+  map.addSource(EVENT_SOURCE, { type: "geojson", data: eventData(events) });
+  map.addLayer(
+    {
+      id: "events-fill",
+      type: "fill",
+      source: EVENT_SOURCE,
+      filter: EVENT_SHAPES["events-fill"],
+      paint: { "fill-color": alert, "fill-opacity": 0.12 },
+    },
+    firstLabel,
+  );
+  map.addLayer(
+    {
+      id: "events-line",
+      type: "line",
+      source: EVENT_SOURCE,
+      filter: EVENT_SHAPES["events-line"],
+      paint: { "line-color": alert, "line-width": 1.5, "line-opacity": 0.7 },
+    },
+    firstLabel,
+  );
+  map.addLayer(
+    {
+      id: "events-point",
+      type: "circle",
+      source: EVENT_SOURCE,
+      filter: EVENT_SHAPES["events-point"],
+      paint: {
+        "circle-color": alert,
+        "circle-opacity": 0.18,
+        "circle-radius": 22,
+        "circle-stroke-color": alert,
+        "circle-stroke-width": 1.5,
+        "circle-stroke-opacity": 0.7,
+      },
+    },
+    firstLabel,
+  );
+
+  map.addSource(ROUTE_SOURCE, { type: "geojson", data: routeData(route) });
   map.addLayer(
     {
       id: ROUTE_SOURCE,
@@ -92,11 +190,62 @@ function addRoute(map: MapLibreMap, route: readonly LonLat[]) {
   );
 }
 
+const EVENT_SHAPES: Record<
+  (typeof EVENT_LAYERS)[number],
+  ExpressionSpecification
+> = {
+  "events-fill": ["==", ["geometry-type"], "Polygon"],
+  "events-line": ["!=", ["geometry-type"], "Point"],
+  "events-point": ["==", ["geometry-type"], "Point"],
+};
+
+/** Show or hide the trip's layers without rebuilding them. */
+function applyLayers(map: MapLibreMap, layers: MapLayers) {
+  if (!map.getLayer(ROUTE_SOURCE)) return;
+  map.setLayoutProperty(
+    ROUTE_SOURCE,
+    "visibility",
+    layers.route ? "visible" : "none",
+  );
+  const families = [
+    ...(layers.weather ? ["weather"] : []),
+    ...(layers.roads ? ["road"] : []),
+  ];
+  for (const id of EVENT_LAYERS) {
+    map.setLayoutProperty(
+      id,
+      "visibility",
+      families.length ? "visible" : "none",
+    );
+    map.setFilter(id, [
+      "all",
+      EVENT_SHAPES[id],
+      ["in", ["get", "family"], ["literal", families]],
+    ]);
+  }
+}
+
 /** A stop, drawn with the design system's own classes and tokens. */
-function stopElement(stop: MapStop): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "flex items-center gap-2 pointer-events-none";
-  el.setAttribute("aria-hidden", "true");
+function stopElement(
+  stop: MapStop,
+  selected: boolean,
+  onSelect: ((id: string) => void) | null,
+): HTMLElement {
+  const el = document.createElement(onSelect ? "button" : "div");
+  el.className = cx(
+    "flex items-center gap-2",
+    onSelect ? "cursor-pointer" : "pointer-events-none",
+  );
+  if (onSelect) {
+    (el as HTMLButtonElement).type = "button";
+    el.setAttribute("aria-label", stop.label);
+    el.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onSelect(stop.id);
+    });
+  } else {
+    el.setAttribute("aria-hidden", "true");
+  }
 
   const mark = document.createElement("span");
   if (stop.state === "now") {
@@ -126,10 +275,12 @@ function stopElement(stop: MapStop): HTMLElement {
     );
   }
 
+  if (selected) mark.classList.add("ring-2", "ring-agent", "ring-offset-2");
+
   const label = document.createElement("span");
   label.className = cx(
     "whitespace-nowrap text-[11px] uppercase tracking-[0.10em]",
-    stop.state === "now"
+    stop.state === "now" || selected
       ? "font-bold text-map-label-strong"
       : "font-medium text-map-label",
   );
@@ -142,6 +293,11 @@ function stopElement(stop: MapStop): HTMLElement {
 export function TripMap({
   stops,
   route = stops.map((s) => s.lonLat),
+  events = [],
+  layers = defaultLayers,
+  selectedId = null,
+  onSelect,
+  ref,
   fitPadding = 48,
   interactive = true,
   className,
@@ -149,6 +305,12 @@ export function TripMap({
   stops: readonly MapStop[];
   /** Defaults to straight lines between the stops, in order. */
   route?: readonly LonLat[];
+  events?: readonly MapEvent[];
+  layers?: MapLayers;
+  selectedId?: string | null;
+  /** Makes the stops buttons: the popover opens from here. */
+  onSelect?: (id: string) => void;
+  ref?: Ref<TripMapHandle>;
   /** Room to leave for panels floating over the map, in pixels. */
   fitPadding?:
     | number
@@ -161,8 +323,26 @@ export function TripMap({
     map: MapLibreMap;
     maplibre: typeof import("maplibre-gl");
   } | null>(null);
-  const latest = useRef({ stops, route });
-  latest.current = { stops, route };
+  const latest = useRef({ stops, route, events, layers, onSelect, fitPadding });
+  latest.current = { stops, route, events, layers, onSelect, fitPadding };
+
+  // Whether stops are buttons; the handler itself is read through `latest`, so
+  // a new function on every render does not rebuild every marker.
+  const selectable = onSelect !== undefined;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      zoomIn: () => loaded?.map.zoomIn(),
+      zoomOut: () => loaded?.map.zoomOut(),
+      recentre: () =>
+        loaded?.map.fitBounds(
+          bounds(latest.current.stops, latest.current.route),
+          { padding: latest.current.fitPadding, maxZoom: 13 },
+        ),
+    }),
+    [loaded],
+  );
 
   // The map itself: created once, restyled when the theme changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: built once; stops and route are synced by the effect below
@@ -186,9 +366,12 @@ export function TripMap({
         attributionControl: { compact: true },
       });
       const m = map;
-      // Fires again after every setStyle, which drops the route with the
-      // old style — so this is also what redraws it after a theme change.
-      m.on("style.load", () => addRoute(m, latest.current.route));
+      // Fires again after every setStyle, which drops the trip's layers with
+      // the old style — so this is also what redraws them after a theme change.
+      m.on("style.load", () => {
+        addTripLayers(m, latest.current.route, latest.current.events);
+        applyLayers(m, latest.current.layers);
+      });
       setLoaded({ map: m, maplibre });
 
       observer = new MutationObserver(() => {
@@ -219,9 +402,12 @@ export function TripMap({
   useEffect(() => {
     if (!loaded) return;
     const { map, maplibre } = loaded;
+    const select = selectable
+      ? (id: string) => latest.current.onSelect?.(id)
+      : null;
     const markers: Marker[] = stops.map((stop) =>
       new maplibre.Marker({
-        element: stopElement(stop),
+        element: stopElement(stop, stop.id === selectedId, select),
         anchor: "left",
         offset: [-9, 0],
       })
@@ -229,10 +415,15 @@ export function TripMap({
         .addTo(map),
     );
     map.getSource<GeoJSONSource>(ROUTE_SOURCE)?.setData(routeData(route));
+    map.getSource<GeoJSONSource>(EVENT_SOURCE)?.setData(eventData(events));
     return () => {
       for (const m of markers) m.remove();
     };
-  }, [loaded, stops, route]);
+  }, [loaded, stops, route, events, selectedId, selectable]);
+
+  useEffect(() => {
+    if (loaded?.map.isStyleLoaded()) applyLayers(loaded.map, layers);
+  }, [loaded, layers]);
 
   if (!BASE_URL) {
     // No basemap configured (a checkout without NEXT_PUBLIC_MAP_BASE_URL):
