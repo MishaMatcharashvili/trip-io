@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { foundationsPage, indexPage } from "./cards.ts";
 import { type Flow, screenPage } from "./page.ts";
 import { active } from "./screens/active.ts";
+import { briefing } from "./screens/briefing.ts";
 
 /**
  * Builds the mobile design bundle into `design/mobile/`: one self-contained
@@ -20,7 +21,7 @@ const OUT = join(
   "../../../design/mobile",
 );
 
-const flows: Flow[] = [active];
+const flows: Flow[] = [active, briefing];
 
 rmSync(OUT, { recursive: true, force: true });
 
