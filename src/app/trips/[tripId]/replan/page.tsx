@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getTrip, proposal, unchangedNodes } from "@/data/trip";
 import { TopBar } from "@/features/chrome";
 import { Button, ButtonLink } from "@/ui/button";
@@ -9,6 +9,7 @@ import { Icon } from "@/ui/icon";
 import { BasemapWeather } from "@/ui/map/basemap-weather";
 import { BottomNav, tripTabs } from "@/ui/nav";
 import { Eyebrow, Headline, Num } from "@/ui/text";
+import { loadTrip } from "../load";
 
 export const metadata: Metadata = { title: "Replanning" };
 
@@ -44,7 +45,17 @@ export default async function ReplanPage({
 }: PageProps<"/trips/[tripId]/replan">) {
   const { tripId } = await params;
   const trip = getTrip(tripId);
-  if (!trip) notFound();
+  if (!trip) {
+    // A real trip's replan is made where its evidence is: the open alert's
+    // before-and-after, or, with nothing proposed, the day editor.
+    const { screen } = await loadTrip(tripId);
+    const open = screen.alerts.alerts.find((a) => a.outcome === null);
+    redirect(
+      open
+        ? `/trips/${tripId}/alerts/${open.id}`
+        : `/trips/${tripId}/day/today`,
+    );
+  }
 
   return (
     <div className="relative flex min-h-dvh flex-col">
