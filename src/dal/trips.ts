@@ -8,7 +8,7 @@ import {
 import type { PatchOp } from "../domain/trip/patch.ts";
 import type { Author } from "../domain/trip/validate.ts";
 import { db, type Queryable } from "./client.ts";
-import { trip } from "./schema/index.ts";
+import { trip, watchPass } from "./schema/index.ts";
 import type { Tx } from "./tx.ts";
 
 // The patch log and the node projection that hangs off it, as rows.
@@ -350,10 +350,24 @@ export async function reassignTrips(
   fromUserId: string,
   toUserId: string,
 ): Promise<void> {
-  await db
-    .update(trip)
-    .set({ userId: toUserId })
-    .where(eq(trip.userId, fromUserId));
+  // The anonymous user is deleted once linked, and passes and saved places
+  // cascade with their user: they move with the trips, or they are lost.
+  await db.batch([
+    db
+      .update(trip)
+      .set({ userId: toUserId })
+      .where(eq(trip.userId, fromUserId)),
+    db
+      .update(watchPass)
+      .set({ userId: toUserId })
+      .where(eq(watchPass.userId, fromUserId)),
+    db.execute(sql`
+      INSERT INTO saved_place (user_id, place_id, saved_at)
+      SELECT ${toUserId}, place_id, saved_at FROM saved_place
+      WHERE user_id = ${fromUserId}
+      ON CONFLICT DO NOTHING
+    `),
+  ]);
 }
 
 export type TripListRow = {
