@@ -78,6 +78,13 @@
       "when": 1790443602263,
       "tag": "0010_saved_places",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790443652964,
+      "tag": "0011_watch_preferences",
+      "breakpoints": true
     }
   ]
 }
