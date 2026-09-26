@@ -14,6 +14,7 @@
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
 import { generateTrip } from "../../src/bll/trip-generation.ts";
+import { startFreeWatch } from "../../src/bll/watch-pass.ts";
 import { db } from "../../src/dal/client.ts";
 import { user } from "../../src/dal/schema/index.ts";
 import {
@@ -80,9 +81,13 @@ if (!result.ok) {
   process.exit(1);
 }
 
+// The account's free first watch, when it still has one; otherwise the trip is
+// planned but not watched until a pass is bought on /plans.
+const watch = await startFreeWatch(result.tripId, owner.id);
+
 const stops = Object.keys(result.doc.nodes).length;
 const base = process.env.APP_URL ?? "http://localhost:3000";
 console.log(
-  `${stops} stops from ${result.source} → ${base}/trips/${result.tripId}`,
+  `${stops} stops from ${result.source}, ${watch.ok ? "watched (free pass)" : "not watched"} → ${base}/trips/${result.tripId}`,
 );
 process.exit(0);
