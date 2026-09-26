@@ -1,6 +1,8 @@
 import {
+  type EventArea,
   type LiveMatch,
   lastCheckFor,
+  liveEventAreas,
   liveMatchesFor,
 } from "../dal/matches.ts";
 import { type PlaceCard, placeCards } from "../dal/places.ts";
@@ -23,6 +25,8 @@ export type TripScreen = TripView & {
   positions: Record<string, LonLat>;
   /** Judged pairs still in effect, newest first. */
   matches: LiveMatch[];
+  /** Where the events behind those pairs are: the map's weather and road layers. */
+  events: EventArea[];
   alerts: AlertsPage;
   /** The patch log, newest first. */
   history: PatchRecord[];
@@ -35,10 +39,11 @@ export async function tripScreen(tripId: string): Promise<TripScreen | null> {
   const view = await tripView(tripId);
   if (!view) return null;
 
-  const [places, matches, alerts, patches, watch, lastCheck] =
+  const [places, matches, events, alerts, patches, watch, lastCheck] =
     await Promise.all([
       placeCards(placeIdsOf(view.doc)),
       liveMatchesFor(tripId),
+      liveEventAreas(tripId),
       alertsPage(tripId),
       history(tripId),
       loadWatch(tripId),
@@ -57,6 +62,7 @@ export async function tripScreen(tripId: string): Promise<TripScreen | null> {
     places: Object.fromEntries(places),
     positions,
     matches,
+    events,
     alerts,
     history: patches,
     watch,
@@ -64,7 +70,7 @@ export async function tripScreen(tripId: string): Promise<TripScreen | null> {
   };
 }
 
-export type { LiveMatch, TripListRow };
+export type { EventArea, LiveMatch, TripListRow };
 
 /** A traveller's trips, soonest first. */
 export function myTrips(userId: string): Promise<TripListRow[]> {

@@ -525,3 +525,34 @@ export async function lastCheckFor(tripId: string): Promise<string | null> {
   const at = rows.rows[0]?.at;
   return at ? new Date(at as string).toISOString() : null;
 }
+
+export type EventArea = {
+  id: string;
+  kind: EventKind;
+  /** GeoJSON geometry, as PostGIS writes it. */
+  geometry: { type: string; coordinates: unknown };
+};
+
+/**
+ * Where the events behind a trip's live matches are: the weather and road
+ * layers of the trip map. Only events the judge routed to the traveller, so the
+ * map never shows a disruption the itinerary does not.
+ */
+export async function liveEventAreas(
+  tripId: string,
+  now: Date = new Date(),
+): Promise<EventArea[]> {
+  const rows = await db.execute(sql`
+    SELECT DISTINCT e.id, e.kind, ST_AsGeoJSON(e.geom::geometry, 5) AS geometry
+    FROM event_match m
+    JOIN world_event e ON e.id = m.event_id
+    WHERE m.trip_id = ${tripId}
+      AND m.route IN ('interrupt', 'briefing')
+      AND (e.valid_to IS NULL OR e.valid_to > ${now.toISOString()})
+  `);
+  return rows.rows.map((r) => ({
+    id: r.id as string,
+    kind: r.kind as EventKind,
+    geometry: JSON.parse(r.geometry as string),
+  }));
+}

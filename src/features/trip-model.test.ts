@@ -31,6 +31,7 @@ function screen(patch: Partial<TripScreen> = {}): TripScreen {
     places: {},
     positions,
     matches: [],
+    events: [],
     alerts: { title: "", alerts: [], told: 0, applied: 0, kept: 0, checks: 0 },
     history: [],
     watch: null,
