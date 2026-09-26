@@ -1,7 +1,13 @@
 import type { LiveMatch, TripScreen } from "../bll/trip-screen.ts";
 import type { Checkpoint, Day, Source, Trip } from "../data/trip.ts";
 import type { LonLat } from "../domain/geo.ts";
-import { dayKey, nodeEnd, sortedNodes } from "../domain/trip/document.ts";
+import { diffDays } from "../domain/trip/diff.ts";
+import {
+  dayKey,
+  nodeEnd,
+  sortedNodes,
+  type TripDoc,
+} from "../domain/trip/document.ts";
 import { addDays } from "../domain/trip/generate/schedule.ts";
 import { at, kindLabel } from "../domain/watch/briefing.ts";
 import type { DaySegment } from "../ui/bars.tsx";
@@ -313,4 +319,35 @@ export function mapStops(day: Day): MapStop[] {
 /** Every stop of the trip, for the whole-trip map. */
 export function tripStops(trip: Trip): MapStop[] {
   return trip.days.flatMap(mapStops);
+}
+
+export type ChangeRow = { from: string; to: string };
+
+/**
+ * A patch as before-and-after rows: "16:00 Gergeti hike" → "11:30 Gergeti
+ * hike". Every node the patch touched gets one row; nothing else is listed,
+ * because "nothing else moved" is the promise the panel makes.
+ */
+export function changeRows(before: TripDoc, after: TripDoc): ChangeRow[] {
+  const line = (n: { startsAt: string; meta: { title: string } }) =>
+    `${at(n.startsAt)} ${n.meta.title}`;
+  const seen = new Set<string>();
+  const rows: ChangeRow[] = [];
+  for (const { changes } of diffDays(before, after)) {
+    for (const change of changes) {
+      if (seen.has(change.id)) continue;
+      seen.add(change.id);
+      switch (change.kind) {
+        case "added":
+          rows.push({ from: "New", to: line(change.after) });
+          break;
+        case "removed":
+          rows.push({ from: line(change.before), to: "Removed" });
+          break;
+        default:
+          rows.push({ from: line(change.before), to: line(change.after) });
+      }
+    }
+  }
+  return rows;
 }

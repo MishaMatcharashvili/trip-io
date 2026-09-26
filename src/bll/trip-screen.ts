@@ -9,10 +9,14 @@ import { type PlaceCard, placeCards } from "../dal/places.ts";
 import { type PatchRecord, type TripListRow, tripsFor } from "../dal/trips.ts";
 import { loadWatch, type Watch } from "../dal/watches.ts";
 import type { LonLat } from "../domain/geo.ts";
-import { placeIdsOf, sortedNodes } from "../domain/trip/document.ts";
+import {
+  placeIdsOf,
+  sortedNodes,
+  type TripDoc,
+} from "../domain/trip/document.ts";
 import { openMeteo } from "../infra/open-meteo.ts";
 import { type AlertsPage, alertsPage } from "./interventions.ts";
-import { history, type TripView, tripView } from "./trip-document.ts";
+import { docAt, history, type TripView, tripView } from "./trip-document.ts";
 
 // The read models behind the web client's trip screens. Each is one call a page
 // makes after it has checked access; none of them decides anything.
@@ -32,6 +36,11 @@ export type TripScreen = TripView & {
   history: PatchRecord[];
   watch: Watch | null;
   lastCheck: string | null;
+  /**
+   * The document before the head patch, when there is one before it: what the
+   * "day updated" panel diffs against, and what an undo would go back to.
+   */
+  before: TripDoc | null;
 };
 
 /** Everything the trip screens show about one trip. Access is the caller's. */
@@ -50,6 +59,9 @@ export async function tripScreen(tripId: string): Promise<TripScreen | null> {
       lastCheckFor(tripId),
     ]);
 
+  const previous = patches[1];
+  const before = previous ? await docAt(tripId, previous.id) : null;
+
   const positions: Record<string, LonLat> = {};
   for (const { id, node } of sortedNodes(view.doc.nodes)) {
     const at = node.placeId ? places.get(node.placeId)?.lonLat : node.lonLat;
@@ -67,6 +79,7 @@ export async function tripScreen(tripId: string): Promise<TripScreen | null> {
     history: patches,
     watch,
     lastCheck,
+    before,
   };
 }
 

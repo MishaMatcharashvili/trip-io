@@ -9,7 +9,13 @@ import {
   P,
   places,
 } from "../domain/trip/test-fixtures.ts";
-import { dateRange, mapStops, partyLine, tripModel } from "./trip-model.ts";
+import {
+  changeRows,
+  dateRange,
+  mapStops,
+  partyLine,
+  tripModel,
+} from "./trip-model.ts";
 
 // The fixture Kazbegi day, as the trip screen's read model would hand it over.
 function screen(patch: Partial<TripScreen> = {}): TripScreen {
@@ -36,6 +42,7 @@ function screen(patch: Partial<TripScreen> = {}): TripScreen {
     history: [],
     watch: null,
     lastCheck: null,
+    before: null,
     ...patch,
   } as TripScreen;
 }
@@ -120,5 +127,21 @@ describe("labels", () => {
   test("party", () => {
     assert.equal(partyLine({ adults: 1 }), "Travelling solo");
     assert.equal(partyLine({ adults: 2, children: 1 }), "2 adults · 1 child");
+  });
+});
+
+describe("changeRows", () => {
+  test("one row per node the patch touched", () => {
+    const before = kazbegiDoc();
+    const after = kazbegiDoc();
+    after.nodes[N.hike] = {
+      ...after.nodes[N.hike],
+      startsAt: at(DAY, "11:30"),
+    };
+    delete after.nodes[N.dinner];
+    assert.deepEqual(changeRows(before, after), [
+      { from: "16:00 Gergeti Trinity hike", to: "11:30 Gergeti Trinity hike" },
+      { from: "19:30 Dinner · Cafe 5047m", to: "Removed" },
+    ]);
   });
 });
