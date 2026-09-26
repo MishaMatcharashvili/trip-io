@@ -29,6 +29,7 @@
     "catalogue:extract": "node scripts/catalogue/extract.ts",
     "catalogue:corridors": "node scripts/catalogue/build-corridors.ts",
     "catalogue:load": "node --env-file=.env scripts/catalogue/load.ts",
+    "design:mobile": "tsx scripts/design/mobile/build.ts"
     "map:build": "node --env-file=.env scripts/map/build.ts"
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
