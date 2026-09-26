@@ -4,6 +4,7 @@ import { Divider, EvidenceRow, Panel } from "@/ui/card";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import { Display, Eyebrow, Num, Prose, Title } from "@/ui/text";
+import { KeepPlanAction } from "./trip-actions";
 
 /**
  * The interrupt card — the one thing on screen asking for a decision.
@@ -16,10 +17,16 @@ import { Display, Eyebrow, Num, Prose, Title } from "@/ui/text";
 export function AdvisoryCard({
   advisory,
   tripId,
+  href = `/trips/${tripId}/replan`,
+  interventionId,
   className,
 }: {
   advisory: Advisory;
   tripId: string;
+  /** Where the change is reviewed and applied. */
+  href?: string;
+  /** A real intervention: "Keep current plan" answers it. */
+  interventionId?: string;
   className?: string;
 }) {
   return (
@@ -47,18 +54,18 @@ export function AdvisoryCard({
         </div>
 
         <div className="flex gap-2">
-          <ButtonLink
-            href={`/trips/${tripId}/replan`}
-            variant="primary"
-            className="flex-1"
-          >
+          <ButtonLink href={href} variant="primary" className="flex-1">
             Replan my day
           </ButtonLink>
-          <ButtonLink href={`/trips/${tripId}/replan`}>View changes</ButtonLink>
+          <ButtonLink href={href}>View changes</ButtonLink>
         </div>
 
         <div className="flex items-center gap-3">
-          <QuietAction>Keep current plan</QuietAction>
+          {interventionId ? (
+            <KeepPlanAction interventionId={interventionId} />
+          ) : (
+            <QuietAction>Keep current plan</QuietAction>
+          )}
           <div className="flex-1" />
           <Eyebrow>{advisory.evidence}</Eyebrow>
         </div>
@@ -104,11 +111,15 @@ export function OpportunityCard({
  */
 export function AllClearCard({
   sources,
+  headline = "Today is going to plan",
+  note = "I have checked everything on your route since 06:00 and found nothing that changes your day. I will interrupt you if that stops being true.",
   nextSweep,
   watchHref,
   className,
 }: {
   sources: Array<{ name: string; tone: "ok" | "idle"; status: string }>;
+  headline?: string;
+  note?: string;
   nextSweep: string;
   watchHref: string;
   className?: string;
@@ -122,11 +133,8 @@ export function AllClearCard({
           </span>
           <Eyebrow tone="ok">Nothing needs your attention</Eyebrow>
         </div>
-        <Display className="text-[25px]">Today is going to plan</Display>
-        <Prose>
-          I have checked everything on your route since 06:00 and found nothing
-          that changes your day. I will interrupt you if that stops being true.
-        </Prose>
+        <Display className="text-[25px]">{headline}</Display>
+        <Prose>{note}</Prose>
       </div>
 
       <Divider />
