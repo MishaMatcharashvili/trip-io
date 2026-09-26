@@ -8,6 +8,7 @@ import {
   appendPatch,
   createTrip,
   docAt,
+  duplicateTrip,
   history,
   previewPatch,
   restoreTo,
@@ -230,6 +231,29 @@ export const trips = new Hono<SessionEnv>()
       });
       // A trip with no stops has no watch yet: nothing to be reached about.
       return saved ? c.body(null, 204) : c.json({ error: "not watched" }, 409);
+    },
+  )
+
+  // "Plan it again": the same stops on new dates, as a new trip.
+  .post(
+    "/:id/duplicate",
+    zValidator("param", params),
+    zValidator("json", z.object({ startDate: z.iso.date() })),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const result = await duplicateTrip(
+        id,
+        c.get("userId"),
+        c.req.valid("json").startDate,
+      );
+      if (!result.ok) {
+        const { body, status } = failure(result);
+        return c.json(body, status);
+      }
+      return c.json({ id: result.tripId }, 201);
     },
   )
 
