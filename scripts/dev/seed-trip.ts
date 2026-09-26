@@ -82,5 +82,7 @@ if (!result.ok) {
 
 const stops = Object.keys(result.doc.nodes).length;
 const base = process.env.APP_URL ?? "http://localhost:3000";
-console.log(`${stops} stops from ${result.source} → ${base}/trips/${result.tripId}`);
+console.log(
+  `${stops} stops from ${result.source} → ${base}/trips/${result.tripId}`,
+);
 process.exit(0);
