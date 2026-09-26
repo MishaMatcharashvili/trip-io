@@ -20,7 +20,7 @@ export const active: Flow = {
       note: "The map is the canvas. The day's one disruption floats over it; the next stop and the ask bar sit in the sheet.",
       render: (t) => `
 <div class="map">${basemap("route", t)}</div>
-${statusBar("14:52")}
+${statusBar("10:48")}
 ${tripHeader({ title: "Georgia · Day 3", sub: "Gudauri → Kazbegi" })}
 <div class="abs float col clip line-w" style="top:112px;left:12px;right:12px;z-index:5">
   <div class="row" style="padding:12px 14px 0;gap:8px">
@@ -39,7 +39,7 @@ ${tripHeader({ title: "Georgia · Day 3", sub: "Gudauri → Kazbegi" })}
 </div>
 <div class="sheet" style="bottom:82px;z-index:6">
   <div class="grab"></div>
-  ${sheetHead({ eyebrow: "Now", eyebrowTone: "agent", title: "Driving to Kazbegi", value: "15:10", valueNote: "38 km left" })}
+  ${sheetHead({ eyebrow: "Now", eyebrowTone: "agent", title: "Driving to Kazbegi", value: "11:20", valueNote: "24 km left" })}
   <div class="hr" style="margin:0 16px"></div>
   ${agendaRow({ time: "16:00", title: "Gergeti Trinity hike", detail: "1 conflict · inside the rain window", tone: "alert" })}
   <div class="row" style="padding:0 16px 10px;gap:8px">
@@ -95,7 +95,7 @@ ${homeIndicator}`,
       render: (t) => `
 <div class="map" style="opacity:.55">${basemap("route", t)}</div>
 <div class="veil"></div>
-${statusBar("14:21", { offline: true })}
+${statusBar("11:21", { offline: true })}
 ${tripHeader({
   title: "Georgia · Day 3",
   sub: "Gudauri → Kazbegi",
@@ -104,7 +104,7 @@ ${tripHeader({
 <div class="abs float col clip" style="top:112px;left:12px;right:12px;z-index:5">
   <div class="col" style="padding:16px 16px 14px;gap:10px">
     <div class="row mut2" style="gap:9px">${ic("offline", 16)}<span class="eyebrow">Watch layer paused</span></div>
-    <div class="h2" style="font-size:20px">I stopped watching at 13:04</div>
+    <div class="h2" style="font-size:20px">I stopped watching at 10:34</div>
     <div class="sm mut">No connection since you left Gudauri. Your itinerary is all here, but I can't see weather, roads or transport until you're back online — treat everything below as last known, not current.</div>
     <div class="row" style="gap:9px">
       <span class="btn btn-p grow" style="height:44px">Try again</span>
@@ -114,10 +114,10 @@ ${tripHeader({
   <div class="hr"></div>
   <div class="col" style="padding:6px 16px 8px">
     ${[
-      ["Weather", "13:04"],
-      ["Roads", "13:01"],
-      ["Transport", "12:48"],
-      ["Local events", "12:20"],
+      ["Weather", "10:34"],
+      ["Roads", "10:31"],
+      ["Transport", "10:18"],
+      ["Local events", "09:50"],
     ]
       .map(
         ([name, at], i) =>
@@ -128,7 +128,7 @@ ${tripHeader({
 </div>
 <div class="sheet" style="bottom:82px;z-index:6">
   <div class="grab"></div>
-  ${sheetHead({ eyebrow: "Your plan, as of 13:04", title: "Driving to Kazbegi", value: "15:10", valueNote: "Estimated" })}
+  ${sheetHead({ eyebrow: "Your plan, as of 10:34", title: "Driving to Kazbegi", value: "11:20", valueNote: "Estimated" })}
   <div class="hr" style="margin:0 16px"></div>
   ${agendaRow({ time: "16:00", title: "Gergeti Trinity hike", detail: "Rain was forecast from 15:30 — unverified since", trailing: "" })}
   <div class="hr" style="margin:0 16px"></div>

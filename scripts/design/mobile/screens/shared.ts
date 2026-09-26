@@ -91,11 +91,11 @@ export function appBar({
   back?: boolean;
   right?: string;
 }): string {
-  return `<div class="appbar row" style="height:56px;padding:0 16px;gap:10px">
+  return `<div class="appbar"><div class="row" style="height:56px;padding:0 16px;gap:10px">
   ${back ? `<span class="mut row">${ic("chevronLeft", 20)}</span>` : ""}
   <div class="col grow" style="gap:1px"><div class="h3" style="font-size:16px">${title}</div>${sub ? `<div class="eyebrow">${sub}</div>` : ""}</div>
   ${right}
-</div>`;
+</div></div>`;
 }
 
 /** Four sources in a row, each a dot and a count — the watch strip. */
