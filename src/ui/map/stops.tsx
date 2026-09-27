@@ -249,7 +249,15 @@ export function mountStops(
   const onStyle = () => addLayers(map, stopData(stops, selectedId));
   map.on("style.load", onStyle);
   map.on("render", sync);
-  if (map.isStyleLoaded()) onStyle();
+  // A map borrowed from the pool has its style already, and fires no
+  // style.load for this borrower. isStyleLoaded() cannot tell: it stays false
+  // while tiles load. Adding throws when the style itself is not ready, and
+  // then style.load does it.
+  try {
+    onStyle();
+  } catch {
+    // Not loaded yet; the listener above adds the layers.
+  }
 
   return {
     update(nextStops, nextSelected) {
@@ -272,6 +280,9 @@ export function mountStops(
       map.off("render", sync);
       for (const m of markers.values()) m.marker.remove();
       markers.clear();
+      // The map outlives this page (pool.ts): leave it bare for the next one.
+      if (map.getLayer(LABEL_LAYER)) map.removeLayer(LABEL_LAYER);
+      if (map.getSource(STOP_SOURCE)) map.removeSource(STOP_SOURCE);
       // Unmounting inside React's own commit warns; the map's cleanup runs in one.
       queueMicrotask(() => root.unmount());
     },
