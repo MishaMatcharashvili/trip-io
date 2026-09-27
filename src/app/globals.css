@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* MapLibre's stylesheet, layered under the utilities. Unlayered, its
+   `.maplibregl-map { position: relative }` beats every `absolute inset-0` a
+   screen puts on the map, and the map collapses to zero height. */
+@import "maplibre-gl/dist/maplibre-gl.css" layer(components);
 
 /* `dark:` follows the resolved theme on <html>, not the OS directly, so a
    manual choice in the theme switch wins over the system preference. */
