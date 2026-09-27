@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { preconnect } from "react-dom";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
@@ -345,6 +346,14 @@ export function TripMap({
   interactive?: boolean;
   className?: string;
 }) {
+  // Everything the map loads lives on the Blob store: open the connection
+  // while the page's own scripts are still arriving. The fetches are CORS, so
+  // the connection must be an anonymous one or the browser opens a second.
+  // Rendered on the server too, so the hint is in the first HTML.
+  if (BASE_URL) {
+    preconnect(new URL(BASE_URL).origin, { crossOrigin: "anonymous" });
+  }
+
   const [arrived, setArrived] = useState<RouteLegs | null>(null);
   useEffect(() => {
     if (!isPending(routeProp)) return;
