@@ -144,11 +144,11 @@ export const ic = icon;
 
 /** The iOS status bar. Offline dims the signal and drops the wifi glyph. */
 export function statusBar(time = "14:52", { offline = false } = {}): string {
-  const signal = `<svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"${offline ? ' class="dim"' : ""}><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>`;
+  const signal = `<svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor" aria-hidden="true"${offline ? ' class="dim"' : ""}><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>`;
   const wifi = offline
     ? ""
-    : `<svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M7.5 2.2c2.2 0 4.2.8 5.7 2.2l1.1-1.2A10 10 0 0 0 7.5.5 10 10 0 0 0 .7 3.2l1.1 1.2a8.3 8.3 0 0 1 5.7-2.2z"/><path d="M7.5 5.4c1.3 0 2.5.5 3.4 1.3l1.1-1.2a6.6 6.6 0 0 0-9 0l1.1 1.2c.9-.8 2.1-1.3 3.4-1.3z"/><path d="M9.5 8 7.5 10.4 5.5 8a3 3 0 0 1 4 0z"/></svg>`;
-  const battery = `<svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg>`;
+    : `<svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor" aria-hidden="true"><path d="M7.5 2.2c2.2 0 4.2.8 5.7 2.2l1.1-1.2A10 10 0 0 0 7.5.5 10 10 0 0 0 .7 3.2l1.1 1.2a8.3 8.3 0 0 1 5.7-2.2z"/><path d="M7.5 5.4c1.3 0 2.5.5 3.4 1.3l1.1-1.2a6.6 6.6 0 0 0-9 0l1.1 1.2c.9-.8 2.1-1.3 3.4-1.3z"/><path d="M9.5 8 7.5 10.4 5.5 8a3 3 0 0 1 4 0z"/></svg>`;
+  const battery = `<svg width="25" height="12" viewBox="0 0 25 12" aria-hidden="true"><rect x=".5" y=".5" width="21" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/><path d="M23 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".45"/></svg>`;
   return `<div class="status"><span>${time}</span><span class="sig">${signal}${wifi}${battery}</span></div>`;
 }
 
