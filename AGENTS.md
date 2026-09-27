@@ -38,3 +38,22 @@ Before adding a file, decide which layer it belongs to. `context/architecture.md
 - `src/server` route handlers do validation and status codes. They call use cases, never repositories.
 
 When the layers test fails, move the code left rather than adding an exception.
+
+# Running and inspecting the app
+
+To check that a change works at runtime, not only that it type-checks, use the `next-dev-loop`
+skill (`.claude/skills/next-dev-loop`, pinned in `skills-lock.json`). It works against a running
+`pnpm dev` through two views: `/_next/mcp` for routes, compilation issues, server and browser
+errors and logs, and `agent-browser` for the DOM, console, network timings, the React tree, Web
+Vitals and screenshots.
+
+Don't write ad-hoc Playwright scripts to load pages, collect console errors, time requests or take
+screenshots; the skill covers all of that. Use Playwright only for what it doesn't: end-to-end
+tests checked into the repo, or runs in Firefox and WebKit.
+
+One-time setup:
+
+- `npm i -g agent-browser@latest` (the skill needs 0.31.1 or later), then `agent-browser install`.
+- On Ubuntu and WSL, Chrome also needs system libraries (`libnspr4`, `libnss3`, `libasound2t64`):
+  `sudo agent-browser install --with-deps`. `agent-browser doctor` reports what is missing.
+- Refresh the skill with `npx skills update next-dev-loop -p`.
