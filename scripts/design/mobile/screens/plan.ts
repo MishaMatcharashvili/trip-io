@@ -137,7 +137,7 @@ ${statusBar("20:16")}
   </div>
   <div class="card col line-a" style="padding:15px;gap:11px;box-shadow:var(--shadow-agent)">
     <div class="row" style="gap:8px"><span class="eyebrow t-agent grow">Pro · the watch layer</span>${dot("agent")}</div>
-    <div class="row" style="gap:8px;align-items:baseline"><span class="h1 mut2">[price]</span><span class="sm mut">per month</span></div>
+    <div class="row" style="gap:8px;align-items:baseline"><span class="h1 mut2">&#91;price&#93;</span><span class="sm mut">per month</span></div>
     <div class="col" style="gap:7px">
       ${[
         [
