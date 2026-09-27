@@ -104,6 +104,18 @@ describe("mistStyle", () => {
     assert.equal(style.sprite, `${BASE}/assets-028c18f/sprites/dark`);
   });
 
+  test("labels carry one name, never the local script stacked under it", () => {
+    const style = mistStyle(BASE, light, "light");
+    const city = style.layers.find((l) => l.id === "places_locality");
+    assert.ok(city?.type === "symbol");
+    assert.deepEqual(city.layout?.["text-field"], [
+      "coalesce",
+      ["get", "name:en"],
+      ["get", "pgf:name"],
+      ["get", "name"],
+    ]);
+  });
+
   test("the palette names every token it paints with", () => {
     assert.deepEqual(Object.keys(light).sort(), [...mapTokens].sort());
     assert.deepEqual(Object.keys(dark).sort(), [...mapTokens].sort());

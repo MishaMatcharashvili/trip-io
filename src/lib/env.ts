@@ -6,6 +6,14 @@ import { z } from "zod";
 // shipping a page that quietly does less.
 
 export const env = createEnv({
+  server: {
+    /**
+     * An OSRM server exposing FOSSGIS's `/routed-car/` paths, for the map's
+     * road-following route lines (src/infra/osrm.ts). Unset, the FOSSGIS
+     * instance is used; a self-hosted one takes over by setting this.
+     */
+    OSRM_URL: z.url().optional(),
+  },
   client: {
     /**
      * The Blob store's `/map` prefix: tiles, fonts, sprites and MapLibre's

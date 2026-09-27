@@ -111,6 +111,33 @@ describe("tripModel", () => {
     assert.equal(lunch?.label, "Zeta Camp");
     assert.deepEqual(lunch?.lonLat, places.get(P.zetaCamp)?.lonLat);
   });
+
+  test("map stops carry the place's category, and a logo only from its own site", () => {
+    const card = (website: string | null) => ({
+      id: P.zetaCamp,
+      name: "Zeta Camp",
+      nameKa: null,
+      category: "restaurant",
+      tier: "curated" as const,
+      lonLat: places.get(P.zetaCamp)?.lonLat ?? ([0, 0] as [number, number]),
+      openingHours: null,
+      address: null,
+      website,
+      phone: null,
+    });
+    const lunch = (website: string | null) =>
+      mapStops(
+        tripModel(screen({ places: { [P.zetaCamp]: card(website) } }), noon)
+          .days[2],
+      ).find((s) => s.id === N.lunch);
+
+    const own = lunch("https://zetacamp.ge");
+    assert.equal(own?.kind, "meal");
+    assert.equal(own?.category, "restaurant");
+    assert.equal(own?.logo, `/api/places/${P.zetaCamp}/logo`);
+    assert.equal(lunch("https://facebook.com/zetacamp")?.logo, undefined);
+    assert.equal(lunch(null)?.logo, undefined);
+  });
 });
 
 describe("labels", () => {

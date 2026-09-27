@@ -4,6 +4,7 @@ import type {
   TripScreen,
 } from "../bll/trip-screen.ts";
 import type { Checkpoint, Day, Source, Trip } from "../data/trip.ts";
+import { ownSite } from "../domain/catalogue/website.ts";
 import type { LonLat } from "../domain/geo.ts";
 import { diffDays } from "../domain/trip/diff.ts";
 import {
@@ -242,6 +243,11 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
           lonLat: (screen.positions[id] as LonLat | undefined) ?? null,
           startsAt: node.startsAt,
           durationMin: node.durationMin,
+          category: place?.category,
+          logo:
+            place && ownSite(place.website)
+              ? `/api/places/${place.id}/logo`
+              : undefined,
         },
       };
     });
@@ -314,6 +320,9 @@ export function mapStops(day: Day): MapStop[] {
             label: c.title.replace(/^(Breakfast|Lunch|Coffee|Dinner) · /, ""),
             state: c.state,
             disrupted: Boolean(c.conflict),
+            kind: c.node.kind,
+            category: c.node.category,
+            logo: c.node.logo,
           },
         ]
       : [],

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { routeLegs } from "@/bll/route-legs";
 import { georgiaMapStops, getTrip, type Trip } from "@/data/trip";
 import { TopBar } from "@/features/chrome";
 import { AddDayButton } from "@/features/trip-actions";
@@ -10,7 +11,7 @@ import { Card, Divider, SectionRule } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
-import { type MapStop, TripMap } from "@/ui/map/trip-map";
+import { type MapStop, type RouteLegs, TripMap } from "@/ui/map/trip-map";
 import { BottomNav, tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num } from "@/ui/text";
 import { loadTrip } from "../load";
@@ -24,12 +25,15 @@ function WholeTrip({
   stats,
   totals,
   stops,
+  route,
   actions,
 }: {
   trip: Trip;
   stats: Stat[];
   totals: Stat[];
   stops: MapStop[];
+  /** Road legs between the stops, streamed in after the page. */
+  route?: Promise<RouteLegs>;
   actions: React.ReactNode;
 }) {
   return (
@@ -136,7 +140,11 @@ function WholeTrip({
 
         <aside className="hidden w-[460px] shrink-0 flex-col border-l border-hairline bg-surface lg:flex">
           <div className="relative h-[470px] overflow-hidden border-b border-hairline">
-            <TripMap stops={stops} className="absolute inset-0 size-full" />
+            <TripMap
+              stops={stops}
+              route={route}
+              className="absolute inset-0 size-full"
+            />
           </div>
           <div className="flex flex-col gap-4 px-[26px] py-[22px]">
             <SectionRule>Across the whole trip</SectionRule>
@@ -200,6 +208,7 @@ export default async function FullTripPage({
   }
 
   const { screen, trip } = await loadTrip(tripId);
+  const stops = tripStops(trip);
   const nodes = Object.values(screen.doc.nodes);
   const driving = nodes
     .filter((n) => n.kind === "transfer")
@@ -242,7 +251,8 @@ export default async function FullTripPage({
           value: told ? `${told} · ${applied} applied` : "None yet",
         },
       ]}
-      stops={tripStops(trip)}
+      stops={stops}
+      route={routeLegs(stops.map((s) => s.lonLat))}
       actions={
         <>
           <AddDayButton
