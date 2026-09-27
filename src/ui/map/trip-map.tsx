@@ -5,7 +5,6 @@ import type {
   GeoJSONSource,
   GeoJSONSourceSpecification,
   Map as MapLibreMap,
-  Marker,
 } from "maplibre-gl";
 import {
   type Ref,
@@ -18,14 +17,16 @@ import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
 import { MAP_WORKER } from "./source.ts";
+import { mountStops, type StopsLayer } from "./stops.tsx";
 import { mistStyle, readPalette } from "./style.ts";
 
 // The real map: MapLibre over the Georgia basemap in the public Blob store.
 // The basemap is painted from the design's map tokens (style.ts); the trip on
 // top of it follows the canvas — the route in periwinkle, because it is the
-// plan the agent is watching; a stop you have passed filled, one ahead in
-// outline, the one you are in pulsing; coral only where something real has
-// happened to a stop.
+// plan the agent is watching; a stop you have passed ringed in periwinkle, one
+// ahead in grey, the one you are in filled and pulsing; coral only where
+// something real has happened to a stop. The stops themselves live in
+// stops.tsx.
 //
 // MapLibre is imported inside the effect, never at module scope: it touches
 // `window` on import, and this component is rendered on the server too.
@@ -39,6 +40,12 @@ export type MapStop = {
   state: "done" | "now" | "upcoming";
   /** A matched world event the judge routed. The only coral on the map. */
   disrupted?: boolean;
+  /** What the node is — visit, meal, stay, transfer — for its glyph. */
+  kind?: string;
+  /** The catalogue place's category, for a more precise glyph than `kind`. */
+  category?: string;
+  /** The place's own logo, drawn in the pin instead of a glyph when it loads. */
+  logo?: string;
 };
 
 /**
@@ -225,71 +232,6 @@ function applyLayers(map: MapLibreMap, layers: MapLayers) {
   }
 }
 
-/** A stop, drawn with the design system's own classes and tokens. */
-function stopElement(
-  stop: MapStop,
-  selected: boolean,
-  onSelect: ((id: string) => void) | null,
-): HTMLElement {
-  const el = document.createElement(onSelect ? "button" : "div");
-  el.className = cx(
-    "flex items-center gap-2",
-    onSelect ? "cursor-pointer" : "pointer-events-none",
-  );
-  if (onSelect) {
-    (el as HTMLButtonElement).type = "button";
-    el.setAttribute("aria-label", stop.label);
-    el.addEventListener("click", (event) => {
-      event.stopPropagation();
-      onSelect(stop.id);
-    });
-  } else {
-    el.setAttribute("aria-hidden", "true");
-  }
-
-  const mark = document.createElement("span");
-  if (stop.state === "now") {
-    mark.className = cx(
-      "relative grid size-[18px] place-items-center rounded-full border-[3px] bg-map-ground",
-      stop.disrupted ? "border-alert-bright" : "border-agent",
-    );
-    // The halo's strength lives on a wrapper: `breathe` animates opacity
-    // between 1 and 0.3, and would otherwise override it into a solid disc.
-    const halo = document.createElement("span");
-    halo.className = "absolute -inset-2 opacity-25";
-    const pulse = document.createElement("span");
-    pulse.className = cx(
-      "block size-full rounded-full animate-breathe",
-      stop.disrupted ? "bg-alert-bright" : "bg-agent",
-    );
-    halo.append(pulse);
-    mark.append(halo);
-  } else {
-    mark.className = cx(
-      "size-[11px] rotate-45 border-2 bg-map-ground",
-      stop.disrupted
-        ? "border-alert-bright"
-        : stop.state === "done"
-          ? "border-agent"
-          : "border-map-label",
-    );
-  }
-
-  if (selected) mark.classList.add("ring-2", "ring-agent", "ring-offset-2");
-
-  const label = document.createElement("span");
-  label.className = cx(
-    "whitespace-nowrap text-[11px] uppercase tracking-[0.10em]",
-    stop.state === "now" || selected
-      ? "font-bold text-map-label-strong"
-      : "font-medium text-map-label",
-  );
-  label.textContent = stop.label;
-
-  el.append(mark, label);
-  return el;
-}
-
 export function TripMap({
   stops,
   route = stops.map((s) => s.lonLat),
@@ -397,29 +339,33 @@ export function TripMap({
     };
   }, [interactive]);
 
-  // The trip on the map: HTML markers (themed by CSS, so a theme change
-  // needs nothing here) and the route line, kept in step with props.
+  // The stops (stops.tsx): mounted once per map, then told what changed.
+  const [stopsLayer, setStopsLayer] = useState<StopsLayer | null>(null);
   useEffect(() => {
     if (!loaded) return;
-    const { map, maplibre } = loaded;
-    const select = selectable
-      ? (id: string) => latest.current.onSelect?.(id)
-      : null;
-    const markers: Marker[] = stops.map((stop) =>
-      new maplibre.Marker({
-        element: stopElement(stop, stop.id === selectedId, select),
-        anchor: "left",
-        offset: [-9, 0],
-      })
-        .setLngLat(stop.lonLat)
-        .addTo(map),
+    const layer = mountStops(
+      loaded.map,
+      loaded.maplibre,
+      selectable ? (id: string) => latest.current.onSelect?.(id) : null,
     );
+    setStopsLayer(layer);
+    return () => {
+      layer.remove();
+      setStopsLayer(null);
+    };
+  }, [loaded, selectable]);
+
+  useEffect(() => {
+    stopsLayer?.update(stops, selectedId);
+  }, [stopsLayer, stops, selectedId]);
+
+  // The route and the event areas, kept in step with props.
+  useEffect(() => {
+    if (!loaded) return;
+    const { map } = loaded;
     map.getSource<GeoJSONSource>(ROUTE_SOURCE)?.setData(routeData(route));
     map.getSource<GeoJSONSource>(EVENT_SOURCE)?.setData(eventData(events));
-    return () => {
-      for (const m of markers) m.remove();
-    };
-  }, [loaded, stops, route, events, selectedId, selectable]);
+  }, [loaded, stops, route, events]);
 
   useEffect(() => {
     if (loaded?.map.isStyleLoaded()) applyLayers(loaded.map, layers);
