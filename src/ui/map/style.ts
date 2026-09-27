@@ -1,5 +1,5 @@
 import { BLACK, type Flavor, GRAYSCALE, layers } from "@protomaps/basemaps";
-import type { StyleSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, StyleSpecification } from "maplibre-gl";
 import { MAP_ASSETS, MAP_TILES } from "./source.ts";
 
 // The basemap in Mist. Colour has three jobs in this product — periwinkle is
@@ -108,9 +108,81 @@ export function mistFlavor(p: MapPalette, theme: "light" | "dark"): Flavor {
 /** The Protomaps source id the layers below are written against. */
 export const BASEMAP_SOURCE = "protomaps";
 
+type Layer = StyleSpecification["layers"][number];
+type Size = NonNullable<
+  Extract<Layer, { type: "symbol" }>["layout"]
+>["text-size"];
+
+/**
+ * One name per label: English where OpenStreetMap has it, the local name
+ * otherwise. Protomaps stacks the local script under the English name, which
+ * doubles every town in Georgia and buries the trip under the basemap.
+ */
+const ONE_NAME: ExpressionSpecification = [
+  "coalesce",
+  ["get", "name:en"],
+  ["get", "pgf:name"],
+  ["get", "name"],
+];
+
+/** Labels that are not names: house numbers and road shields keep their own. */
+const OWN_TEXT = new Set(["address_label", "roads_shields"]);
+
+const byZoom = (...stops: number[]): Size =>
+  ["interpolate", ["linear"], ["zoom"], ...stops] as Size;
+
+/** A city outranks a village by a point or two, never by ten. */
+const rankSize = (small: number, large: number): ExpressionSpecification => [
+  "case",
+  [">=", ["get", "population_rank"], 11],
+  large,
+  small,
+];
+
+/**
+ * Label sizes for a map the trip sits on top of. Protomaps' defaults are
+ * written for a map that is the whole page — a capital at 22px — and here
+ * they shout over the stops.
+ */
+const LABEL_SIZE: Record<string, Size> = {
+  places_country: 11,
+  places_region: 10,
+  places_locality: [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    5,
+    rankSize(10, 12),
+    9,
+    rankSize(11, 14),
+    14,
+    rankSize(12, 15),
+  ],
+  places_subplace: byZoom(11, 9, 16, 12),
+  water_label_ocean: 10,
+  water_label_lakes: 10,
+  water_waterway_label: 10,
+  earth_label_islands: 10,
+  roads_labels_major: 10,
+  roads_labels_minor: 10,
+};
+
+/** The basemap's labels, quietened: one name each, at a calm size. */
+export function calmLabels(layers: Layer[]): Layer[] {
+  return layers.map((layer) => {
+    if (layer.type !== "symbol" || !layer.layout?.["text-field"]) return layer;
+    const layout = { ...layer.layout };
+    if (!OWN_TEXT.has(layer.id)) layout["text-field"] = ONE_NAME;
+    const size = LABEL_SIZE[layer.id];
+    if (size !== undefined) layout["text-size"] = size;
+    return { ...layer, layout };
+  });
+}
+
 /**
  * The whole style. Labels are in English where OpenStreetMap has an English
- * name and in Georgian otherwise — the fonts carry both scripts.
+ * name and in Georgian otherwise — the fonts carry both scripts — and never
+ * both at once.
  */
 export function mistStyle(
   baseUrl: string,
@@ -130,6 +202,8 @@ export function mistStyle(
           '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
       },
     },
-    layers: layers(BASEMAP_SOURCE, mistFlavor(palette, theme), { lang: "en" }),
+    layers: calmLabels(
+      layers(BASEMAP_SOURCE, mistFlavor(palette, theme), { lang: "en" }),
+    ),
   };
 }
