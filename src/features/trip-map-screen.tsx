@@ -13,6 +13,7 @@ import {
   type MapEvent,
   type MapLayers,
   type MapStop,
+  type RouteLegs,
   TripMap,
   type TripMapHandle,
 } from "@/ui/map/trip-map";
@@ -47,11 +48,14 @@ const PADDING: Record<"desktop" | "mobile", Padding> = {
  */
 export function TripMapScreen({
   stops,
+  route,
   events = [],
   cards,
   dimmed = false,
 }: {
   stops: MapStop[];
+  /** Road legs between the stops, streamed in after the page. */
+  route?: Promise<RouteLegs>;
   events?: MapEvent[];
   cards: StopCard[];
   dimmed?: boolean;
@@ -97,6 +101,7 @@ export function TripMapScreen({
           key={layout}
           ref={map}
           stops={stops}
+          route={route}
           events={events}
           layers={layers}
           selectedId={selected}

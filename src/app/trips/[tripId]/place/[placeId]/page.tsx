@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { routeLegs } from "@/bll/route-legs";
 import { savedPlaceIds } from "@/bll/saved";
 import { type Checkpoint, type Day, getTrip, type Trip } from "@/data/trip";
 import { summariseHours } from "@/domain/catalogue/opening-hours";
@@ -263,6 +264,7 @@ export default async function PlacePage({
       <div className="absolute inset-x-0 top-0 h-[260px] overflow-hidden">
         <TripMap
           stops={stops}
+          route={routeLegs(stops.map((s) => s.lonLat))}
           selectedId={stop.id}
           fitPadding={{ top: 90, right: 40, bottom: 60, left: 40 }}
           className="absolute inset-0 size-full"
