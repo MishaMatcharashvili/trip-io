@@ -17,7 +17,7 @@ import { preconnect } from "react-dom";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
-import { MAP_TILES, MAP_WORKER } from "./source.ts";
+import { loadMapLibre } from "./maplibre.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
 import { mistStyle, readPalette } from "./style.ts";
 
@@ -90,36 +90,6 @@ const currentTheme = (): Theme =>
   document.documentElement.getAttribute("data-theme") === "dark"
     ? "dark"
     : "light";
-
-let registered: Promise<typeof import("maplibre-gl")> | null = null;
-
-/** Load MapLibre once per page, with the pmtiles protocol and our worker. */
-function loadMapLibre(baseUrl: string) {
-  registered ??= (async () => {
-    const [maplibre, { PMTiles, Protocol }] = await Promise.all([
-      import("maplibre-gl"),
-      import("pmtiles"),
-    ]);
-    maplibre.setWorkerUrl(
-      `${baseUrl}/${MAP_WORKER.prefix(maplibre.getVersion()).replace(/^map\//, "")}/maplibre-gl-worker.mjs`,
-    );
-    // Start the workers now, not when the first map is built.
-    maplibre.prewarm();
-
-    // The archive's header and root directory are the first read any tile
-    // needs. The protocol keys archives by URL, so registering this one
-    // under the style's URL means the map reuses the read begun here.
-    const protocol = new Protocol();
-    const archive = new PMTiles(`${baseUrl}/${MAP_TILES.file}`);
-    protocol.add(archive);
-    archive.getHeader().catch(() => {
-      // The map retries on its own and reports what it cannot load.
-    });
-    maplibre.addProtocol("pmtiles", protocol.tile);
-    return maplibre;
-  })();
-  return registered;
-}
 
 // Begin as soon as this module runs in a browser, while the page hydrates,
 // rather than after the first map's effect.
