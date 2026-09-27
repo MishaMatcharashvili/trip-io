@@ -32,6 +32,10 @@ export type Checkpoint = {
     lonLat: [number, number] | null;
     startsAt: string;
     durationMin: number;
+    /** The place's catalogue category, when the node is at a place. */
+    category?: string;
+    /** Where the place's own logo is served, when it has a website of its own. */
+    logo?: string;
   };
 };
 
