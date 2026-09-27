@@ -264,7 +264,6 @@ export default async function PlacePage({
         <TripMap
           stops={stops}
           selectedId={stop.id}
-          route={stops.map((s) => s.lonLat)}
           fitPadding={{ top: 90, right: 40, bottom: 60, left: 40 }}
           className="absolute inset-0 size-full"
         />

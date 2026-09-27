@@ -23,10 +23,10 @@ import { mistStyle, readPalette } from "./style.ts";
 // The real map: MapLibre over the Georgia basemap in the public Blob store.
 // The basemap is painted from the design's map tokens (style.ts); the trip on
 // top of it follows the canvas — the route in periwinkle, because it is the
-// plan the agent is watching; a stop you have passed ringed in periwinkle, one
-// ahead in grey, the one you are in filled and pulsing; coral only where
-// something real has happened to a stop. The stops themselves live in
-// stops.tsx.
+// plan the agent is watching, solid where you have driven and dashed ahead; a
+// stop you have passed ringed in periwinkle, one ahead in grey, the one you
+// are in filled and pulsing; coral only where something real has happened to
+// a stop. The stops themselves live in stops.tsx.
 //
 // MapLibre is imported inside the effect, never at module scope: it touches
 // `window` on import, and this component is rendered on the server too.
@@ -47,6 +47,9 @@ export type MapStop = {
   /** The place's own logo, drawn in the pin instead of a glyph when it loads. */
   logo?: string;
 };
+
+/** Leg i runs from stop i to stop i + 1. */
+export type RouteLegs = readonly (readonly LonLat[])[];
 
 /**
  * A world event behind one of the trip's live matches, as GeoJSON. The map
@@ -105,13 +108,23 @@ function loadMapLibre(baseUrl: string) {
   return registered;
 }
 
+const straight = (stops: readonly MapStop[]): RouteLegs =>
+  stops.slice(1).map((s, i) => [stops[i].lonLat, s.lonLat]);
+
+/** A leg is behind you once you have reached the stop it leads to. */
 function routeData(
-  route: readonly LonLat[],
+  legs: RouteLegs,
+  stops: readonly MapStop[],
 ): GeoJSONSourceSpecification["data"] {
   return {
-    type: "Feature",
-    properties: {},
-    geometry: { type: "LineString", coordinates: route.map((p) => [...p]) },
+    type: "FeatureCollection",
+    features: legs.map((leg, i) => ({
+      type: "Feature",
+      properties: {
+        done: stops[i + 1] ? stops[i + 1].state !== "upcoming" : false,
+      },
+      geometry: { type: "LineString", coordinates: leg.map((p) => [...p]) },
+    })),
   };
 }
 
@@ -138,10 +151,12 @@ const token = (name: string) =>
  */
 function addTripLayers(
   map: MapLibreMap,
-  route: readonly LonLat[],
+  route: RouteLegs,
+  stops: readonly MapStop[],
   events: readonly MapEvent[],
 ) {
   const agent = token("--color-agent");
+  const ground = token("--color-map-ground");
   const alert = token("--color-alert-bright");
   const firstLabel = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
 
@@ -184,18 +199,80 @@ function addTripLayers(
     firstLabel,
   );
 
-  map.addSource(ROUTE_SOURCE, { type: "geojson", data: routeData(route) });
+  // The route: a ground-coloured casing lifts it off the roads it follows,
+  // it thickens as you zoom in, and the legs still ahead are dashed and
+  // lighter than the ones behind you.
+  map.addSource(ROUTE_SOURCE, {
+    type: "geojson",
+    data: routeData(route, stops),
+  });
+  const layout = {
+    "line-cap": "round",
+    "line-join": "round",
+  } as const;
+  map.addLayer(
+    {
+      id: ROUTE_CASING,
+      type: "line",
+      source: ROUTE_SOURCE,
+      layout,
+      paint: {
+        "line-color": ground,
+        "line-width": ROUTE_WIDTH(3),
+        "line-opacity": 0.85,
+      },
+    },
+    firstLabel,
+  );
+  map.addLayer(
+    {
+      id: ROUTE_AHEAD,
+      type: "line",
+      source: ROUTE_SOURCE,
+      filter: ["!", ["get", "done"]],
+      layout: { ...layout, "line-cap": "butt" },
+      paint: {
+        "line-color": agent,
+        "line-width": ROUTE_WIDTH(0),
+        "line-opacity": 0.6,
+        "line-dasharray": [2, 1.6],
+      },
+    },
+    firstLabel,
+  );
   map.addLayer(
     {
       id: ROUTE_SOURCE,
       type: "line",
       source: ROUTE_SOURCE,
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": agent, "line-width": 3, "line-opacity": 0.9 },
+      filter: ["get", "done"],
+      layout,
+      paint: {
+        "line-color": agent,
+        "line-width": ROUTE_WIDTH(0),
+        "line-opacity": 0.95,
+      },
     },
     firstLabel,
   );
 }
+
+const ROUTE_CASING = "trip-route-casing";
+const ROUTE_AHEAD = "trip-route-ahead";
+const ROUTE_LAYERS = [ROUTE_CASING, ROUTE_AHEAD, ROUTE_SOURCE] as const;
+
+/** The route's width by zoom, plus `extra` on each side for its casing. */
+const ROUTE_WIDTH = (extra: number): ExpressionSpecification => [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  6,
+  2.5 + extra,
+  10,
+  3.5 + extra,
+  14,
+  5 + extra,
+];
 
 const EVENT_SHAPES: Record<
   (typeof EVENT_LAYERS)[number],
@@ -209,11 +286,9 @@ const EVENT_SHAPES: Record<
 /** Show or hide the trip's layers without rebuilding them. */
 function applyLayers(map: MapLibreMap, layers: MapLayers) {
   if (!map.getLayer(ROUTE_SOURCE)) return;
-  map.setLayoutProperty(
-    ROUTE_SOURCE,
-    "visibility",
-    layers.route ? "visible" : "none",
-  );
+  for (const id of ROUTE_LAYERS) {
+    map.setLayoutProperty(id, "visibility", layers.route ? "visible" : "none");
+  }
   const families = [
     ...(layers.weather ? ["weather"] : []),
     ...(layers.roads ? ["road"] : []),
@@ -234,7 +309,7 @@ function applyLayers(map: MapLibreMap, layers: MapLayers) {
 
 export function TripMap({
   stops,
-  route = stops.map((s) => s.lonLat),
+  route: routeProp,
   events = [],
   layers = defaultLayers,
   selectedId = null,
@@ -245,8 +320,8 @@ export function TripMap({
   className,
 }: {
   stops: readonly MapStop[];
-  /** Defaults to straight lines between the stops, in order. */
-  route?: readonly LonLat[];
+  /** One leg per pair of consecutive stops; straight lines when absent. */
+  route?: RouteLegs;
   events?: readonly MapEvent[];
   layers?: MapLayers;
   selectedId?: string | null;
@@ -260,6 +335,7 @@ export function TripMap({
   interactive?: boolean;
   className?: string;
 }) {
+  const route = routeProp ?? straight(stops);
   const container = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState<{
     map: MapLibreMap;
@@ -311,7 +387,12 @@ export function TripMap({
       // Fires again after every setStyle, which drops the trip's layers with
       // the old style — so this is also what redraws them after a theme change.
       m.on("style.load", () => {
-        addTripLayers(m, latest.current.route, latest.current.events);
+        addTripLayers(
+          m,
+          latest.current.route,
+          latest.current.stops,
+          latest.current.events,
+        );
         applyLayers(m, latest.current.layers);
       });
       setLoaded({ map: m, maplibre });
@@ -363,7 +444,9 @@ export function TripMap({
   useEffect(() => {
     if (!loaded) return;
     const { map } = loaded;
-    map.getSource<GeoJSONSource>(ROUTE_SOURCE)?.setData(routeData(route));
+    map
+      .getSource<GeoJSONSource>(ROUTE_SOURCE)
+      ?.setData(routeData(route, stops));
     map.getSource<GeoJSONSource>(EVENT_SOURCE)?.setData(eventData(events));
   }, [loaded, stops, route, events]);
 
@@ -390,11 +473,8 @@ export function TripMap({
 }
 
 /** The box around everything on the map, or all of Georgia if it is empty. */
-function bounds(
-  stops: readonly MapStop[],
-  route: readonly LonLat[],
-): [LonLat, LonLat] {
-  const points = [...stops.map((s) => s.lonLat), ...route];
+function bounds(stops: readonly MapStop[], route: RouteLegs): [LonLat, LonLat] {
+  const points = [...stops.map((s) => s.lonLat), ...route.flat()];
   if (points.length === 0) {
     const { west, south, east, north } = GEORGIA_BBOX;
     return [
