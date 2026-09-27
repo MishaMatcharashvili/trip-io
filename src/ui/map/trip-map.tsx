@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
+import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
 import { MAP_WORKER } from "./source.ts";
 import { mistStyle, readPalette } from "./style.ts";
@@ -66,7 +67,7 @@ export type TripMapHandle = {
   recentre(): void;
 };
 
-const BASE_URL = process.env.NEXT_PUBLIC_MAP_BASE_URL;
+const BASE_URL = env.NEXT_PUBLIC_MAP_BASE_URL;
 
 const ROUTE_SOURCE = "trip-route";
 const EVENT_SOURCE = "trip-events";

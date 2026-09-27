@@ -36,6 +36,7 @@
     "@hono/zod-validator": "^0.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@protomaps/basemaps": "5.7.2",
+    "@t3-oss/env-nextjs": "^0.13.11",
     "@trigger.dev/sdk": "^4.6.3",
     "better-auth": "^1.7.4",
     "drizzle-orm": "^0.45.2",
