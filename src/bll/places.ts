@@ -1,11 +1,18 @@
-import { countInArea, type PlaceHit, searchPlaces } from "../dal/places.ts";
+import {
+  countInArea,
+  type PlaceHit,
+  placeCards,
+  searchPlaces,
+} from "../dal/places.ts";
 import type { CategoryGroup } from "../domain/catalogue/categories.ts";
 import {
   areaBySlug,
   type FocusAreaSlug,
   focusAreas,
 } from "../domain/catalogue/focus-areas.ts";
+import { ownSite } from "../domain/catalogue/website.ts";
 import type { LonLat } from "../domain/geo.ts";
+import { type SiteIcon, siteIcon } from "../infra/site-icon.ts";
 
 export type { PlaceHit };
 
@@ -42,4 +49,14 @@ export function catalogueByArea(): Promise<AreaCount[]> {
       ...(await countInArea(a.match)),
     })),
   );
+}
+
+/**
+ * A place's logo from its own website, or null: no such place, no website of
+ * its own (a Facebook page is not one), or nothing usable published there.
+ */
+export async function placeLogo(placeId: string): Promise<SiteIcon | null> {
+  const place = (await placeCards([placeId])).get(placeId);
+  const site = ownSite(place?.website);
+  return site ? siteIcon(site) : null;
 }
