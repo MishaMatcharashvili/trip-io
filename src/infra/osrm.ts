@@ -32,12 +32,16 @@ export const osrm: RoadRouter = {
     if (points.length < 2) return null;
     const base = process.env.OSRM_URL ?? DEFAULT_URL;
     const url = `${base}/routed-car/route/v1/driving/${points.map(coord).join(";")}?overview=full&geometries=geojson&steps=false`;
+    // `next` is Next's data-cache option. It is typed here, not through Next's
+    // global augmentation, because this file is also compiled for the Expo
+    // app's API types, which know nothing of Next; outside Next it is ignored.
+    const init: RequestInit & { next?: { revalidate: number } } = {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      next: { revalidate: DAY_S },
+    };
     try {
-      const res = await fetch(url, {
-        headers: { "User-Agent": USER_AGENT },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        next: { revalidate: DAY_S },
-      });
+      const res = await fetch(url, init);
       if (!res.ok) return null;
       const body = (await res.json()) as Response;
       const route = body.code === "Ok" ? body.routes?.[0] : undefined;
