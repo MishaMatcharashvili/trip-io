@@ -108,6 +108,12 @@ function loadMapLibre(baseUrl: string) {
   return registered;
 }
 
+/** A promise, including the chunks React hands a client component from the server. */
+const isPending = (
+  route: RouteLegs | Promise<RouteLegs> | undefined,
+): route is Promise<RouteLegs> =>
+  typeof (route as { then?: unknown } | undefined)?.then === "function";
+
 const straight = (stops: readonly MapStop[]): RouteLegs =>
   stops.slice(1).map((s, i) => [stops[i].lonLat, s.lonLat]);
 
@@ -320,8 +326,12 @@ export function TripMap({
   className,
 }: {
   stops: readonly MapStop[];
-  /** One leg per pair of consecutive stops; straight lines when absent. */
-  route?: RouteLegs;
+  /**
+   * One leg per pair of consecutive stops; straight lines when absent. A
+   * promise — road geometry a server page did not wait for — draws straight
+   * legs until it settles, so the map never waits on a router.
+   */
+  route?: RouteLegs | Promise<RouteLegs>;
   events?: readonly MapEvent[];
   layers?: MapLayers;
   selectedId?: string | null;
@@ -335,7 +345,23 @@ export function TripMap({
   interactive?: boolean;
   className?: string;
 }) {
-  const route = routeProp ?? straight(stops);
+  const [arrived, setArrived] = useState<RouteLegs | null>(null);
+  useEffect(() => {
+    if (!isPending(routeProp)) return;
+    let live = true;
+    routeProp.then(
+      (legs) => live && setArrived(legs),
+      () => {},
+    );
+    return () => {
+      live = false;
+      setArrived(null);
+    };
+  }, [routeProp]);
+  const given = isPending(routeProp) ? arrived : routeProp;
+  // Legs that no longer match the stops (a stop added since) are not drawn.
+  const route =
+    given && given.length === stops.length - 1 ? given : straight(stops);
   const container = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState<{
     map: MapLibreMap;
