@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { dayKey } from "@/domain/trip/document";
 import { AccountButton, Brand, TopBar } from "@/features/chrome";
+import { tbilisiToday } from "@/features/shared-reads";
 import { TripComposer } from "@/features/trip-composer";
 import { ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
@@ -19,8 +19,8 @@ const examples = [
   "Four days walking in Svaneti, moderate pace",
 ];
 
-export default function NewTripPage() {
-  const today = dayKey(new Date());
+export default async function NewTripPage() {
+  const today = await tbilisiToday();
 
   return (
     <>
