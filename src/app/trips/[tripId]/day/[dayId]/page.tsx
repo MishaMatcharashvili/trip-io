@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { dayForecast } from "@/bll/trip-screen";
 import {
   type Day,
   getDay,
@@ -12,6 +11,7 @@ import {
 import { MobileTitleBar, TopBar } from "@/features/chrome";
 import { DayEditor } from "@/features/day-editor";
 import { CheckpointList } from "@/features/itinerary";
+import { forecastRibbon } from "@/features/shared-reads";
 import { mapStops, weatherView } from "@/features/trip-model";
 import { WeatherRibbon } from "@/ui/bars";
 import { Button, ButtonLink } from "@/ui/button";
@@ -186,7 +186,7 @@ export default async function DayPage({
         stops.reduce((s, p) => s + p.lonLat[1], 0) / stops.length,
       ]
     : null;
-  const forecast = near ? await dayForecast(near, day.date) : null;
+  const forecast = near ? await forecastRibbon(near, day.date) : null;
 
   // An open recommendation that touches this day: the review card.
   const touched = new Set(day.checkpoints.map((c) => c.id));

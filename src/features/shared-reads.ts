@@ -1,5 +1,7 @@
 import { cacheLife } from "next/cache";
 import { type AreaCount, catalogueByArea } from "@/bll/places";
+import { dayForecast, type ForecastHour } from "@/bll/trip-screen";
+import type { LonLat } from "@/domain/geo";
 import { dayKey } from "@/domain/trip/document";
 
 // Reads that are the same for every visitor, cached across requests with
@@ -33,4 +35,31 @@ export async function areaCounts(): Promise<AreaCount[]> {
   "use cache";
   cacheLife("hours");
   return catalogueByArea();
+}
+
+/**
+ * The hourly forecast ribbon for a day at a point. Open-Meteo updates hourly
+ * at best and the plan pays per call (docs/implementation-plan.md §2), so
+ * everyone looking at the same area and day shares one answer for 15 minutes.
+ * The point is rounded to about a kilometre so near-identical trips share it
+ * too. A failed fetch is also kept for those minutes: the ribbon is a
+ * convenience, and retrying on every page view would not bring it back sooner.
+ */
+export function forecastRibbon(
+  point: LonLat,
+  date: string,
+): Promise<ForecastHour[] | null> {
+  // Rounded before the cached call: its arguments are its cache key.
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return cachedForecast(round(point[0]), round(point[1]), date);
+}
+
+async function cachedForecast(
+  lon: number,
+  lat: number,
+  date: string,
+): Promise<ForecastHour[] | null> {
+  "use cache";
+  cacheLife({ stale: 300, revalidate: 900, expire: 3600 });
+  return dayForecast([lon, lat], date);
 }
