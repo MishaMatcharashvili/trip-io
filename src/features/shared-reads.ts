@@ -1,4 +1,5 @@
 import { cacheLife } from "next/cache";
+import { type AreaCount, catalogueByArea } from "@/bll/places";
 import { dayKey } from "@/domain/trip/document";
 
 // Reads that are the same for every visitor, cached across requests with
@@ -22,4 +23,14 @@ export async function tbilisiToday(): Promise<string> {
   "use cache";
   cacheLife("hours");
   return dayKey(new Date());
+}
+
+/**
+ * How many places each focus area holds: Explore's region chips. Curation
+ * moves these slowly, and an hour behind costs nothing.
+ */
+export async function areaCounts(): Promise<AreaCount[]> {
+  "use cache";
+  cacheLife("hours");
+  return catalogueByArea();
 }
