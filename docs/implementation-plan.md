@@ -101,7 +101,7 @@ Business logic lives in `src/core/*` as plain functions that both HTTP handlers 
 | Database | Neon Postgres \+ PostGIS | `CREATE EXTENSION postgis` works on any project. Use the **pooled** connection string; serverless plus direct connections exhausts the pool fast. |
 | ORM | Drizzle \+ drizzle\-kit | Raw SQL where PostGIS gets interesting. |
 | Auth | Better Auth | Supports the doc's *"no accounts until save"* — anonymous trip in local state, account created at save, trip claimed. Expo support built in. |
-| Map | MapLibre GL \+ PMTiles | One `.pmtiles` file on Vercel Blob or R2; MapLibre's pmtiles protocol reads HTTP ranges directly. **No tile server.** Georgia's extract is small. |
+| Map | ~~MapLibre GL \+ PMTiles~~ Google Maps JS API \+ Routes API | Superseded: the self-hosted basemap and OSRM roads were replaced by Google Maps and the Routes API (traffic-aware driving times, roads that follow the road). Setup, limits, billing and rollback in `docs/google-maps.md`. The original reasoning: one `.pmtiles` file on Vercel Blob or R2, no tile server. |
 | Queue | Postgres table \+ `SKIP LOCKED` | As specced. No Redis. §5. |
 | Email | Resend | Briefings. |
 | Push | expo\-notifications \+ EAS | Apple Developer account ($99/yr), APNs key, FCM. **Start day one** — credential latency does not compress. |
