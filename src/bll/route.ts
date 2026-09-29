@@ -5,7 +5,6 @@ import {
   type RouteRequest,
   type RoutesProvider,
 } from "../domain/route/contract.ts";
-import { googleRoutes } from "../infra/google-routes.ts";
 
 // Route a set of stops. The one door to the routing provider: the HTTP handler,
 // and anything else that needs a real road (an itinerary check, the AI's tools),
@@ -18,6 +17,12 @@ import { googleRoutes } from "../infra/google-routes.ts";
 export type RouteLimits = {
   userPerMinute: number;
   userPerDay: number;
+  /**
+   * Provider calls, everyone together, per minute. Mapbox refuses an account
+   * past 300 a minute; this stops well short, so one busy minute cannot lock
+   * every traveller out.
+   */
+  globalPerMinute: number;
   /** Provider calls, everyone together, per UTC day. */
   globalPerDay: number;
 };
@@ -25,6 +30,7 @@ export type RouteLimits = {
 export const defaultLimits: RouteLimits = {
   userPerMinute: 20,
   userPerDay: 200,
+  globalPerMinute: 200,
   globalPerDay: 1_000,
 };
 
@@ -48,8 +54,9 @@ export type RouteDeps = {
 
 const inflight = new Map<string, Promise<RouteOutcome>>();
 
-const defaults = (): RouteDeps => ({
-  provider: googleRoutes({ apiKey: process.env.GOOGLE_MAPS_ROUTES_API_KEY }),
+// The provider is the caller's to build: it holds a credential, and reading
+// the environment is the server layer's job, not a use case's.
+const defaults = (): Omit<RouteDeps, "provider"> => ({
   count: countUse,
   now: () => new Date(),
   limits: defaultLimits,
@@ -62,7 +69,7 @@ const DAY = 86_400;
 export async function computeRoute(
   request: RouteRequest,
   userId: string,
-  overrides: Partial<RouteDeps> = {},
+  overrides: Pick<RouteDeps, "provider"> & Partial<RouteDeps>,
 ): Promise<RouteOutcome> {
   const deps = { ...defaults(), ...overrides };
   const started = Date.now();
@@ -105,7 +112,11 @@ export async function computeRoute(
 
   const call = (async (): Promise<RouteOutcome> => {
     // Counted when a call is actually made, so a shared answer costs nothing.
-    if ((await deps.count("routes:all", DAY, now)) > limits.globalPerDay) {
+    if (
+      (await deps.count("routes:all:m", MINUTE, now)) >
+        limits.globalPerMinute ||
+      (await deps.count("routes:all", DAY, now)) > limits.globalPerDay
+    ) {
       return { ok: false, reason: "quota" };
     }
     return deps.provider.compute(request, now);

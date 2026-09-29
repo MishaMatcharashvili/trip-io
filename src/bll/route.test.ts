@@ -16,10 +16,10 @@ const request = (extra = {}) =>
 
 const answer: RouteAnswer = {
   routes: [],
+  stops: [],
   mode: "drive",
   traffic: "live",
   computedAt: NOW.toISOString(),
-  fallback: null,
 };
 
 function harness(
@@ -28,7 +28,7 @@ function harness(
   const calls: unknown[] = [];
   const counts = new Map<string, number>();
   const logs: RouteLog[] = [];
-  const deps: Partial<RouteDeps> = {
+  const deps: Pick<RouteDeps, "provider"> & Partial<RouteDeps> = {
     provider: {
       configured: true,
       compute: async (req) => {
@@ -41,7 +41,12 @@ function harness(
       return counts.get(key) as number;
     },
     now: () => NOW,
-    limits: { userPerMinute: 3, userPerDay: 10, globalPerDay: 100 },
+    limits: {
+      userPerMinute: 3,
+      userPerDay: 10,
+      globalPerMinute: 100,
+      globalPerDay: 100,
+    },
     log: (e) => logs.push(e),
     ...overrides,
   };
@@ -98,7 +103,31 @@ describe("computeRoute", () => {
 
   test("the day's total stops everyone, and is reported as quota", async () => {
     const h = harness({
-      limits: { userPerMinute: 99, userPerDay: 99, globalPerDay: 1 },
+      limits: {
+        userPerMinute: 99,
+        userPerDay: 99,
+        globalPerMinute: 99,
+        globalPerDay: 1,
+      },
+    });
+    const a = [{ lonLat: [44.1, 41.7] }, { lonLat: [45, 41.8] }];
+    const b = [{ lonLat: [44.2, 41.7] }, { lonLat: [45, 41.8] }];
+    assert.ok((await computeRoute(request({ stops: a }), "u1", h.deps)).ok);
+    assert.deepEqual(await computeRoute(request({ stops: b }), "u2", h.deps), {
+      ok: false,
+      reason: "quota",
+    });
+    assert.equal(h.calls.length, 1);
+  });
+
+  test("a busy minute stops everyone before the provider's own limit does", async () => {
+    const h = harness({
+      limits: {
+        userPerMinute: 99,
+        userPerDay: 99,
+        globalPerMinute: 1,
+        globalPerDay: 99,
+      },
     });
     const a = [{ lonLat: [44.1, 41.7] }, { lonLat: [45, 41.8] }];
     const b = [{ lonLat: [44.2, 41.7] }, { lonLat: [45, 41.8] }];
@@ -143,6 +172,17 @@ describe("computeRoute", () => {
     assert.deepEqual(await computeRoute(request(), "u1", h.deps), {
       ok: false,
       reason: "auth",
+    });
+  });
+
+  test("a failure that belongs to one stop keeps saying which", async () => {
+    const h = harness({
+      outcome: { ok: false, reason: "unroutable-stop", stop: 1 },
+    });
+    assert.deepEqual(await computeRoute(request(), "u1", h.deps), {
+      ok: false,
+      reason: "unroutable-stop",
+      stop: 1,
     });
   });
 
