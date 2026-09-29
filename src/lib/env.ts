@@ -8,12 +8,6 @@ import { z } from "zod";
 export const env = createEnv({
   server: {
     /**
-     * An OSRM server exposing FOSSGIS's `/routed-car/` paths, for the map's
-     * road-following route lines (src/infra/osrm.ts). Unset, the FOSSGIS
-     * instance is used; a self-hosted one takes over by setting this.
-     */
-    OSRM_URL: z.url().optional(),
-    /**
      * The key for the Routes API (src/infra/google-routes.ts). Server-only and
      * restricted to that one API; the browser never sees it. Unset, route
      * requests answer "not configured" and the map shows stops without a road.
@@ -29,14 +23,6 @@ export const env = createEnv({
     ROUTES_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
   },
   client: {
-    /**
-     * The Blob store's `/map` prefix: tiles, fonts, sprites and MapLibre's
-     * worker (src/ui/map/source.ts). NEXT_PUBLIC_ values are inlined when the
-     * client is built, so a deploy without it has maps that can never load.
-     * Required on Vercel; a local checkout may leave it out and gets the
-     * ground colour instead of a map.
-     */
-    NEXT_PUBLIC_MAP_BASE_URL: process.env.VERCEL ? z.url() : z.url().optional(),
     /**
      * The Maps JavaScript API key, for the browser: restricted to that API and
      * to this app's origins in Google Cloud. Inlined when the client is built,
@@ -56,7 +42,6 @@ export const env = createEnv({
       : z.string().min(1).optional(),
   },
   experimental__runtimeEnv: {
-    NEXT_PUBLIC_MAP_BASE_URL: process.env.NEXT_PUBLIC_MAP_BASE_URL,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:
       process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID,
