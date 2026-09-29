@@ -6,7 +6,7 @@ import type { RouteView } from "./route-model";
 /**
  * What the map's route says about itself: the time on the road, what kind of
  * estimate it is, the ways offered, and the ways to act on it (ask again, open
- * it in Google Maps). Every state has words; none is a bare spinner or a
+ * it in Google Maps' navigation). Every state has words; none is a bare spinner or a
  * silent absence.
  */
 export function RouteSection({
@@ -29,6 +29,9 @@ export function RouteSection({
           <div className="flex items-baseline gap-2">
             <Num className="text-[17px] font-semibold">{view.time}</Num>
             <Num className="text-small text-ink-muted">{view.distance}</Num>
+            {view.typical ? (
+              <span className="text-mini text-ink-faint">{view.typical}</span>
+            ) : null}
             {view.updating ? (
               <span className="text-mini text-ink-faint">Updating…</span>
             ) : null}
@@ -37,14 +40,23 @@ export function RouteSection({
             <div className="text-mini text-ink-muted">{view.via}</div>
           ) : null}
           <div className="text-mini text-ink-faint">{view.basis}</div>
-          {view.fallback ? (
-            <div className="text-mini text-ink-muted">{view.fallback}</div>
-          ) : null}
+          <div className="text-mini text-ink-faint">{view.scope}</div>
           {view.warnings.map((w) => (
             <div key={w} className="text-mini text-ink-muted">
               {w}
             </div>
           ))}
+          {view.legs.length ? (
+            <ul className="flex flex-col gap-0.5 text-mini text-ink-muted">
+              {view.legs.map((l) => (
+                <li key={l.key} className="flex items-baseline gap-2">
+                  <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                  <Num>{l.time}</Num>
+                  <Num className="text-ink-faint">{l.distance}</Num>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {view.choices.length ? (
             <div
               className="flex flex-col gap-1"

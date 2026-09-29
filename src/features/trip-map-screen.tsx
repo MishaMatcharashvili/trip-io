@@ -84,7 +84,7 @@ export function TripMapScreen({
   } = useTripRoute(stops, {
     alternatives: stops.length === 2,
   });
-  const view = describeRoute(route, chosen, stops.length, new Date());
+  const view = describeRoute(route, chosen, stops, new Date());
   const mapsUrl = googleMapsDirectionsUrl(stops.map((s) => s.lonLat));
   const drawn = drawnRoute(route, chosen, pickRoute);
 
