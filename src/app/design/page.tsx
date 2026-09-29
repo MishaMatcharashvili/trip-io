@@ -386,9 +386,9 @@ export default function DesignSystemPage() {
         <section className="flex flex-col gap-3">
           <SectionRule>Map</SectionRule>
           <Prose className="max-w-[640px]">
-            MapLibre over Georgia from the public Blob store, painted only in
-            the map tokens. The route is periwinkle because it is the plan the
-            agent watches; coral marks the one stop something real happened to.
+            Google Maps over Georgia, with the trip drawn in the design's
+            tokens. The route is periwinkle because it is the plan the agent
+            watches; coral marks the one stop something real happened to.
           </Prose>
           <Card className="overflow-hidden p-0">
             <TripMap stops={georgiaMapStops} className="h-[420px] w-full" />

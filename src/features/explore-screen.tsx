@@ -269,8 +269,8 @@ export function ExploreScreen({
   const [trips, setTrips] = useState<TripRef[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const rows = useRef(new Map<string, HTMLDivElement>());
-  // One layout at a time: two hidden MapLibre maps would be two WebGL
-  // contexts, and two lists would fight over which row a pin scrolls to.
+  // One layout at a time: two hidden maps would be two map loads
+  // (billed), and two lists would fight over which row a pin scrolls to.
   const [desktop, setDesktop] = useState<boolean | null>(null);
 
   useEffect(() => {
