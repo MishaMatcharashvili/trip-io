@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { interventionCard } from "@/bll/interventions";
 import { routeLegs } from "@/bll/route-legs";
-import { dayForecast } from "@/bll/trip-screen";
 import { offerFor } from "@/bll/watch-pass";
 import {
   advisory,
@@ -16,6 +15,7 @@ import {
 } from "@/data/trip";
 import type { LonLat } from "@/domain/geo";
 import { TopBar } from "@/features/chrome";
+import { forecastRibbon } from "@/features/shared-reads";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
 import {
   ago,
@@ -155,7 +155,7 @@ async function realView(
       ] as LonLat)
     : null;
   const forecast =
-    centre && day.date ? await dayForecast(centre, day.date, now) : null;
+    centre && day.date ? await forecastRibbon(centre, day.date) : null;
 
   const next = day.checkpoints.find((c) => c.state === "upcoming");
   const checked = ago(screen.lastCheck, now);

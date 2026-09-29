@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { catalogueByArea } from "@/bll/places";
 import { type RoadSeason, roadSeason } from "@/domain/catalogue/road-season";
 import { TopBar } from "@/features/chrome";
 import { type AreaChip, ExploreScreen } from "@/features/explore-screen";
+import { areaCounts, tbilisiToday } from "@/features/shared-reads";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { cx } from "@/ui/cx";
@@ -110,14 +110,8 @@ function SeasonFind() {
 }
 
 export default async function ExplorePage() {
-  const month =
-    Number(
-      new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Tbilisi",
-        month: "numeric",
-      }).format(new Date()),
-    ) || 1;
-  const counts = await catalogueByArea();
+  const [today, counts] = await Promise.all([tbilisiToday(), areaCounts()]);
+  const month = Number(today.slice(5, 7)) || 1;
   const areas: AreaChip[] = counts.map((c) => ({
     slug: c.slug,
     name: areaNames[c.slug] ?? c.slug,

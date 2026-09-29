@@ -10,15 +10,17 @@ import {
   type Ref,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
+import { preconnect } from "react-dom";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
-import { MAP_WORKER } from "./source.ts";
+import { loadMapLibre } from "./maplibre.ts";
+import { borrow, giveBack, type Lease, setInteractive } from "./pool.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
-import { mistStyle, readPalette } from "./style.ts";
 
 // The real map: MapLibre over the Georgia basemap in the public Blob store.
 // The basemap is painted from the design's map tokens (style.ts); the trip on
@@ -28,8 +30,8 @@ import { mistStyle, readPalette } from "./style.ts";
 // are in filled and pulsing; coral only where something real has happened to
 // a stop. The stops themselves live in stops.tsx.
 //
-// MapLibre is imported inside the effect, never at module scope: it touches
-// `window` on import, and this component is rendered on the server too.
+// The map itself is not this component's: it borrows the page's one map from
+// the pool (pool.ts), draws this trip on it, and hands it back on the way out.
 
 export type LonLat = [number, number];
 
@@ -83,30 +85,9 @@ const ROUTE_SOURCE = "trip-route";
 const EVENT_SOURCE = "trip-events";
 const EVENT_LAYERS = ["events-fill", "events-line", "events-point"] as const;
 
-type Theme = "light" | "dark";
-
-const currentTheme = (): Theme =>
-  document.documentElement.getAttribute("data-theme") === "dark"
-    ? "dark"
-    : "light";
-
-let registered: Promise<typeof import("maplibre-gl")> | null = null;
-
-/** Load MapLibre once per page, with the pmtiles protocol and our worker. */
-function loadMapLibre(baseUrl: string) {
-  registered ??= (async () => {
-    const [maplibre, { Protocol }] = await Promise.all([
-      import("maplibre-gl"),
-      import("pmtiles"),
-    ]);
-    maplibre.setWorkerUrl(
-      `${baseUrl}/${MAP_WORKER.prefix(maplibre.getVersion()).replace(/^map\//, "")}/maplibre-gl-worker.mjs`,
-    );
-    maplibre.addProtocol("pmtiles", new Protocol().tile);
-    return maplibre;
-  })();
-  return registered;
-}
+// Begin as soon as this module runs in a browser, while the page hydrates,
+// rather than after the first map's effect.
+if (typeof window !== "undefined" && BASE_URL) loadMapLibre(BASE_URL);
 
 /** A promise, including the chunks React hands a client component from the server. */
 const isPending = (
@@ -289,6 +270,16 @@ const EVENT_SHAPES: Record<
   "events-point": ["==", ["geometry-type"], "Point"],
 };
 
+/** Take the trip off the map, leaving the basemap for the next borrower. */
+function removeTripLayers(map: MapLibreMap) {
+  for (const id of [...EVENT_LAYERS, ...ROUTE_LAYERS]) {
+    if (map.getLayer(id)) map.removeLayer(id);
+  }
+  for (const id of [EVENT_SOURCE, ROUTE_SOURCE]) {
+    if (map.getSource(id)) map.removeSource(id);
+  }
+}
+
 /** Show or hide the trip's layers without rebuilding them. */
 function applyLayers(map: MapLibreMap, layers: MapLayers) {
   if (!map.getLayer(ROUTE_SOURCE)) return;
@@ -339,12 +330,18 @@ export function TripMap({
   onSelect?: (id: string) => void;
   ref?: Ref<TripMapHandle>;
   /** Room to leave for panels floating over the map, in pixels. */
-  fitPadding?:
-    | number
-    | { top: number; right: number; bottom: number; left: number };
+  fitPadding?: Padding;
   interactive?: boolean;
   className?: string;
 }) {
+  // Everything the map loads lives on the Blob store: open the connection
+  // while the page's own scripts are still arriving. The fetches are CORS, so
+  // the connection must be an anonymous one or the browser opens a second.
+  // Rendered on the server too, so the hint is in the first HTML.
+  if (BASE_URL) {
+    preconnect(new URL(BASE_URL).origin, { crossOrigin: "anonymous" });
+  }
+
   const [arrived, setArrived] = useState<RouteLegs | null>(null);
   useEffect(() => {
     if (!isPending(routeProp)) return;
@@ -362,11 +359,8 @@ export function TripMap({
   // Legs that no longer match the stops (a stop added since) are not drawn.
   const route =
     given && given.length === stops.length - 1 ? given : straight(stops);
-  const container = useRef<HTMLDivElement>(null);
-  const [loaded, setLoaded] = useState<{
-    map: MapLibreMap;
-    maplibre: typeof import("maplibre-gl");
-  } | null>(null);
+  const slot = useRef<HTMLDivElement>(null);
+  const [lease, setLease] = useState<Lease | null>(null);
   const latest = useRef({ stops, route, events, layers, onSelect, fitPadding });
   latest.current = { stops, route, events, layers, onSelect, fitPadding };
 
@@ -377,82 +371,60 @@ export function TripMap({
   useImperativeHandle(
     ref,
     () => ({
-      zoomIn: () => loaded?.map.zoomIn(),
-      zoomOut: () => loaded?.map.zoomOut(),
-      recentre: () =>
-        loaded?.map.fitBounds(
-          bounds(latest.current.stops, latest.current.route),
-          { padding: latest.current.fitPadding, maxZoom: 13 },
-        ),
+      zoomIn: () => lease?.map.zoomIn(),
+      zoomOut: () => lease?.map.zoomOut(),
+      recentre: () => {
+        if (lease) frame(lease.map, latest.current, true);
+      },
     }),
-    [loaded],
+    [lease],
   );
 
-  // The map itself: created once, restyled when the theme changes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: built once; stops and route are synced by the effect below
-  useEffect(() => {
-    const el = container.current;
+  // Borrow the page's map and frame this trip on it. A layout effect, so the
+  // previous page hands the map back in the same commit, before this one
+  // asks for it, and the map is in place before the browser paints.
+  useLayoutEffect(() => {
+    const el = slot.current;
     if (!el || !BASE_URL) return;
-    const baseUrl = BASE_URL;
-    let cancelled = false;
-    let observer: MutationObserver | null = null;
-    let map: MapLibreMap | null = null;
+    let held: Lease | null = null;
 
-    loadMapLibre(baseUrl).then((maplibre) => {
-      if (cancelled) return;
-      const theme = currentTheme();
-      map = new maplibre.Map({
-        container: el,
-        style: mistStyle(baseUrl, readPalette(document.documentElement), theme),
-        bounds: bounds(latest.current.stops, latest.current.route),
-        fitBoundsOptions: { padding: fitPadding, maxZoom: 13 },
-        interactive,
-        attributionControl: { compact: true },
-      });
-      const m = map;
-      // Fires again after every setStyle, which drops the trip's layers with
-      // the old style — so this is also what redraws them after a theme change.
-      m.on("style.load", () => {
+    const cancel = borrow(el, BASE_URL, (l) => {
+      held = l;
+      setInteractive(l.map, interactive);
+      frame(l.map, latest.current, false);
+      // Runs again after a theme change, which reloads the style and takes
+      // the trip's layers with it.
+      l.onStyle = () => {
         addTripLayers(
-          m,
+          l.map,
           latest.current.route,
           latest.current.stops,
           latest.current.events,
         );
-        applyLayers(m, latest.current.layers);
-      });
-      setLoaded({ map: m, maplibre });
-
-      observer = new MutationObserver(() => {
-        m.setStyle(
-          mistStyle(
-            baseUrl,
-            readPalette(document.documentElement),
-            currentTheme(),
-          ),
-        );
-      });
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["data-theme"],
-      });
+        applyLayers(l.map, latest.current.layers);
+      };
+      if (l.styled) l.onStyle();
+      setLease(l);
     });
 
     return () => {
-      cancelled = true;
-      observer?.disconnect();
-      map?.remove();
-      setLoaded(null);
+      cancel();
+      if (held) {
+        removeTripLayers(held.map);
+        giveBack(held);
+      }
+      setLease(null);
     };
   }, [interactive]);
 
-  // The stops (stops.tsx): mounted once per map, then told what changed.
+  // The stops (stops.tsx): mounted once per borrowed map, then told what
+  // changed. Removed again before the next borrower mounts its own.
   const [stopsLayer, setStopsLayer] = useState<StopsLayer | null>(null);
   useEffect(() => {
-    if (!loaded) return;
+    if (!lease) return;
     const layer = mountStops(
-      loaded.map,
-      loaded.maplibre,
+      lease.map,
+      lease.maplibre,
       selectable ? (id: string) => latest.current.onSelect?.(id) : null,
     );
     setStopsLayer(layer);
@@ -460,7 +432,7 @@ export function TripMap({
       layer.remove();
       setStopsLayer(null);
     };
-  }, [loaded, selectable]);
+  }, [lease, selectable]);
 
   useEffect(() => {
     stopsLayer?.update(stops, selectedId);
@@ -468,17 +440,17 @@ export function TripMap({
 
   // The route and the event areas, kept in step with props.
   useEffect(() => {
-    if (!loaded) return;
-    const { map } = loaded;
+    if (!lease) return;
+    const { map } = lease;
     map
       .getSource<GeoJSONSource>(ROUTE_SOURCE)
       ?.setData(routeData(route, stops));
     map.getSource<GeoJSONSource>(EVENT_SOURCE)?.setData(eventData(events));
-  }, [loaded, stops, route, events]);
+  }, [lease, stops, route, events]);
 
   useEffect(() => {
-    if (loaded?.map.isStyleLoaded()) applyLayers(loaded.map, layers);
-  }, [loaded, layers]);
+    if (lease) applyLayers(lease.map, layers);
+  }, [lease, layers]);
 
   if (!BASE_URL) {
     // No basemap configured (a checkout without NEXT_PUBLIC_MAP_BASE_URL):
@@ -490,12 +462,33 @@ export function TripMap({
 
   return (
     <div
-      ref={container}
+      ref={slot}
       className={cx("bg-map-ground", className)}
       role="img"
       aria-label={`Map of the trip: ${stops.map((s) => s.label).join(", ")}`}
     />
   );
+}
+
+type Padding =
+  | number
+  | { top: number; right: number; bottom: number; left: number };
+
+/** Fit the camera to the trip, leaving room for what floats over the map. */
+function frame(
+  map: MapLibreMap,
+  trip: {
+    stops: readonly MapStop[];
+    route: RouteLegs;
+    fitPadding: Padding;
+  },
+  animate: boolean,
+) {
+  map.fitBounds(bounds(trip.stops, trip.route), {
+    padding: trip.fitPadding,
+    maxZoom: 13,
+    animate,
+  });
 }
 
 /** The box around everything on the map, or all of Georgia if it is empty. */
