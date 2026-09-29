@@ -47,7 +47,12 @@ export type TripRoute =
       /** Asked again for the same stops: the answer shown is the previous one. */
       refreshing: boolean;
     }
-  | { status: "failed"; reason: ClientFailure };
+  | {
+      status: "failed";
+      reason: ClientFailure;
+      /** Which stop, when the failure is one stop's. */
+      stop?: number;
+    };
 
 export type TripRouteOptions = {
   /** False for a picture, or where the traveller cannot ask (signed out). */
@@ -126,7 +131,7 @@ export function useTripRoute(
       ? { status: "loading" }
       : current.ok
         ? { status: "ready", answer: current.answer, refreshing }
-        : { status: "failed", reason: current.reason };
+        : { status: "failed", reason: current.reason, stop: current.stop };
   }
 
   const computedAt = route.status === "ready" ? route.answer.computedAt : "";

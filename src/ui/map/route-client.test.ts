@@ -13,7 +13,7 @@ const answerFor = (n: number): RouteAnswer => ({
     {
       distanceM: 100 * n,
       durationS: 10 * n,
-      staticDurationS: null,
+      typicalDurationS: null,
       path: [
         [44, 41.7],
         [44.1, 41.7],
@@ -21,21 +21,23 @@ const answerFor = (n: number): RouteAnswer => ({
       legs: Array.from({ length: n }, () => ({
         distanceM: 100,
         durationS: 10,
-        staticDurationS: null,
+        typicalDurationS: null,
         path: [
           [44, 41.7],
           [44.1, 41.7],
         ] as [number, number][],
       })),
       description: null,
-      labels: [],
-      warnings: [],
     },
   ],
+  stops: Array.from({ length: n + 1 }, (_, i) => ({
+    lonLat: [44 + i * 0.01, 41.7] as [number, number],
+    distanceM: 5,
+    road: null,
+  })),
   mode: "drive",
   traffic: "live",
   computedAt: "2030-01-01T00:00:00.000Z",
-  fallback: null,
 });
 
 const counting = () => {
@@ -121,6 +123,21 @@ describe("route client", () => {
     assert.deepEqual(seen, [MAX_STOPS, 5]);
     assert.ok(out.ok);
     if (out.ok) assert.equal(out.answer.routes[0].legs.length, MAX_STOPS + 3);
+  });
+
+  test("a stop that cannot be routed is named by its place in the whole trip, not in its chunk", async () => {
+    const client = createRouteClient(async (req) =>
+      req.stops.length === 5
+        ? { ok: false, reason: "unroutable-stop", stop: 2 }
+        : { ok: true, answer: answerFor(req.stops.length - 1) },
+    );
+    const out = await client.route({ stops: stops(MAX_STOPS + 4) });
+    // The second chunk starts at the shared boundary stop, index 24.
+    assert.deepEqual(out, {
+      ok: false,
+      reason: "unroutable-stop",
+      stop: 2 + (MAX_STOPS - 1),
+    });
   });
 
   test("alternatives are asked for between two stops only", async () => {

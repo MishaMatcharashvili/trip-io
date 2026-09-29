@@ -1,9 +1,10 @@
-import type {
-  RouteAnswer,
-  RouteFailure,
-  RouteMode,
-  RouteRequestInput,
-  RouteStop,
+import {
+  MAX_STOPS,
+  type RouteAnswer,
+  type RouteFailure,
+  type RouteMode,
+  type RouteRequestInput,
+  type RouteStop,
 } from "../../domain/route/contract.ts";
 import {
   chunkStops,
@@ -26,7 +27,7 @@ export type ClientFailure = RouteFailure | "signed-out" | "offline";
 
 export type ClientOutcome =
   | { ok: true; answer: RouteAnswer }
-  | { ok: false; reason: ClientFailure };
+  | { ok: false; reason: ClientFailure; stop?: number };
 
 export type Fetcher = (request: RouteRequestInput) => Promise<ClientOutcome>;
 
@@ -84,8 +85,15 @@ export function createRouteClient(
           ),
         ),
       );
-      const failed = outcomes.find((o) => !o.ok);
-      if (failed) return failed;
+      const failedAt = outcomes.findIndex((o) => !o.ok);
+      if (failedAt >= 0) {
+        const failed = outcomes[failedAt];
+        // A stop's index is within its chunk; chunks share their boundary
+        // stop, so chunk n begins (n × (MAX_STOPS − 1)) stops in.
+        return !failed.ok && failed.stop !== undefined
+          ? { ...failed, stop: failed.stop + failedAt * (MAX_STOPS - 1) }
+          : failed;
+      }
       const answers = outcomes.flatMap((o) => (o.ok ? [o.answer] : []));
       return { ok: true, answer: joinAnswers(answers) };
     },
