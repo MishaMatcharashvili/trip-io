@@ -19,6 +19,7 @@
     "smoke:briefing": "node --env-file=.env scripts/dev/smoke-briefing.ts",
     "smoke:interrupt": "node --env-file=.env scripts/dev/smoke-interrupt.ts",
     "smoke:road": "node --env-file=.env scripts/dev/smoke-road.ts",
+    "smoke:route": "node --env-file=.env scripts/dev/smoke-route.ts",
     "smoke:telegram": "node --env-file=.env scripts/dev/smoke-telegram.ts",
     "kill:count": "node --env-file=.env scripts/dev/synthetic-count.ts",
     "judge:eval": "node --env-file=.env scripts/dev/judge-eval.ts",
