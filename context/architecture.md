@@ -29,7 +29,7 @@ schema and cron design this section summarizes.
 | ORM | Drizzle + drizzle-kit | raw SQL where PostGIS gets interesting (matching query, corridor geometry) |
 | Catalogue ETL | DuckDB (`@duckdb/node-api`, dev-only scripts) | reads Overture's Parquet from S3 with bbox pushdown; the whole programmatic gate runs here, testable without a database |
 | Auth | Better Auth | anonymous trip in local state → account created at save → trip claimed; Expo support built in |
-| Map | Google Maps JavaScript API; roads from the Google Routes API | the browser draws the map; `POST /api/route` asks Google for the road, so the server key never reaches the client. Setup, limits and billing in `docs/google-maps.md` |
+| Map | Mapbox GL JS; roads from the Mapbox Directions API | the browser draws the map; `POST /api/route` asks Mapbox for the road, so the Directions token never reaches the client. Setup, limits and billing in `docs/mapbox.md` |
 | Queue | Postgres table + `SELECT ... FOR UPDATE SKIP LOCKED` | no Redis; cron handlers enqueue, a drain handler claims and processes |
 | Scheduling | Trigger.dev schedules → `/api/cron/*` route handlers | the clock only; Hobby cron runs once/day and rejects finer schedules at deploy time (see Cron topology) |
 | Email | Resend | daily briefing |
