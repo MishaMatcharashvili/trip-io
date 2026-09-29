@@ -40,8 +40,8 @@ type Padding = { top: number; right: number; bottom: number; left: number };
 
 /**
  * Room left for the panels floating over the map, per layout. On a phone the
- * map ends where the itinerary sheet begins (330px), so Google's
- * logo and terms at the map's foot are never under it; desktop panels stop
+ * map ends where the itinerary sheet begins (330px), so Mapbox's
+ * logo and attribution at the map's foot are never under it; desktop panels stop
  * 30px short of the bottom for the same reason.
  */
 const PADDING: Record<"desktop" | "mobile", Padding> = {
@@ -50,7 +50,7 @@ const PADDING: Record<"desktop" | "mobile", Padding> = {
 };
 
 /**
- * The map as the trip screen's canvas: Google Maps full-bleed, with the design's
+ * The map as the trip screen's canvas: Mapbox full-bleed, with the design's
  * own zoom / recentre controls and layer switcher on desktop, and a stop opened
  * in a popover without leaving the map. On a phone a tapped stop opens its own
  * screen instead — there is no room beside the sheet for a popover.
@@ -232,7 +232,7 @@ export function TripMapScreen({
             <span className="flex-1 text-small">
               Traffic
               <span className="block text-mini text-ink-faint">
-                Live roads, from Google
+                Congestion where Mapbox has data
               </span>
             </span>
             <Toggle

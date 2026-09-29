@@ -37,9 +37,23 @@ export const env = createEnv({
     NEXT_PUBLIC_MAPBOX_TOKEN: process.env.VERCEL
       ? z.string().startsWith("pk.")
       : z.string().startsWith("pk.").optional(),
+    /**
+     * A Mapbox Studio style, if the app's own palette is built there. Unset,
+     * Mapbox's light and dark streets styles are used.
+     */
+    NEXT_PUBLIC_MAPBOX_STYLE_LIGHT: z
+      .string()
+      .startsWith("mapbox://styles/")
+      .optional(),
+    NEXT_PUBLIC_MAPBOX_STYLE_DARK: z
+      .string()
+      .startsWith("mapbox://styles/")
+      .optional(),
   },
   experimental__runtimeEnv: {
     NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+    NEXT_PUBLIC_MAPBOX_STYLE_LIGHT: process.env.NEXT_PUBLIC_MAPBOX_STYLE_LIGHT,
+    NEXT_PUBLIC_MAPBOX_STYLE_DARK: process.env.NEXT_PUBLIC_MAPBOX_STYLE_DARK,
   },
   // `.env.example` lists every key with an empty value; empty means unset.
   emptyStringAsUndefined: true,

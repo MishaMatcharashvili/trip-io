@@ -9,15 +9,22 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { preconnect } from "react-dom";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
 import { mountOverlays, type Overlays } from "./overlays.ts";
-import { borrow, giveBack, type Lease, setInteractive } from "./pool.ts";
+import {
+  applyScheme,
+  borrow,
+  giveBack,
+  type Lease,
+  setInteractive,
+} from "./pool.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
 
-// The real map: Google Maps, styled by the app's Map ID. The trip on top of it
+// The real map: Mapbox GL JS, in Mapbox's light or dark style. The trip on top of it
 // follows the canvas — the route in periwinkle, because it is the plan the
 // agent is watching, solid where you have driven and dashed ahead; a stop you
 // have passed ringed in periwinkle, one ahead in grey, the one you are in
@@ -27,8 +34,8 @@ import { mountStops, type StopsLayer } from "./stops.tsx";
 // The map itself is not this component's: it borrows the page's one map from
 // the pool (pool.ts), draws this trip on it, and hands it back on the way out.
 //
-// Google's logo and terms are drawn by Google in the map's bottom corners and
-// may not be covered: whatever floats over a map leaves them clear.
+// Mapbox's logo and attribution are drawn by Mapbox in the map's bottom
+// corners and may not be covered: whatever floats over a map leaves them clear.
 
 export type LonLat = [number, number];
 
@@ -77,7 +84,10 @@ export type MapLayers = {
   route: boolean;
   weather: boolean;
   roads: boolean;
-  /** Google's live road-traffic layer; separate from the route's estimate. */
+  /**
+   * Mapbox's traffic layer: congestion where Mapbox has data. Separate from
+   * the route's estimate, and it asks nothing of the Directions API.
+   */
   traffic: boolean;
 };
 
@@ -95,16 +105,16 @@ export type TripMapHandle = {
   recentre(): void;
 };
 
-const API_KEY = env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-/** Fitting a single village should not zoom to its rooftops. */
-const MAX_FIT_ZOOM = 13;
+const TOKEN = env.NEXT_PUBLIC_MAPBOX_TOKEN;
+/** Fitting a single village should not zoom to its rooftops (Mapbox zoom). */
+const MAX_FIT_ZOOM = 12;
 
 type Padding =
   | number
   | { top: number; right: number; bottom: number; left: number };
 
-// Watches the theme attribute the theme script keeps: a map's colour scheme is
-// fixed when it is built, so a change means a new map.
+// Watches the theme attribute the theme script keeps: a change restyles the
+// map, and the trip's layers are added again on top of the new style.
 function subscribeTheme(onChange: () => void) {
   const observer = new MutationObserver(onChange);
   observer.observe(document.documentElement, {
@@ -141,13 +151,10 @@ export function TripMap({
   interactive?: boolean;
   className?: string;
 }) {
-  // The API loads from Google's own hosts: open the connections while the
-  // page's scripts are still arriving. Rendered on the server too, so the hint
-  // is in the first HTML.
-  if (API_KEY) {
-    preconnect("https://maps.googleapis.com");
-    preconnect("https://maps.gstatic.com", { crossOrigin: "anonymous" });
-  }
+  // Tiles and styles load from Mapbox's own host: open the connection while
+  // the page's scripts are still arriving. Rendered on the server too, so the
+  // hint is in the first HTML.
+  if (TOKEN) preconnect("https://api.mapbox.com");
 
   const slot = useRef<HTMLDivElement>(null);
   const [lease, setLease] = useState<Lease | null>(null);
@@ -163,8 +170,8 @@ export function TripMap({
   useImperativeHandle(
     ref,
     () => ({
-      zoomIn: () => lease?.map.setZoom((lease.map.getZoom() ?? 7) + 1),
-      zoomOut: () => lease?.map.setZoom((lease.map.getZoom() ?? 7) - 1),
+      zoomIn: () => lease?.map.zoomIn(),
+      zoomOut: () => lease?.map.zoomOut(),
       recentre: () => {
         if (lease) frame(lease, latest.current);
       },
@@ -174,18 +181,17 @@ export function TripMap({
 
   // Borrow the page's map and frame this trip on it. A layout effect, so the
   // previous page hands the map back in the same commit, before this one
-  // asks for it, and the map is in place before the browser paints. `theme`
-  // is a dependency on purpose: a map cannot change its colour scheme, so a
-  // new theme returns this one and borrows another.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `theme` only triggers a fresh borrow
+  // asks for it, and the map is in place before the browser paints. The theme
+  // is not a dependency: a Mapbox map is restyled in place (below), never
+  // rebuilt.
   useLayoutEffect(() => {
     const el = slot.current;
-    if (!el || !API_KEY) return;
+    if (!el || !TOKEN) return;
     let held: Lease | null = null;
 
     const cancel = borrow(
       el,
-      API_KEY,
+      TOKEN,
       (l) => {
         held = l;
         setInteractive(l.map, interactive);
@@ -200,7 +206,13 @@ export function TripMap({
       if (held) giveBack(held);
       setLease(null);
     };
-  }, [interactive, theme]);
+  }, [interactive]);
+
+  // A theme change restyles the map it is on: the style drops the trip's
+  // layers, and the overlays put them back when it has loaded.
+  useEffect(() => {
+    if (lease) applyScheme(lease, theme === "dark" ? "dark" : "light");
+  }, [lease, theme]);
 
   // The stops (stops.tsx): mounted once per borrowed map, then told what
   // changed. Removed again before the next borrower mounts its own.
@@ -208,7 +220,7 @@ export function TripMap({
   useEffect(() => {
     if (!lease) return;
     const layer = mountStops(
-      lease.google,
+      lease.mapbox,
       lease.map,
       selectable ? (id: string) => latest.current.onSelect?.(id) : null,
     );
@@ -227,7 +239,7 @@ export function TripMap({
   const [overlays, setOverlays] = useState<Overlays | null>(null);
   useEffect(() => {
     if (!lease) return;
-    const mounted = mountOverlays(lease.google, lease.map);
+    const mounted = mountOverlays(lease.map);
     setOverlays(mounted);
     return () => {
       mounted.remove();
@@ -279,7 +291,7 @@ export function TripMap({
     frame(lease, latest.current);
   }, [lease, stopKey]);
 
-  if (!API_KEY || failed) {
+  if (!TOKEN || failed) {
     // No map available (a checkout without a key, a blocked script, offline):
     // the ground colour alone, rather than a broken map. The screen's own
     // itinerary list is what the traveller reads.
@@ -315,7 +327,7 @@ function frame(
     fitPadding: Padding;
   },
 ) {
-  const { map } = lease;
+  const { map, mapbox } = lease;
   const points = [
     ...trip.stops.map((s) => s.lonLat),
     ...(trip.route?.legs.flat() ?? []),
@@ -324,11 +336,12 @@ function frame(
     const { west, south, east, north } = GEORGIA_BBOX;
     points.push([west, south], [east, north]);
   }
-  const bounds = new google.maps.LatLngBounds();
-  for (const [lng, lat] of points) bounds.extend({ lat, lng });
-  map.fitBounds(bounds, trip.fitPadding);
-  // Fitting a single point (or a village) would otherwise zoom to rooftops.
-  google.maps.event.addListenerOnce(map, "idle", () => {
-    if ((map.getZoom() ?? 0) > MAX_FIT_ZOOM) map.setZoom(MAX_FIT_ZOOM);
+  const bounds = new mapbox.LngLatBounds();
+  for (const point of points) bounds.extend(point);
+  map.fitBounds(bounds, {
+    padding: trip.fitPadding,
+    // Fitting a single point (or a village) would otherwise zoom to rooftops.
+    maxZoom: MAX_FIT_ZOOM,
+    duration: 0,
   });
 }
