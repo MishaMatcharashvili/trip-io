@@ -35,7 +35,7 @@ export function routeSignature(request: RouteRequestInput): string {
     request.stops.map((s) => [
       s.lonLat[0].toFixed(6),
       s.lonLat[1].toFixed(6),
-      s.googlePlaceId ?? null,
+      s.access ? [s.access[0].toFixed(6), s.access[1].toFixed(6)] : null,
     ]),
   ]);
 }
@@ -51,26 +51,25 @@ const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 export function joinAnswers(answers: readonly RouteAnswer[]): RouteAnswer {
   if (answers.length === 1) return answers[0];
   const parts = answers.map((a) => a.routes[0]);
-  const staticKnown = parts.every((p) => p.staticDurationS !== null);
+  const typicalKnown = parts.every((p) => p.typicalDurationS !== null);
   const route: RouteAlternative = {
     distanceM: sum(parts.map((p) => p.distanceM)),
     durationS: sum(parts.map((p) => p.durationS)),
-    staticDurationS: staticKnown
-      ? sum(parts.map((p) => p.staticDurationS as number))
+    typicalDurationS: typicalKnown
+      ? sum(parts.map((p) => p.typicalDurationS as number))
       : null,
     path: parts.flatMap((p) => p.path),
     legs: parts.flatMap((p) => p.legs),
     description: null,
-    labels: [],
-    warnings: [...new Set(parts.flatMap((p) => p.warnings))],
   };
   const traffic = new Set(answers.map((a) => a.traffic));
   return {
     routes: [route],
+    // Chunks share their boundary stop: it is counted once, from the chunk it ends.
+    stops: answers.flatMap((a, i) => (i === 0 ? a.stops : a.stops.slice(1))),
     mode: answers[0].mode,
     traffic: traffic.size === 1 ? answers[0].traffic : "live",
     // The oldest part decides how stale the whole is.
     computedAt: answers.map((a) => a.computedAt).sort()[0],
-    fallback: answers.find((a) => a.fallback)?.fallback ?? null,
   };
 }

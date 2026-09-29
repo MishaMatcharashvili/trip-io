@@ -30,7 +30,7 @@ describe("routeRequest", () => {
     );
   });
 
-  test("takes origin, destination and 25 intermediates, and no more", () => {
+  test("takes the provider's 25 coordinates, origin and destination among them, and no more", () => {
     assert.equal(MAX_STOPS, MAX_INTERMEDIATES + 2);
     assert.ok(routeRequest.safeParse({ stops: stops(MAX_STOPS) }).success);
     assert.ok(!routeRequest.safeParse({ stops: stops(MAX_STOPS + 1) }).success);
@@ -54,6 +54,20 @@ describe("routeRequest", () => {
     );
     assert.ok(
       !routeRequest.safeParse({ stops: [{ lonLat: [44] }, stop(44)] }).success,
+    );
+  });
+
+  test("a road-access point is checked like the place: longitude first, in the region", () => {
+    const place = [44.8, 41.7] as [number, number];
+    assert.ok(
+      routeRequest.safeParse({
+        stops: [{ lonLat: place, access: [44.81, 41.69] }, stop(44)],
+      }).success,
+    );
+    assert.ok(
+      !routeRequest.safeParse({
+        stops: [{ lonLat: place, access: [41.69, 44.81] }, stop(44)],
+      }).success,
     );
   });
 

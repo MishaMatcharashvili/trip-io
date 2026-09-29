@@ -7,9 +7,12 @@ import type { LonLat } from "../geo.ts";
 // a RouteOutcome. The AI and the itinerary logic can ask for a route, and read
 // one, without knowing who calculated it.
 
-/** Intermediate waypoints the provider takes; origin and destination come on top. */
-export const MAX_INTERMEDIATES = 25;
-export const MAX_STOPS = MAX_INTERMEDIATES + 2;
+/**
+ * Coordinates one request may carry, origin and destination included. The
+ * provider's own ceiling: more is refused there, so it is refused here first.
+ */
+export const MAX_STOPS = 25;
+export const MAX_INTERMEDIATES = MAX_STOPS - 2;
 
 /** The modes a route can be asked for. Anything else is refused, never turned into driving. */
 export const routeModes = ["drive", "walk"] as const;
@@ -33,12 +36,15 @@ const lonLat = z
   .refine(inRegion, { message: "outside the region trips are planned in" });
 
 export const routeStop = z.object({
+  /** Where the place is: the destination, which may be off any road. */
   lonLat,
   /**
-   * Google's own identifier for the place, when the app holds one: it lets the
-   * provider pick the right entrance. Not the app's place id.
+   * A point a vehicle can actually reach, when the app holds one (a car park,
+   * a gate, the road below a summit church). The route is drawn to it; the
+   * stop stays where `lonLat` says. Without one the provider snaps `lonLat`
+   * to the nearest road and says how far it moved.
    */
-  googlePlaceId: z.string().min(1).max(300).optional(),
+  access: lonLat.optional(),
 });
 export type RouteStop = z.infer<typeof routeStop>;
 
@@ -75,8 +81,11 @@ export type RouteLeg = {
   distanceM: number;
   /** With traffic, for a driving route asked at its departure time. */
   durationS: number;
-  /** The road's own length of time, without traffic. Absent for walking. */
-  staticDurationS: number | null;
+  /**
+   * How long the road usually takes, ignoring live conditions. Only driving
+   * has one; walking is null.
+   */
+  typicalDurationS: number | null;
   /** The road itself, as returned. Never a line drawn between the stops. */
   path: LonLat[];
 };
@@ -84,20 +93,29 @@ export type RouteLeg = {
 export type RouteAlternative = {
   distanceM: number;
   durationS: number;
-  staticDurationS: number | null;
-  /** The whole route's outline, for drawing and framing. */
+  typicalDurationS: number | null;
+  /** The whole route's outline, as the provider returned it. */
   path: LonLat[];
   legs: RouteLeg[];
-  /** How the provider names this route ("via E60"), when it does. */
+  /** The roads the route takes ("E60, Rustaveli Ave"), when the provider names them. */
   description: string | null;
-  labels: string[];
-  /** The provider's own cautions, verbatim: toll roads, restricted areas, etc. */
-  warnings: string[];
+};
+
+/** Where the provider actually put a stop on the road network. */
+export type StopSnap = {
+  /** The point on the road the route runs to. */
+  lonLat: LonLat;
+  /** How far that is from the coordinate asked for, in metres. */
+  distanceM: number;
+  /** The road's name, when it has one. */
+  road: string | null;
 };
 
 export type RouteAnswer = {
   /** The provider's preferred route first. */
   routes: RouteAlternative[];
+  /** One per stop, in order: where each landed on the road network. */
+  stops: StopSnap[];
   mode: RouteMode;
   /**
    * Whether the durations reflect traffic. A route asked for a departure time
@@ -106,11 +124,6 @@ export type RouteAnswer = {
   traffic: "live" | "predicted" | "none";
   /** When the request was made, so a stale estimate can say how stale. */
   computedAt: string;
-  /**
-   * Set when the provider could not use the routing it was asked for and fell
-   * back to another — its durations are then less reliable.
-   */
-  fallback: { mode: string; reason: string } | null;
 };
 
 /** Why no route came back, in words the screen can act on. */
@@ -119,6 +132,8 @@ export const routeFailures = [
   "not-configured",
   "rate-limited",
   "no-route",
+  /** A stop has no road near enough to route to. Says which, when it can. */
+  "unroutable-stop",
   "quota",
   "auth",
   "timeout",
@@ -129,9 +144,14 @@ export type RouteFailure = (typeof routeFailures)[number];
 
 export type RouteOutcome =
   | { ok: true; answer: RouteAnswer }
-  | { ok: false; reason: RouteFailure };
+  | {
+      ok: false;
+      reason: RouteFailure;
+      /** Index into the request's stops, for a failure that is one stop's. */
+      stop?: number;
+    };
 
-/** The port a routing provider implements (src/infra/google-routes.ts). */
+/** The port a routing provider implements (src/infra/mapbox-directions.ts). */
 export type RoutesProvider = {
   /** Whether a credential is present; without one no request is attempted. */
   readonly configured: boolean;

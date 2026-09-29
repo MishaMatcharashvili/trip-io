@@ -57,6 +57,16 @@ describe("routeSignature", () => {
     );
   });
 
+  test("a road-access point is a different question from the place alone", () => {
+    const withAccess = {
+      stops: [
+        { ...a.stops[0], access: [44.81, 41.7] as [number, number] },
+        a.stops[1],
+      ],
+    };
+    assert.notEqual(routeSignature(a), routeSignature(withAccess));
+  });
+
   test("ignores noise below ten centimetres", () => {
     const b = {
       stops: [
@@ -69,6 +79,11 @@ describe("routeSignature", () => {
 });
 
 describe("joinAnswers", () => {
+  const snap = (lon: number, lat: number) => ({
+    lonLat: [lon, lat] as [number, number],
+    distanceM: 4,
+    road: null,
+  });
   const answer = (
     over: Partial<RouteAnswer["routes"][number]>,
     computedAt: string,
@@ -77,7 +92,7 @@ describe("joinAnswers", () => {
       {
         distanceM: 1000,
         durationS: 100,
-        staticDurationS: 90,
+        typicalDurationS: 90,
         path: [
           [44, 41],
           [44.1, 41.1],
@@ -86,23 +101,21 @@ describe("joinAnswers", () => {
           {
             distanceM: 1000,
             durationS: 100,
-            staticDurationS: 90,
+            typicalDurationS: 90,
             path: [
               [44, 41],
               [44.1, 41.1],
             ],
           },
         ],
-        description: "via A",
-        labels: [],
-        warnings: [],
+        description: "A",
         ...over,
       },
     ],
+    stops: [snap(44, 41), snap(44.1, 41.1)],
     mode: "drive",
     traffic: "live",
     computedAt,
-    fallback: null,
   });
 
   test("one answer stays itself", () => {
@@ -112,17 +125,16 @@ describe("joinAnswers", () => {
 
   test("legs go end to end, totals add, the oldest part sets the age", () => {
     const joined = joinAnswers([
-      answer({ warnings: ["tolls"] }, "2030-01-01T00:05:00Z"),
-      answer(
-        { distanceM: 500, durationS: 50, warnings: ["tolls", "ferry"] },
-        "2030-01-01T00:01:00Z",
-      ),
+      answer({}, "2030-01-01T00:05:00Z"),
+      answer({ distanceM: 500, durationS: 50 }, "2030-01-01T00:01:00Z"),
     ]);
     const [route] = joined.routes;
     assert.equal(route.distanceM, 1500);
     assert.equal(route.durationS, 150);
     assert.equal(route.legs.length, 2);
-    assert.deepEqual(route.warnings, ["tolls", "ferry"]);
+    assert.equal(route.typicalDurationS, 180);
+    // Two chunks of two stops share one: three stops, not four.
+    assert.equal(joined.stops.length, 3);
     assert.equal(joined.computedAt, "2030-01-01T00:01:00Z");
     assert.equal(joined.routes.length, 1);
   });
