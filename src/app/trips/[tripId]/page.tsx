@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { interventionCard } from "@/bll/interventions";
-import { routeLegs } from "@/bll/route-legs";
 import { offerFor } from "@/bll/watch-pass";
 import {
   advisory,
@@ -238,8 +237,6 @@ async function realView(
   return {
     view,
     stops,
-    // Not awaited: the map draws straight legs until the roads arrive.
-    route: routeLegs(stops.map((s) => s.lonLat)),
     cards: stopCards(trip, day, alertHref),
     events: screen.events,
   };
@@ -253,7 +250,7 @@ export default async function ActiveTripPage({
   const { state, day, ask } = await searchParams;
 
   const fixture = getTrip(tripId);
-  const { view, stops, route, cards, events } = fixture
+  const { view, stops, cards, events } = fixture
     ? fixtureView(fixture, state)
     : await realView(
         await loadTrip(tripId),
@@ -275,7 +272,6 @@ export default async function ActiveTripPage({
       <div className="relative flex-1 overflow-hidden">
         <TripMapScreen
           stops={stops}
-          route={route}
           events={events}
           cards={cards}
           dimmed={view.forcePaused}

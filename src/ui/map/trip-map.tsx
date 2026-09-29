@@ -1,11 +1,5 @@
 "use client";
 
-import type {
-  ExpressionSpecification,
-  GeoJSONSource,
-  GeoJSONSourceSpecification,
-  Map as MapLibreMap,
-} from "maplibre-gl";
 import {
   type Ref,
   useEffect,
@@ -13,25 +7,28 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { preconnect } from "react-dom";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
-import { loadMapLibre } from "./maplibre.ts";
+import { mountOverlays, type Overlays } from "./overlays.ts";
 import { borrow, giveBack, type Lease, setInteractive } from "./pool.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
 
-// The real map: MapLibre over the Georgia basemap in the public Blob store.
-// The basemap is painted from the design's map tokens (style.ts); the trip on
-// top of it follows the canvas — the route in periwinkle, because it is the
-// plan the agent is watching, solid where you have driven and dashed ahead; a
-// stop you have passed ringed in periwinkle, one ahead in grey, the one you
-// are in filled and pulsing; coral only where something real has happened to
-// a stop. The stops themselves live in stops.tsx.
+// The real map: Google Maps, styled by the app's Map ID. The trip on top of it
+// follows the canvas — the route in periwinkle, because it is the plan the
+// agent is watching, solid where you have driven and dashed ahead; a stop you
+// have passed ringed in periwinkle, one ahead in grey, the one you are in
+// filled and pulsing; coral only where something real has happened to a stop.
+// The stops themselves live in stops.tsx, the lines in overlays.ts.
 //
 // The map itself is not this component's: it borrows the page's one map from
 // the pool (pool.ts), draws this trip on it, and hands it back on the way out.
+//
+// Google's logo and terms are drawn by Google in the map's bottom corners and
+// may not be covered: whatever floats over a map leaves them clear.
 
 export type LonLat = [number, number];
 
@@ -50,8 +47,20 @@ export type MapStop = {
   logo?: string;
 };
 
-/** Leg i runs from stop i to stop i + 1. */
-export type RouteLegs = readonly (readonly LonLat[])[];
+/**
+ * The road to draw: one line per pair of consecutive stops, as returned by the
+ * routing provider. There is no default and no straight-line stand-in; a map
+ * without one draws its stops alone.
+ */
+export type MapRoute = {
+  /** Leg i runs from stop i to stop i + 1. */
+  legs: readonly (readonly LonLat[])[];
+  /** Other ways between the same two stops, drawn beside the chosen one. */
+  alternatives?: readonly (readonly LonLat[])[];
+  /** Being replaced: drawn faded so it does not pass for current. */
+  stale?: boolean;
+  onPickAlternative?: (index: number) => void;
+};
 
 /**
  * A world event behind one of the trip's live matches, as GeoJSON. The map
@@ -64,12 +73,19 @@ export type MapEvent = {
 };
 
 /** Which of the trip's own layers are drawn. */
-export type MapLayers = { route: boolean; weather: boolean; roads: boolean };
+export type MapLayers = {
+  route: boolean;
+  weather: boolean;
+  roads: boolean;
+  /** Google's live road-traffic layer; separate from the route's estimate. */
+  traffic: boolean;
+};
 
 export const defaultLayers: MapLayers = {
   route: true,
   weather: true,
   roads: true,
+  traffic: false,
 };
 
 /** What the map's own controls (zoom, recentre) drive. */
@@ -79,234 +95,30 @@ export type TripMapHandle = {
   recentre(): void;
 };
 
-const BASE_URL = env.NEXT_PUBLIC_MAP_BASE_URL;
+const API_KEY = env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+/** Fitting a single village should not zoom to its rooftops. */
+const MAX_FIT_ZOOM = 13;
 
-const ROUTE_SOURCE = "trip-route";
-const EVENT_SOURCE = "trip-events";
-const EVENT_LAYERS = ["events-fill", "events-line", "events-point"] as const;
+type Padding =
+  | number
+  | { top: number; right: number; bottom: number; left: number };
 
-// Begin as soon as this module runs in a browser, while the page hydrates,
-// rather than after the first map's effect.
-if (typeof window !== "undefined" && BASE_URL) loadMapLibre(BASE_URL);
-
-/** A promise, including the chunks React hands a client component from the server. */
-const isPending = (
-  route: RouteLegs | Promise<RouteLegs> | undefined,
-): route is Promise<RouteLegs> =>
-  typeof (route as { then?: unknown } | undefined)?.then === "function";
-
-const straight = (stops: readonly MapStop[]): RouteLegs =>
-  stops.slice(1).map((s, i) => [stops[i].lonLat, s.lonLat]);
-
-/** A leg is behind you once you have reached the stop it leads to. */
-function routeData(
-  legs: RouteLegs,
-  stops: readonly MapStop[],
-): GeoJSONSourceSpecification["data"] {
-  return {
-    type: "FeatureCollection",
-    features: legs.map((leg, i) => ({
-      type: "Feature",
-      properties: {
-        done: stops[i + 1] ? stops[i + 1].state !== "upcoming" : false,
-      },
-      geometry: { type: "LineString", coordinates: leg.map((p) => [...p]) },
-    })),
-  };
-}
-
-function eventData(
-  events: readonly MapEvent[],
-): GeoJSONSourceSpecification["data"] {
-  return {
-    type: "FeatureCollection",
-    features: events.map((e) => ({
-      type: "Feature",
-      id: e.id,
-      properties: { family: e.kind.split(".")[0] },
-      geometry: e.geometry as never,
-    })),
-  };
-}
-
-const token = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-/**
- * The trip's own layers, above the roads and below the place labels: the
- * route, and the areas of the events that touch it.
- */
-function addTripLayers(
-  map: MapLibreMap,
-  route: RouteLegs,
-  stops: readonly MapStop[],
-  events: readonly MapEvent[],
-) {
-  const agent = token("--color-agent");
-  const ground = token("--color-map-ground");
-  const alert = token("--color-alert-bright");
-  const firstLabel = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
-
-  map.addSource(EVENT_SOURCE, { type: "geojson", data: eventData(events) });
-  map.addLayer(
-    {
-      id: "events-fill",
-      type: "fill",
-      source: EVENT_SOURCE,
-      filter: EVENT_SHAPES["events-fill"],
-      paint: { "fill-color": alert, "fill-opacity": 0.12 },
-    },
-    firstLabel,
-  );
-  map.addLayer(
-    {
-      id: "events-line",
-      type: "line",
-      source: EVENT_SOURCE,
-      filter: EVENT_SHAPES["events-line"],
-      paint: { "line-color": alert, "line-width": 1.5, "line-opacity": 0.7 },
-    },
-    firstLabel,
-  );
-  map.addLayer(
-    {
-      id: "events-point",
-      type: "circle",
-      source: EVENT_SOURCE,
-      filter: EVENT_SHAPES["events-point"],
-      paint: {
-        "circle-color": alert,
-        "circle-opacity": 0.18,
-        "circle-radius": 22,
-        "circle-stroke-color": alert,
-        "circle-stroke-width": 1.5,
-        "circle-stroke-opacity": 0.7,
-      },
-    },
-    firstLabel,
-  );
-
-  // The route: a ground-coloured casing lifts it off the roads it follows,
-  // it thickens as you zoom in, and the legs still ahead are dashed and
-  // lighter than the ones behind you.
-  map.addSource(ROUTE_SOURCE, {
-    type: "geojson",
-    data: routeData(route, stops),
+// Watches the theme attribute the theme script keeps: a map's colour scheme is
+// fixed when it is built, so a change means a new map.
+function subscribeTheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
   });
-  const layout = {
-    "line-cap": "round",
-    "line-join": "round",
-  } as const;
-  map.addLayer(
-    {
-      id: ROUTE_CASING,
-      type: "line",
-      source: ROUTE_SOURCE,
-      layout,
-      paint: {
-        "line-color": ground,
-        "line-width": ROUTE_WIDTH(3),
-        "line-opacity": 0.85,
-      },
-    },
-    firstLabel,
-  );
-  map.addLayer(
-    {
-      id: ROUTE_AHEAD,
-      type: "line",
-      source: ROUTE_SOURCE,
-      filter: ["!", ["get", "done"]],
-      layout: { ...layout, "line-cap": "butt" },
-      paint: {
-        "line-color": agent,
-        "line-width": ROUTE_WIDTH(0),
-        "line-opacity": 0.6,
-        "line-dasharray": [2, 1.6],
-      },
-    },
-    firstLabel,
-  );
-  map.addLayer(
-    {
-      id: ROUTE_SOURCE,
-      type: "line",
-      source: ROUTE_SOURCE,
-      filter: ["get", "done"],
-      layout,
-      paint: {
-        "line-color": agent,
-        "line-width": ROUTE_WIDTH(0),
-        "line-opacity": 0.95,
-      },
-    },
-    firstLabel,
-  );
+  return () => observer.disconnect();
 }
-
-const ROUTE_CASING = "trip-route-casing";
-const ROUTE_AHEAD = "trip-route-ahead";
-const ROUTE_LAYERS = [ROUTE_CASING, ROUTE_AHEAD, ROUTE_SOURCE] as const;
-
-/** The route's width by zoom, plus `extra` on each side for its casing. */
-const ROUTE_WIDTH = (extra: number): ExpressionSpecification => [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  6,
-  2.5 + extra,
-  10,
-  3.5 + extra,
-  14,
-  5 + extra,
-];
-
-const EVENT_SHAPES: Record<
-  (typeof EVENT_LAYERS)[number],
-  ExpressionSpecification
-> = {
-  "events-fill": ["==", ["geometry-type"], "Polygon"],
-  "events-line": ["!=", ["geometry-type"], "Point"],
-  "events-point": ["==", ["geometry-type"], "Point"],
-};
-
-/** Take the trip off the map, leaving the basemap for the next borrower. */
-function removeTripLayers(map: MapLibreMap) {
-  for (const id of [...EVENT_LAYERS, ...ROUTE_LAYERS]) {
-    if (map.getLayer(id)) map.removeLayer(id);
-  }
-  for (const id of [EVENT_SOURCE, ROUTE_SOURCE]) {
-    if (map.getSource(id)) map.removeSource(id);
-  }
-}
-
-/** Show or hide the trip's layers without rebuilding them. */
-function applyLayers(map: MapLibreMap, layers: MapLayers) {
-  if (!map.getLayer(ROUTE_SOURCE)) return;
-  for (const id of ROUTE_LAYERS) {
-    map.setLayoutProperty(id, "visibility", layers.route ? "visible" : "none");
-  }
-  const families = [
-    ...(layers.weather ? ["weather"] : []),
-    ...(layers.roads ? ["road"] : []),
-  ];
-  for (const id of EVENT_LAYERS) {
-    map.setLayoutProperty(
-      id,
-      "visibility",
-      families.length ? "visible" : "none",
-    );
-    map.setFilter(id, [
-      "all",
-      EVENT_SHAPES[id],
-      ["in", ["get", "family"], ["literal", families]],
-    ]);
-  }
-}
+const readTheme = () =>
+  document.documentElement.getAttribute("data-theme") ?? "light";
 
 export function TripMap({
   stops,
-  route: routeProp,
+  route,
   events = [],
   layers = defaultLayers,
   selectedId = null,
@@ -317,12 +129,7 @@ export function TripMap({
   className,
 }: {
   stops: readonly MapStop[];
-  /**
-   * One leg per pair of consecutive stops; straight lines when absent. A
-   * promise — road geometry a server page did not wait for — draws straight
-   * legs until it settles, so the map never waits on a router.
-   */
-  route?: RouteLegs | Promise<RouteLegs>;
+  route?: MapRoute | null;
   events?: readonly MapEvent[];
   layers?: MapLayers;
   selectedId?: string | null;
@@ -334,35 +141,20 @@ export function TripMap({
   interactive?: boolean;
   className?: string;
 }) {
-  // Everything the map loads lives on the Blob store: open the connection
-  // while the page's own scripts are still arriving. The fetches are CORS, so
-  // the connection must be an anonymous one or the browser opens a second.
-  // Rendered on the server too, so the hint is in the first HTML.
-  if (BASE_URL) {
-    preconnect(new URL(BASE_URL).origin, { crossOrigin: "anonymous" });
+  // The API loads from Google's own hosts: open the connections while the
+  // page's scripts are still arriving. Rendered on the server too, so the hint
+  // is in the first HTML.
+  if (API_KEY) {
+    preconnect("https://maps.googleapis.com");
+    preconnect("https://maps.gstatic.com", { crossOrigin: "anonymous" });
   }
 
-  const [arrived, setArrived] = useState<RouteLegs | null>(null);
-  useEffect(() => {
-    if (!isPending(routeProp)) return;
-    let live = true;
-    routeProp.then(
-      (legs) => live && setArrived(legs),
-      () => {},
-    );
-    return () => {
-      live = false;
-      setArrived(null);
-    };
-  }, [routeProp]);
-  const given = isPending(routeProp) ? arrived : routeProp;
-  // Legs that no longer match the stops (a stop added since) are not drawn.
-  const route =
-    given && given.length === stops.length - 1 ? given : straight(stops);
   const slot = useRef<HTMLDivElement>(null);
   const [lease, setLease] = useState<Lease | null>(null);
-  const latest = useRef({ stops, route, events, layers, onSelect, fitPadding });
-  latest.current = { stops, route, events, layers, onSelect, fitPadding };
+  const [failed, setFailed] = useState(false);
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light");
+  const latest = useRef({ stops, route, fitPadding, onSelect });
+  latest.current = { stops, route, fitPadding, onSelect };
 
   // Whether stops are buttons; the handler itself is read through `latest`, so
   // a new function on every render does not rebuild every marker.
@@ -371,10 +163,10 @@ export function TripMap({
   useImperativeHandle(
     ref,
     () => ({
-      zoomIn: () => lease?.map.zoomIn(),
-      zoomOut: () => lease?.map.zoomOut(),
+      zoomIn: () => lease?.map.setZoom((lease.map.getZoom() ?? 7) + 1),
+      zoomOut: () => lease?.map.setZoom((lease.map.getZoom() ?? 7) - 1),
       recentre: () => {
-        if (lease) frame(lease.map, latest.current, true);
+        if (lease) frame(lease, latest.current);
       },
     }),
     [lease],
@@ -382,40 +174,33 @@ export function TripMap({
 
   // Borrow the page's map and frame this trip on it. A layout effect, so the
   // previous page hands the map back in the same commit, before this one
-  // asks for it, and the map is in place before the browser paints.
+  // asks for it, and the map is in place before the browser paints. `theme`
+  // is a dependency on purpose: a map cannot change its colour scheme, so a
+  // new theme returns this one and borrows another.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `theme` only triggers a fresh borrow
   useLayoutEffect(() => {
     const el = slot.current;
-    if (!el || !BASE_URL) return;
+    if (!el || !API_KEY) return;
     let held: Lease | null = null;
 
-    const cancel = borrow(el, BASE_URL, (l) => {
-      held = l;
-      setInteractive(l.map, interactive);
-      frame(l.map, latest.current, false);
-      // Runs again after a theme change, which reloads the style and takes
-      // the trip's layers with it.
-      l.onStyle = () => {
-        addTripLayers(
-          l.map,
-          latest.current.route,
-          latest.current.stops,
-          latest.current.events,
-        );
-        applyLayers(l.map, latest.current.layers);
-      };
-      if (l.styled) l.onStyle();
-      setLease(l);
-    });
+    const cancel = borrow(
+      el,
+      API_KEY,
+      (l) => {
+        held = l;
+        setInteractive(l.map, interactive);
+        frame(l, latest.current);
+        setLease(l);
+      },
+      () => setFailed(true),
+    );
 
     return () => {
       cancel();
-      if (held) {
-        removeTripLayers(held.map);
-        giveBack(held);
-      }
+      if (held) giveBack(held);
       setLease(null);
     };
-  }, [interactive]);
+  }, [interactive, theme]);
 
   // The stops (stops.tsx): mounted once per borrowed map, then told what
   // changed. Removed again before the next borrower mounts its own.
@@ -423,8 +208,8 @@ export function TripMap({
   useEffect(() => {
     if (!lease) return;
     const layer = mountStops(
+      lease.google,
       lease.map,
-      lease.maplibre,
       selectable ? (id: string) => latest.current.onSelect?.(id) : null,
     );
     setStopsLayer(layer);
@@ -438,73 +223,112 @@ export function TripMap({
     stopsLayer?.update(stops, selectedId);
   }, [stopsLayer, stops, selectedId]);
 
-  // The route and the event areas, kept in step with props.
+  // The road, the event areas and the traffic layer (overlays.ts).
+  const [overlays, setOverlays] = useState<Overlays | null>(null);
   useEffect(() => {
     if (!lease) return;
-    const { map } = lease;
-    map
-      .getSource<GeoJSONSource>(ROUTE_SOURCE)
-      ?.setData(routeData(route, stops));
-    map.getSource<GeoJSONSource>(EVENT_SOURCE)?.setData(eventData(events));
-  }, [lease, stops, route, events]);
+    const mounted = mountOverlays(lease.google, lease.map);
+    setOverlays(mounted);
+    return () => {
+      mounted.remove();
+      setOverlays(null);
+    };
+  }, [lease]);
 
   useEffect(() => {
-    if (lease) applyLayers(lease.map, layers);
-  }, [lease, layers]);
+    if (!overlays) return;
+    // Legs that no longer match the stops (one added since) are not drawn.
+    const matches = route && route.legs.length === stops.length - 1;
+    overlays.setRoute(
+      {
+        legs: matches
+          ? route.legs.map((path, i) => ({
+              path,
+              done: stops[i + 1].state !== "upcoming",
+            }))
+          : [],
+        alternatives: matches ? (route.alternatives ?? []) : [],
+        stale: Boolean(route?.stale),
+        visible: layers.route,
+      },
+      (index) => route?.onPickAlternative?.(index),
+    );
+  }, [overlays, route, stops, layers.route]);
 
-  if (!BASE_URL) {
-    // No basemap configured (a checkout without NEXT_PUBLIC_MAP_BASE_URL):
-    // the ground colour alone, rather than a broken map.
+  useEffect(() => {
+    overlays?.setEvents({
+      events,
+      families: [
+        ...(layers.weather ? ["weather"] : []),
+        ...(layers.roads ? ["road"] : []),
+      ],
+    });
+  }, [overlays, events, layers.weather, layers.roads]);
+
+  useEffect(() => {
+    overlays?.setTraffic(layers.traffic);
+  }, [overlays, layers.traffic]);
+
+  // Reframe when the stops themselves change (one added, moved or reordered),
+  // never on a pan, a zoom or a route arriving: the camera is the reader's.
+  const stopKey = stops.map((s) => `${s.id}:${s.lonLat}`).join("|");
+  const framedFor = useRef(stopKey);
+  useEffect(() => {
+    if (!lease || framedFor.current === stopKey) return;
+    framedFor.current = stopKey;
+    frame(lease, latest.current);
+  }, [lease, stopKey]);
+
+  if (!API_KEY || failed) {
+    // No map available (a checkout without a key, a blocked script, offline):
+    // the ground colour alone, rather than a broken map. The screen's own
+    // itinerary list is what the traveller reads.
     return (
-      <div className={cx("bg-map-ground", className)} aria-hidden="true" />
+      <div
+        className={cx(
+          "grid place-items-center bg-map-ground p-4 text-center text-mini text-ink-faint",
+          className,
+        )}
+        role="img"
+        aria-label={`Map unavailable. Stops: ${stops.map((s) => s.label).join(", ")}`}
+      >
+        {failed ? "The map could not be loaded." : null}
+      </div>
     );
   }
 
   return (
-    <div
+    <section
       ref={slot}
       className={cx("bg-map-ground", className)}
-      role="img"
       aria-label={`Map of the trip: ${stops.map((s) => s.label).join(", ")}`}
     />
   );
 }
 
-type Padding =
-  | number
-  | { top: number; right: number; bottom: number; left: number };
-
 /** Fit the camera to the trip, leaving room for what floats over the map. */
 function frame(
-  map: MapLibreMap,
+  lease: Lease,
   trip: {
     stops: readonly MapStop[];
-    route: RouteLegs;
+    route?: MapRoute | null;
     fitPadding: Padding;
   },
-  animate: boolean,
 ) {
-  map.fitBounds(bounds(trip.stops, trip.route), {
-    padding: trip.fitPadding,
-    maxZoom: 13,
-    animate,
-  });
-}
-
-/** The box around everything on the map, or all of Georgia if it is empty. */
-function bounds(stops: readonly MapStop[], route: RouteLegs): [LonLat, LonLat] {
-  const points = [...stops.map((s) => s.lonLat), ...route.flat()];
+  const { map } = lease;
+  const points = [
+    ...trip.stops.map((s) => s.lonLat),
+    ...(trip.route?.legs.flat() ?? []),
+  ];
   if (points.length === 0) {
     const { west, south, east, north } = GEORGIA_BBOX;
-    return [
-      [west, south],
-      [east, north],
-    ];
+    points.push([west, south], [east, north]);
   }
-  const lons = points.map((p) => p[0]);
-  const lats = points.map((p) => p[1]);
-  return [
-    [Math.min(...lons), Math.min(...lats)],
-    [Math.max(...lons), Math.max(...lats)],
-  ];
+  const bounds = new google.maps.LatLngBounds();
+  for (const [lng, lat] of points) bounds.extend({ lat, lng });
+  map.fitBounds(bounds, trip.fitPadding);
+  // Fitting a single point (or a village) would otherwise zoom to rooftops.
+  google.maps.event.addListenerOnce(map, "idle", () => {
+    if ((map.getZoom() ?? 0) > MAX_FIT_ZOOM) map.setZoom(MAX_FIT_ZOOM);
+  });
 }

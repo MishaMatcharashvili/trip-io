@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { routeLegs } from "@/bll/route-legs";
 import { savedPlaceIds } from "@/bll/saved";
 import { type Checkpoint, type Day, getTrip, type Trip } from "@/data/trip";
 import { summariseHours } from "@/domain/catalogue/opening-hours";
+import { RoutedTripMap } from "@/features/routed-trip-map";
 import { SaveToggle } from "@/features/save-toggle";
 import { RemoveStopButton } from "@/features/trip-actions";
 import { duration, mapStops } from "@/features/trip-model";
@@ -13,7 +13,6 @@ import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import { BasemapMobile } from "@/ui/map/basemap-mobile";
-import { TripMap } from "@/ui/map/trip-map";
 import { Display, Eyebrow, Num, Prose } from "@/ui/text";
 import { loadTrip } from "../../load";
 
@@ -262,9 +261,8 @@ export default async function PlacePage({
   return (
     <div className="relative flex min-h-dvh flex-col">
       <div className="absolute inset-x-0 top-0 h-[260px] overflow-hidden">
-        <TripMap
+        <RoutedTripMap
           stops={stops}
-          route={routeLegs(stops.map((s) => s.lonLat))}
           selectedId={stop.id}
           fitPadding={{ top: 90, right: 40, bottom: 60, left: 40 }}
           className="absolute inset-0 size-full"

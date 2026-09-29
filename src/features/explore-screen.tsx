@@ -353,7 +353,6 @@ export function ExploreScreen({
     <div className="relative flex-1 overflow-hidden">
       <TripMap
         stops={stops}
-        route={[]}
         selectedId={selected}
         onSelect={select}
         fitPadding={{ top: 60, right: 400, bottom: 60, left: 470 }}
@@ -382,7 +381,6 @@ export function ExploreScreen({
       <div className="absolute inset-x-0 top-0 h-[200px] overflow-hidden">
         <TripMap
           stops={stops}
-          route={[]}
           interactive={false}
           fitPadding={20}
           className="absolute inset-0 size-full"
