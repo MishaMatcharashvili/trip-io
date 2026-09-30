@@ -599,7 +599,7 @@ export const watchLedger = [
 
 /**
  * The fixture trip's stops on the real map, so the reference render shows
- * MapLibre too. Ids are the day-3 checkpoints the popover opens.
+ * the map too. Ids are the day-3 checkpoints the popover opens.
  */
 export const georgiaMapStops: Array<{
   id: string;

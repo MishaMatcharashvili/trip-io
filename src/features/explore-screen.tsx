@@ -269,8 +269,8 @@ export function ExploreScreen({
   const [trips, setTrips] = useState<TripRef[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const rows = useRef(new Map<string, HTMLDivElement>());
-  // One layout at a time: two hidden MapLibre maps would be two WebGL
-  // contexts, and two lists would fight over which row a pin scrolls to.
+  // One layout at a time: two hidden maps would be two map loads
+  // (billed), and two lists would fight over which row a pin scrolls to.
   const [desktop, setDesktop] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -353,7 +353,6 @@ export function ExploreScreen({
     <div className="relative flex-1 overflow-hidden">
       <TripMap
         stops={stops}
-        route={[]}
         selectedId={selected}
         onSelect={select}
         fitPadding={{ top: 60, right: 400, bottom: 60, left: 470 }}
@@ -382,7 +381,6 @@ export function ExploreScreen({
       <div className="absolute inset-x-0 top-0 h-[200px] overflow-hidden">
         <TripMap
           stops={stops}
-          route={[]}
           interactive={false}
           fitPadding={20}
           className="absolute inset-0 size-full"

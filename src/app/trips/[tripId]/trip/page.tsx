@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { routeLegs } from "@/bll/route-legs";
 import { georgiaMapStops, getTrip, type Trip } from "@/data/trip";
 import { TopBar } from "@/features/chrome";
+import { RoutedTripMap } from "@/features/routed-trip-map";
 import { AddDayButton } from "@/features/trip-actions";
 import { duration, tripStops } from "@/features/trip-model";
 import { DayShape } from "@/ui/bars";
@@ -11,7 +11,7 @@ import { Card, Divider, SectionRule } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
-import { type MapStop, type RouteLegs, TripMap } from "@/ui/map/trip-map";
+import type { MapStop } from "@/ui/map/trip-map";
 import { BottomNav, tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num } from "@/ui/text";
 import { loadTrip } from "../load";
@@ -25,15 +25,12 @@ function WholeTrip({
   stats,
   totals,
   stops,
-  route,
   actions,
 }: {
   trip: Trip;
   stats: Stat[];
   totals: Stat[];
   stops: MapStop[];
-  /** Road legs between the stops, streamed in after the page. */
-  route?: Promise<RouteLegs>;
   actions: React.ReactNode;
 }) {
   return (
@@ -140,9 +137,8 @@ function WholeTrip({
 
         <aside className="hidden w-[460px] shrink-0 flex-col border-l border-hairline bg-surface lg:flex">
           <div className="relative h-[470px] overflow-hidden border-b border-hairline">
-            <TripMap
+            <RoutedTripMap
               stops={stops}
-              route={route}
               className="absolute inset-0 size-full"
             />
           </div>
@@ -252,7 +248,6 @@ export default async function FullTripPage({
         },
       ]}
       stops={stops}
-      route={routeLegs(stops.map((s) => s.lonLat))}
       actions={
         <>
           <AddDayButton

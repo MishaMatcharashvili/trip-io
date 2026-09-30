@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { routeLegs } from "@/bll/route-legs";
 import { myTrips, type TripListRow, tripScreen } from "@/bll/trip-screen";
 import { passesHeldBy } from "@/bll/watch-pass";
 import { georgia, georgiaMapStops, type Trip } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { TopBar } from "@/features/chrome";
+import { RoutedTripMap } from "@/features/routed-trip-map";
 import { dateRange, tripModel, tripStops } from "@/features/trip-model";
 import { getAuth } from "@/infra/auth";
 import { ButtonLink } from "@/ui/button";
@@ -14,7 +14,7 @@ import { Card, Divider, SectionRule } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
-import { type MapStop, type RouteLegs, TripMap } from "@/ui/map/trip-map";
+import type { MapStop } from "@/ui/map/trip-map";
 import { BottomNav, homeTabs } from "@/ui/nav";
 import { Display, Headline, Prose, Title } from "@/ui/text";
 
@@ -23,8 +23,6 @@ export const metadata: Metadata = { title: "Your trips" };
 type Live = {
   trip: Trip;
   stops: MapStop[];
-  /** Road legs between the stops, streamed in after the page. */
-  route?: Promise<RouteLegs>;
   /** The decision waiting on the traveller, when there is one. */
   decision: { title: string; detail: string; href: string } | null;
   detectors: { name: string; tone: "ok" | "alert" | "idle" }[];
@@ -42,9 +40,9 @@ function LiveCard({ live }: { live: Live }) {
       className="flex flex-col overflow-hidden lg:flex-row lg:items-stretch"
     >
       <div className="relative h-[140px] shrink-0 overflow-hidden lg:h-auto lg:min-h-[200px] lg:w-[296px]">
-        <TripMap
+        <RoutedTripMap
           stops={live.stops}
-          route={live.route}
+          routing={{ enabled: !live.example }}
           interactive={false}
           fitPadding={24}
           className="absolute inset-0 size-full"
@@ -170,7 +168,6 @@ async function liveFor(row: TripListRow): Promise<Live | null> {
   return {
     trip,
     stops,
-    route: routeLegs(stops.map((s) => s.lonLat)),
     decision: open
       ? {
           title: "1 change needs your decision",
