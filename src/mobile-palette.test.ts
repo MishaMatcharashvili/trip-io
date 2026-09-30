@@ -33,13 +33,25 @@ function mobileColour(theme: "light" | "dark", key: string): string {
   return value.toLowerCase();
 }
 
+/** `inkMuted` → `ink-muted`. */
+const tokenOf = (key: string) =>
+  key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+
+/** Every key the mobile palette declares, read from the light block. */
+const keys = [
+  ...(mobile
+    .match(/const light\b[^=]*=\s*\{([^}]*)\}/)?.[1]
+    .matchAll(/\b(\w+):\s*"#/g) ?? []),
+].map((m) => m[1]);
+
 describe("mobile palette", () => {
-  for (const [key, token] of [
-    ["canvas", "canvas"],
-    ["ink", "ink"],
-  ] as const) {
-    test(`${key} matches --color-${token} in both themes`, () => {
-      const web = cssToken(token);
+  test("declares its colours", () => {
+    assert.ok(keys.length > 2, "keys read from mobile/src/theme.ts");
+  });
+
+  for (const key of keys) {
+    test(`${key} matches --color-${tokenOf(key)} in both themes`, () => {
+      const web = cssToken(tokenOf(key));
       assert.equal(mobileColour("light", key), web.light);
       assert.equal(mobileColour("dark", key), web.dark);
     });
