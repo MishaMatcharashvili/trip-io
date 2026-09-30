@@ -6,6 +6,7 @@ import {
   ScrollView,
   type StyleProp,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   type TextInputProps,
@@ -249,6 +250,41 @@ export function Notice({
   );
 }
 
+/** A setting with a label, a line of what it does, and a switch. */
+export function SwitchRow({
+  label,
+  hint,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  const p = usePalette();
+  return (
+    <View style={styles.switchRow}>
+      <View style={styles.switchText}>
+        <Text style={[styles.switchLabel, { color: p.ink }]}>{label}</Text>
+        {hint ? (
+          <Text style={[styles.hint, { color: p.inkMuted }]}>{hint}</Text>
+        ) : null}
+      </View>
+      <Switch
+        accessibilityLabel={label}
+        value={value}
+        disabled={disabled}
+        onValueChange={onChange}
+        trackColor={{ false: p.control, true: p.agent }}
+        thumbColor={p.knob}
+      />
+    </View>
+  );
+}
+
 export function Loading() {
   const p = usePalette();
   return (
@@ -315,6 +351,9 @@ const styles = StyleSheet.create({
   },
   pillLabel: { fontSize: 11.5, fontWeight: "600" },
   notice: { alignItems: "flex-start" },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  switchText: { flex: 1, gap: 2 },
+  switchLabel: { fontSize: 14.5, fontWeight: "600" },
   loading: { paddingVertical: 48, alignItems: "center" },
   hairline: { height: StyleSheet.hairlineWidth },
 });

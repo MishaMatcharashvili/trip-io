@@ -44,6 +44,14 @@ export function statusOf(error: unknown): number | undefined {
   return typeof status === "number" ? status : undefined;
 }
 
+/** The JSON body a failed `read` carried: the route's `{ error, … }`. */
+export function bodyOf(
+  error: unknown,
+): { error?: string; messages?: string[] } | null {
+  const data = (error as { detail?: { data?: unknown } } | null)?.detail?.data;
+  return data && typeof data === "object" ? data : null;
+}
+
 /** What to tell the traveller about a failure. */
 export function messageOf(error: unknown): string {
   const status = statusOf(error);
