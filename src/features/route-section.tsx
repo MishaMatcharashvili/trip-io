@@ -37,7 +37,9 @@ export function RouteSection({
             ) : null}
           </div>
           {view.via ? (
-            <div className="text-mini text-ink-muted">{view.via}</div>
+            <div className="line-clamp-2 text-mini text-ink-muted">
+              {view.via}
+            </div>
           ) : null}
           <div className="text-mini text-ink-faint">{view.basis}</div>
           <div className="text-mini text-ink-faint">{view.scope}</div>
