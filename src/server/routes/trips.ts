@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
+import { alertsPage } from "@/bll/interventions.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -352,6 +353,15 @@ export const trips = new Hono<SessionEnv>()
       "content-type": "text/calendar; charset=utf-8",
       "content-disposition": `attachment; filename="trip-${id.slice(0, 8)}.ics"`,
     });
+  })
+
+  // Everything this trip was told and what came of it: the phone's alert list,
+  // and the way from a trip to an intervention card.
+  .get("/:id/alerts", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    return c.json(await alertsPage(id));
   })
 
   .get("/:id/patches", zValidator("param", params), async (c) => {
