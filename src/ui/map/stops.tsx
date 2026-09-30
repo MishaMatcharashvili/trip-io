@@ -4,8 +4,8 @@ import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
-import Supercluster from "supercluster";
 import { cx } from "../cx.ts";
+import { clusterIndex, LABEL_ZOOM } from "./cluster.ts";
 import type { Mapbox } from "./mapbox.ts";
 import { stopIcon } from "./stop-icon.ts";
 import type { MapStop } from "./trip-map.tsx";
@@ -20,12 +20,6 @@ import type { MapStop } from "./trip-map.tsx";
 // the map is close enough to have room for it, and always for the stop you
 // picked and the one you are at.
 
-/** From this zoom on every stop carries its name (Mapbox zoom, 512 px tiles). */
-const LABEL_ZOOM = 10;
-/** Stops closer than this, in pixels, merge into a count. */
-const CLUSTER_RADIUS_PX = 40;
-const CLUSTER_MAX_ZOOM = 13;
-
 export type StopsLayer = {
   update(stops: readonly MapStop[], selectedId: string | null): void;
   remove(): void;
@@ -34,8 +28,6 @@ export type StopsLayer = {
 /** Above the others: the one picked, where you are, then trouble. */
 const zIndex = (stop: MapStop, selected: boolean, index: number) =>
   selected ? 3000 : stop.state === "now" ? 2000 : stop.disrupted ? 1000 : index;
-
-type Point = { id: string };
 
 /**
  * Puts the stops on a map. `update` whenever the stops or the selection
@@ -50,10 +42,8 @@ export function mountStops(
   let selectedId: string | null = null;
   let labels = map.getZoom() >= LABEL_ZOOM;
   let zoom = Math.floor(map.getZoom());
-  let index = new Supercluster<Point>({
-    radius: CLUSTER_RADIUS_PX,
-    maxZoom: CLUSTER_MAX_ZOOM,
-  });
+  // Loaded from the start, even with no stops: it is asked on every zoom.
+  let index = clusterIndex([]);
   // A stop's element outlives its marker: a stop that is merged into a count
   // and comes back is the same pin, with its logo already loaded.
   const pins = new Map<string, HTMLElement>();
@@ -125,7 +115,7 @@ export function mountStops(
       const [lng, lat] = feature.geometry.coordinates as [number, number];
       const props = feature.properties as
         | { cluster: true; cluster_id: number }
-        | (Point & { cluster?: false });
+        | { id: string; cluster?: false };
       if (props.cluster) {
         const members = index
           .getLeaves(props.cluster_id, Infinity)
@@ -211,17 +201,7 @@ export function mountStops(
       stops = nextStops;
       selectedId = nextSelected;
       if (moved) {
-        index = new Supercluster<Point>({
-          radius: CLUSTER_RADIUS_PX,
-          maxZoom: CLUSTER_MAX_ZOOM,
-        });
-        index.load(
-          stops.map((s) => ({
-            type: "Feature" as const,
-            properties: { id: s.id },
-            geometry: { type: "Point" as const, coordinates: s.lonLat },
-          })),
-        );
+        index = clusterIndex(stops);
         // A stop that is gone leaves its element behind for nobody.
         const ids = new Set(stops.map((s) => s.id));
         for (const id of [...pins.keys()]) if (!ids.has(id)) pins.delete(id);
