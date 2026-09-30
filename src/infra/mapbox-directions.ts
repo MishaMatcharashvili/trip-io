@@ -286,7 +286,9 @@ export function classify(
     case "NoRoute":
       return { reason: "no-route" };
     case "NoSegment": {
-      // "Could not find a matching segment for input coordinate 1"
+      // Live, Mapbox's message is "Could not find a matching segment for
+      // input coordinates" with no index, so the stop usually stays unnamed.
+      // An index is used if a reply ever carries one.
       const index = /coordinate\s+(\d+)/i.exec(body.message ?? "")?.[1];
       const stop = index === undefined ? undefined : Number(index);
       return stop !== undefined && stop < stopCount

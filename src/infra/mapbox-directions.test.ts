@@ -382,9 +382,18 @@ describe("classify: why nothing came back", () => {
       ),
       { reason: "unroutable-stop", stop: 1 },
     );
-    assert.deepEqual(classify(200, { code: "NoSegment" }, 3), {
-      reason: "unroutable-stop",
-    });
+    // The message Mapbox actually sends, checked against the live API, names none.
+    assert.deepEqual(
+      classify(
+        200,
+        {
+          code: "NoSegment",
+          message: "Could not find a matching segment for input coordinates",
+        },
+        3,
+      ),
+      { reason: "unroutable-stop" },
+    );
     // An index that is not one of the stops is not passed on.
     assert.deepEqual(
       classify(200, { code: "NoSegment", message: "input coordinate 9" }, 3),
