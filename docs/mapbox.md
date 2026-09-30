@@ -29,7 +29,8 @@ against a live service**: no Mapbox token was available while this was written (
   * A stop could be silently moved to any road, however far. Left at its default, Mapbox's snapping
     radius is unlimited, so a mountain viewpoint would become a road in the next valley and the
     route would look right. Every stop now has a 3 km radius. A stop with no road inside it is a
-    failure that names the stop (`unroutable-stop`); a stop moved more than 500 m says so, with the
+    failure (`unroutable-stop`). Mapbox's reply does not say which stop, so the panel says "a stop has no
+    road near enough" unless a reply ever carries an index; a stop moved more than 500 m says so, with the
     distance.
   * Google's place id stood in for "where a car can actually go". The contract now separates the two:
     a stop's `lonLat` is where the place is, and an optional `access` point is where a vehicle can
@@ -94,11 +95,13 @@ shorter than the straight line across it, or a stop moved beyond its radius.
      `http://localhost:3000`. Keep only the default public scopes. It is in the client bundle by
      design; the URL restriction is its protection. The environment schema rejects anything that
      does not start with `pk.`, so a secret token cannot be shipped by mistake.
-   * **Server token** (`MAPBOX_DIRECTIONS_TOKEN`): a separate token, used only by
-     `src/infra/mapbox-directions.ts`, set as a server-only variable in Vercel. Create it with no
-     more scopes than Directions needs. Confirm in the Mapbox dashboard which scopes that is; this
-     page does not assert one. Serverless has no fixed outbound address, so a URL or IP restriction
-     is not available for it: the app's own limits below and Mapbox's usage alerts are the controls.
+   * **Server token** (`MAPBOX_DIRECTIONS_TOKEN`): an ordinary second token (Mapbox has no
+     Directions-specific token type; `pk.` or `sk.` both work, and Directions needs only public
+     scopes), with no URL restriction, used only by `src/infra/mapbox-directions.ts` and set as a
+     server-only variable in Vercel. It must not be the same token as the browser's: that one is in
+     the client bundle, so anyone could call Directions with it directly and skip our auth and
+     limits. Serverless has no fixed outbound address, so a URL or IP restriction is not available
+     for it: the app's own limits below and Mapbox's usage alerts are the controls.
      It must never carry a `NEXT_PUBLIC_` name (`src/mapbox-keys.test.ts` fails if it does, or if a
      file outside the server layers names it).
 2. **Usage alerts.** Mapbox → Statistics / billing: set alerts. **An alert only sends an email**; it
