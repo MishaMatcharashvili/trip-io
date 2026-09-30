@@ -1,12 +1,12 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { api } from "./src/api";
-import { usePalette } from "./src/theme";
+import { api } from "~/api";
+import { usePalette } from "~/theme";
 
 // A placeholder screen: it proves the app reaches the API through the typed
-// client. The real shell (Phase 7) replaces it.
-export default function App() {
+// client. The shell's real screens replace it.
+export default function Index() {
   const [status, setStatus] = useState("checking the API…");
   const palette = usePalette();
 
