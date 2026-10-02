@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { prominence } from "@/domain/catalogue/prominence";
 import { dayHref } from "@/features/trip-links";
 import { apiClient } from "@/lib/hono-client";
 import { Button } from "@/ui/button";
@@ -28,6 +29,8 @@ type Hit = {
   group: string;
   tier: "curated" | "verified" | "raw";
   lonLat: [number, number];
+  confidence?: number | null;
+  websites?: number;
 };
 
 type TripRef = { id: string; title: string; startsAt: string; endsAt: string };
@@ -305,6 +308,14 @@ export function ExploreScreen({
     lonLat: h.lonLat,
     label: h.name,
     state: "upcoming",
+    // When pins are too close to draw apart, the one that stands for them is
+    // the place a traveller is most likely to be looking for.
+    weight: prominence({
+      category: h.category,
+      tier: h.tier,
+      confidence: h.confidence ?? null,
+      websites: h.websites ?? 0,
+    }),
   }));
 
   const select = (id: string) => {

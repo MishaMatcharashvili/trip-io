@@ -53,6 +53,11 @@ export type MapStop = {
   category?: string;
   /** The place's own logo, drawn in the pin instead of a glyph when it loads. */
   logo?: string;
+  /**
+   * How much it matters, for the one that stands for a group when pins are too
+   * close to draw apart. Higher wins; nothing, 0.
+   */
+  weight?: number;
 };
 
 /**

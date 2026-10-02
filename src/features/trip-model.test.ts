@@ -15,6 +15,7 @@ import {
   mapStops,
   partyLine,
   stopDetail,
+  stopWeight,
   tripModel,
   weatherView,
 } from "./trip-model.ts";
@@ -230,5 +231,20 @@ describe("stopDetail", () => {
       stopDetail(node({ startsAt: at(DAY, "23:30"), durationMin: 45 })),
       "45 min · until 00:15",
     );
+  });
+});
+
+describe("stopWeight", () => {
+  test("a visit outweighs a meal, which outweighs a check-in, which outweighs a drive", () => {
+    const w = (kind: string) => stopWeight({ kind, durationMin: 60 });
+    assert.ok(w("visit") > w("meal"));
+    assert.ok(w("meal") > w("stay"));
+    assert.ok(w("stay") > w("transfer"));
+  });
+
+  test("a long stop outweighs a short one of its kind, up to a limit", () => {
+    const w = (min: number) => stopWeight({ kind: "visit", durationMin: min });
+    assert.ok(w(180) > w(30));
+    assert.equal(w(600), w(1200));
   });
 });

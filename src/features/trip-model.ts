@@ -335,6 +335,26 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
   };
 }
 
+/**
+ * How much a stop matters on the map, for the one that stands for a group when
+ * pins are too close to draw apart: a visit over a meal over a check-in, and a
+ * long one over a short one.
+ */
+export function stopWeight(node: {
+  kind: string;
+  durationMin: number;
+}): number {
+  const base =
+    node.kind === "visit"
+      ? 50
+      : node.kind === "meal"
+        ? 28
+        : node.kind === "stay"
+          ? 22
+          : 8;
+  return base + Math.min(25, Math.round(node.durationMin / 8));
+}
+
 /** A day's stops as the map draws them. */
 export function mapStops(day: Day): MapStop[] {
   return day.checkpoints.flatMap((c) =>
@@ -349,6 +369,7 @@ export function mapStops(day: Day): MapStop[] {
             kind: c.node.kind,
             category: c.node.category,
             logo: c.node.logo,
+            weight: stopWeight(c.node),
           },
         ]
       : [],
