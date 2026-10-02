@@ -36,3 +36,18 @@ test("every screen of a trip has a loading state inside the trip", () => {
     .map((page) => relative(APP, page));
   assert.deepEqual(uncovered, []);
 });
+
+// The same for the site's own pages, and stricter: a page that inherits the
+// loading state of a page above it is shown that page's layout, which is what
+// happened to every page without one under the root's. Each has its own. The
+// design reference is static and never loads.
+const EXEMPT = new Set(["design/page.tsx"]);
+
+test("every other page has a loading state of its own", () => {
+  const uncovered = pages(APP)
+    .map((page) => relative(APP, page))
+    .filter((page) => !page.startsWith("trips/") && !page.startsWith("api/"))
+    .filter((page) => !EXEMPT.has(page))
+    .filter((page) => !existsSync(join(APP, dirname(page), "loading.tsx")));
+  assert.deepEqual(uncovered, []);
+});
