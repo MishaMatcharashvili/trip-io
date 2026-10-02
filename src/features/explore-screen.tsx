@@ -11,6 +11,8 @@ import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
 import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { Eyebrow, Headline, Prose, Title } from "@/ui/text";
+import { GROUPS, groupName } from "./explore-model";
+import { ExploreSkeleton } from "./explore-skeleton";
 import { SaveToggle } from "./save-toggle";
 
 // Explore: the catalogue searched live, on the map as it is filtered. The map
@@ -30,16 +32,6 @@ type Hit = {
 type TripRef = { id: string; title: string; startsAt: string; endsAt: string };
 
 export type AreaChip = { slug: string; name: string; count: number };
-
-const GROUPS = [
-  ["heritage", "Heritage"],
-  ["nature", "Nature"],
-  ["food", "Food & wine"],
-  ["culture", "Culture"],
-  ["lodging", "Stay"],
-] as const;
-
-const groupName = Object.fromEntries(GROUPS) as Record<string, string>;
 
 const tierLine = {
   curated: "Checked by hand",
@@ -343,8 +335,10 @@ export function ExploreScreen({
     />
   );
 
+  // Until the layout is known, the same shell the page's loading state draws,
+  // with the real regions and aside: nothing moves when the map arrives.
   if (desktop === null) {
-    return <div className="flex-1 bg-map-ground" aria-hidden="true" />;
+    return <ExploreSkeleton areas={areas} total={total} aside={aside} />;
   }
 
   return desktop ? (

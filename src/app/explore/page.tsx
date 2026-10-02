@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { type RoadSeason, roadSeason } from "@/domain/catalogue/road-season";
-import { TopBar } from "@/features/chrome";
 import { type AreaChip, ExploreScreen } from "@/features/explore-screen";
 import { areaCounts, tbilisiToday } from "@/features/shared-reads";
+import { SiteFrame } from "@/features/site-frame";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
-import { BottomNav, homeTabs } from "@/ui/nav";
 import { Eyebrow, Prose, Title } from "@/ui/text";
 
 export const metadata: Metadata = { title: "Explore" };
@@ -120,9 +119,7 @@ export default async function ExplorePage() {
   const total = areas.reduce((sum, a) => sum + a.count, 0);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopBar active="Explore" />
-
+    <SiteFrame active="Explore" tab="Explore">
       <ExploreScreen
         areas={areas}
         total={total}
@@ -139,8 +136,6 @@ export default async function ExplorePage() {
           </>
         }
       />
-
-      <BottomNav items={homeTabs} active="Explore" />
-    </div>
+    </SiteFrame>
   );
 }
