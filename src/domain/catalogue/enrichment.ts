@@ -40,6 +40,11 @@ export type Photo = {
   caption: string | null;
   /** The venue's own picture, or a traveller's. */
   by: "venue" | "traveller" | null;
+  /**
+   * Who took it and under what licence, with a link to where it lives. Every
+   * freely licensed photograph carries one; the licence asks for it.
+   */
+  credit: { text: string; url: string } | null;
 };
 
 export type Enrichment = {
@@ -90,9 +95,9 @@ export type SearchOutcome =
   | { ok: false; reason: EnrichFailure };
 
 /**
- * The provider behind the port. The three calls are separate because they are
+ * The provider behind the port. The two calls are separate because they are
  * paid for, and limited, separately: finding a place is rare and slow, reading
- * one is the common case, and permission to read it is asked for once.
+ * one is the common case.
  */
 export type PlaceEnricher = {
   /** What the provider is called in storage: the key its identifiers are kept under. */
@@ -100,10 +105,6 @@ export type PlaceEnricher = {
   configured: boolean;
   /** Places that might be this one. Few: each result returned is billed. */
   search(place: PlaceIdentity): Promise<SearchOutcome>;
-  /** Make a found place readable. Idempotent. */
-  allow(
-    id: string,
-  ): Promise<{ ok: true } | { ok: false; reason: EnrichFailure }>;
   /** The place as it is now. Never kept by the caller. */
   read(id: string): Promise<EnrichOutcome>;
 };
@@ -122,6 +123,16 @@ export type KeptContent = {
     outcome: EnrichOutcome,
     ttlSeconds: number,
   ): Promise<void>;
+};
+
+/** Photographs of a place from a source that is not a review site. */
+export type PhotoOutcome =
+  | { ok: true; photos: Photo[] }
+  | { ok: false; reason: EnrichFailure };
+
+export type PhotoSource = {
+  /** Photographs of this place, and only of it: nothing that merely is nearby. */
+  find(place: PlaceIdentity): Promise<PhotoOutcome>;
 };
 
 // Matching ------------------------------------------------------------------

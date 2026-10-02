@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Toggle } from "@/ui/control";
+import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import { MapStyleSwitch } from "@/ui/map/map-style-switch";
@@ -76,6 +77,8 @@ export function TripMapScreen({
   const [layers, setLayers] = useState<MapLayers>(defaultLayers);
   const [selected, setSelected] = useState<string | null>(null);
   const [routeOpen, setRouteOpen] = useState(false);
+  // The desktop route and layers panel: closed until asked for.
+  const [instruments, setInstruments] = useState(false);
 
   // The road: asked for when the stops change or the traveller asks again,
   // never on a pan, a zoom or a panel opening. Between exactly two stops the
@@ -209,87 +212,117 @@ export function TripMapScreen({
           </button>
         </div>
 
-        <Panel className="absolute bottom-[30px] right-[74px] z-20 max-h-[calc(100%-140px)] w-[240px] overflow-y-auto">
-          <div className="px-3.5 py-2.5">
-            <Eyebrow>Route</Eyebrow>
-          </div>
-          <Divider />
-          <RouteSection
-            view={view}
-            onRefresh={refresh}
-            onPick={pickRoute}
-            mapsUrl={mapsUrl}
-            className="px-3.5 py-2.5"
-          />
-          <Divider />
-          <div className="px-3.5 py-2.5">
-            <Eyebrow>Base map</Eyebrow>
-          </div>
-          <Divider />
-          <div className="px-3.5 py-2.5">
-            <MapStyleSwitch />
-          </div>
-          <Divider />
-          <div className="px-3.5 py-2.5">
-            <Eyebrow>Layers</Eyebrow>
-          </div>
-          <Divider />
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <span className="flex-1 text-small">Route</span>
-            <Toggle
-              label="Route layer"
-              size="sm"
-              on={layers.route}
-              onChange={layer("route")}
-            />
-          </div>
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <span className="flex-1 text-small">
-              Traffic
-              <span className="block text-mini text-ink-faint">
-                Congestion where Mapbox has data
-              </span>
-            </span>
-            <Toggle
-              label="Traffic layer"
-              size="sm"
-              on={layers.traffic}
-              onChange={layer("traffic")}
-            />
-          </div>
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <span className="flex-1 text-small">
-              Weather
-              {hasWeather ? null : (
-                <span className="block text-mini text-ink-faint">
-                  Nothing on your stops
+        {/* The route and the layers: a bar that is always there, and a panel that
+            opens above it on request. Open all the time it sat under the cards
+            of the right-hand column and could not be reached. */}
+        <div className="absolute bottom-[30px] right-[74px] z-30 flex max-h-[calc(100%-120px)] w-[240px] flex-col gap-2">
+          {instruments ? (
+            <Panel className="min-h-0 flex-1 overflow-y-auto">
+              <div className="px-3.5 py-2.5">
+                <Eyebrow>Route</Eyebrow>
+              </div>
+              <Divider />
+              <RouteSection
+                view={view}
+                onRefresh={refresh}
+                onPick={pickRoute}
+                mapsUrl={mapsUrl}
+                className="px-3.5 py-2.5"
+              />
+              <Divider />
+              <div className="px-3.5 py-2.5">
+                <Eyebrow>Base map</Eyebrow>
+              </div>
+              <Divider />
+              <div className="px-3.5 py-2.5">
+                <MapStyleSwitch />
+              </div>
+              <Divider />
+              <div className="px-3.5 py-2.5">
+                <Eyebrow>Layers</Eyebrow>
+              </div>
+              <Divider />
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <span className="flex-1 text-small">Route</span>
+                <Toggle
+                  label="Route layer"
+                  size="sm"
+                  on={layers.route}
+                  onChange={layer("route")}
+                />
+              </div>
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <span className="flex-1 text-small">
+                  Traffic
+                  <span className="block text-mini text-ink-faint">
+                    Congestion where Mapbox has data
+                  </span>
                 </span>
-              )}
-            </span>
-            <Toggle
-              label="Weather layer"
-              size="sm"
-              on={layers.weather}
-              onChange={layer("weather")}
-            />
-          </div>
-          <div className="flex items-center gap-2.5 px-3.5 pb-3 pt-2.5">
-            <span className="flex-1 text-small">
-              Road incidents
-              {hasRoads ? null : (
-                <span className="block text-mini text-ink-faint">
-                  None on your route
+                <Toggle
+                  label="Traffic layer"
+                  size="sm"
+                  on={layers.traffic}
+                  onChange={layer("traffic")}
+                />
+              </div>
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <span className="flex-1 text-small">
+                  Weather
+                  {hasWeather ? null : (
+                    <span className="block text-mini text-ink-faint">
+                      Nothing on your stops
+                    </span>
+                  )}
                 </span>
-              )}
+                <Toggle
+                  label="Weather layer"
+                  size="sm"
+                  on={layers.weather}
+                  onChange={layer("weather")}
+                />
+              </div>
+              <div className="flex items-center gap-2.5 px-3.5 pb-3 pt-2.5">
+                <span className="flex-1 text-small">
+                  Road incidents
+                  {hasRoads ? null : (
+                    <span className="block text-mini text-ink-faint">
+                      None on your route
+                    </span>
+                  )}
+                </span>
+                <Toggle
+                  label="Road incidents layer"
+                  size="sm"
+                  on={layers.roads}
+                  onChange={layer("roads")}
+                />
+              </div>
+            </Panel>
+          ) : null}
+          <button
+            type="button"
+            aria-expanded={instruments}
+            onClick={() => setInstruments((open) => !open)}
+            className="flex h-[38px] shrink-0 items-center gap-2 rounded-panel border border-hairline-strong bg-surface px-3.5 text-small font-medium shadow-panel hover:bg-canvas"
+          >
+            <Icon name="route" size={14} className="text-ink-muted" />
+            <span className="flex-1 text-left">
+              {view.kind === "ready"
+                ? `${view.time} · ${view.distance}`
+                : view.kind === "loading"
+                  ? "Finding the road…"
+                  : "Route & layers"}
             </span>
-            <Toggle
-              label="Road incidents layer"
-              size="sm"
-              on={layers.roads}
-              onChange={layer("roads")}
+            <Icon
+              name="chevronDown"
+              size={14}
+              className={cx(
+                "text-ink-faint transition-transform",
+                instruments && "rotate-180",
+              )}
             />
-          </div>
-        </Panel>
+          </button>
+        </div>
 
         {card ? (
           <Panel className="absolute left-[400px] top-5 z-20 w-[260px] overflow-hidden">

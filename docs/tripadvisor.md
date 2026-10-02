@@ -12,7 +12,7 @@ Written 2026-10-02 from that reference; **nothing here has run against the live 
 | **Caching policy: only the Location ID may be stored.** Everything else — text, images, data — may not be "cached, copied, downloaded, stored or indexed", "except as explicitly provided in your contract". No TTL is given. | **This build keeps the content anyway**, in Redis, for 12 hours, on the owner's decision of 2026-10-02 (see below). The id is kept in Postgres as before. |
 | **Review implementation policy:** reviews never appear in page source. | `PlaceVoices` is a client component that fetches `/api/places/:id/enrichment` and draws from state; `robots.ts` disallows `/api/`. Never render a review in a server component. |
 | **Every figure links back, with its rating graphic and date.** | The panel uses the provider's own `icon_url`s and links the rating, each long review and "See all" to the place's page. Brand guidelines page was not readable when this was written: check it before launch. |
-| **Unlicensed ids are invisible.** A place found in the catalogue 404s on details until its id is on your allowlist. | `allow` (an `APPEND`) runs before the first read, and the id is stored only after it succeeded. |
+| **Allowlist.** The reference says a place found in the catalogue 404s on details until its id is on your allowlist. | **Not needed on a Discover key, and not used.** Checked live on 2026-10-02: details and reviews answered 200 for a place that was never allowed, while `POST /allowlist` answered 429 ("Rate Limit was exceeded for provided API Key") to a single append — it is rate-limited separately and the reference says to batch ids rather than send one per request. If a key ever does need it, the answer is a batch job, not a call per place. |
 
 ### The caching decision
 
@@ -33,6 +33,26 @@ from the policy's letter, with a bounded blast radius:
   design to the platform's handler and its fees. A port (`KeptContent`) with a Redis behind it is
   explicit, testable with fakes, and has a TTL we set.
 
+## Photographs come from Wikimedia Commons, not from here
+
+Tripadvisor's own photos are shown if it has them, but the panel's photographs
+are mostly **Wikimedia Commons**: freely licensed, no key, no cost, and (unlike
+Tripadvisor's content) allowed to be kept, so `src/bll/place-photos.ts` holds
+what it finds for 15 minutes. It is a separate request (`GET /api/places/:id/photos`),
+so a review provider that is down, unconfigured or over its limit does not hide
+them. Every photograph carries who took it, its licence and a link to where it
+lives, because the licences ask for the credit.
+
+The one thing that needs care is *relevance*. A search by location returns what is
+near the place, not what is the place — around Narikala it is the mosque beside
+it — so `src/domain/catalogue/photos.ts` keeps only a photograph whose title or
+description names the place: every identifying word of a short name, half of a
+long one, never the city's name or a street's, and never a map or a logo. What no
+photograph names, the place has none of: most hotels and cafés show no photos, which
+is the right answer. The catalogue sometimes holds a landmark under its
+Georgian-romanised name ("Gergetis Samebis Eklesia"), which no English title
+contains; those find nothing. `pnpm smoke:wikimedia` checks the live API.
+
 ## The flow
 
 ```
@@ -43,7 +63,7 @@ open a place ──▶ PlaceVoices (client): near the screen, then 400 ms settle
                    │  Redis hit? ───────────────────────────────────────▶ served, free
                    │  miss:  place_external known?  matched → id
                    │                                none, < 30 days → nothing to show
-                   │                                else search → chooseMatch → allow → store id
+                   │                                else search → chooseMatch → store id
                    │         global day limit (counted only here)
                    │         provider.read(id): details ‖ reviews ‖ photos
                    │  SET with EX (12 h; 30 s for a failure) — a Redis that is down is a miss

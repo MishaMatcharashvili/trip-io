@@ -319,7 +319,11 @@ export function TripMap({
   return (
     <section
       ref={slot}
-      className={cx("bg-map-ground", className)}
+      // Isolated: the pins and their names are positioned with z-indexes of
+      // their own (the picked one above the rest), and without a stacking
+      // context here they would be compared with the panels floating over the
+      // map, and a name would be drawn across a panel.
+      className={cx("isolate bg-map-ground", className)}
       aria-label={`Map of the trip: ${stops.map((s) => s.label).join(", ")}`}
     />
   );
