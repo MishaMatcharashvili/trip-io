@@ -8,6 +8,7 @@ import { apiClient } from "@/lib/hono-client";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Dot } from "@/ui/dot";
+import { Icon } from "@/ui/icon";
 import { Eyebrow, Num, Prose, Title } from "@/ui/text";
 
 /**
@@ -63,7 +64,7 @@ export function WatchPassCard({
     <Card
       tint
       accent="agent"
-      className={`flex flex-col gap-3 p-4 ${className ?? ""}`}
+      className={`flex flex-col gap-2.5 p-3.5 ${className ?? ""}`}
     >
       <div className="flex flex-col gap-1">
         <Eyebrow tone="agent">Not watched yet</Eyebrow>
@@ -72,11 +73,21 @@ export function WatchPassCard({
             ? "Your first watched trip is free"
             : "Watch this trip"}
         </Title>
-        <Prose>
-          Planning is free. Watching means I check the weather and roads around
-          every stop, brief you each morning, and interrupt you only when your
-          plan should change.
-        </Prose>
+        <details className="group">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-mini font-medium text-agent marker:hidden [&::-webkit-details-marker]:hidden">
+            What does watching do?
+            <Icon
+              name="chevronDown"
+              size={12}
+              className="transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <Prose className="pt-1.5">
+            Planning is free. Watching means I check the weather and roads
+            around every stop, brief you each morning, and interrupt you only
+            when your plan should change.
+          </Prose>
+        </details>
       </div>
       {offer.kind === "paid" ? (
         <div className="flex items-baseline gap-2">
