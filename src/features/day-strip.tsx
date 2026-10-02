@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useOptimistic, useRef, useTransition } from "react";
 import { cx } from "@/ui/cx";
 import { type DayChip, hrefFor } from "./day-strip-model";
+import { dayHref } from "./trip-links";
 
 // Which day the map is showing, and the way to change it. A chip for the whole
 // trip and one for each day, each with its weekday over its date, today ringed,
@@ -19,12 +20,15 @@ export function DayStrip({
   tripId,
   chips,
   selected,
+  page = "map",
   className,
 }: {
   tripId: string;
   chips: DayChip[];
   /** "all", or a day's id. */
   selected: string;
+  /** Where choosing goes: the map, or the plan's list of days. */
+  page?: "map" | "plan";
   className?: string;
 }) {
   const router = useRouter();
@@ -43,7 +47,10 @@ export function DayStrip({
     start(() => {
       setShown(id);
       // Replace, not push: choosing among days is not a trail to walk back along.
-      router.replace(hrefFor(tripId, id), { scroll: false });
+      router.replace(
+        page === "plan" ? dayHref(tripId, id) : hrefFor(tripId, id),
+        { scroll: false },
+      );
     });
   };
 
