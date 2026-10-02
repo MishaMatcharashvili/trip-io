@@ -1,4 +1,4 @@
-import type { Review } from "../domain/catalogue/enrichment.ts";
+import type { Photo, Review } from "../domain/catalogue/enrichment.ts";
 
 // What the enrichment panel says, decided apart from how it looks.
 
@@ -63,4 +63,30 @@ export function failureNote(reason: string): {
     default:
       return { text: "Reviews aren’t available right now.", canRetry: false };
   }
+}
+
+/** Google Images for a place by name: where a Commons photograph's credit leads. */
+export function googleImagesUrl(name: string): string {
+  return `https://www.google.com/search?${new URLSearchParams({ q: name, tbm: "isch" })}`;
+}
+
+/**
+ * Where a photograph's credit links. The review site's own photographs link
+ * back to it; a Wikimedia Commons file page is a page of licence metadata
+ * nobody opened a place to read, so the credit leads to more pictures of the
+ * place instead, and still names who took the photograph and under what.
+ */
+export function creditHref(
+  credit: NonNullable<Photo["credit"]>,
+  name: string,
+): string {
+  try {
+    const host = new URL(credit.url).hostname;
+    if (host === "wikimedia.org" || host.endsWith(".wikimedia.org")) {
+      return googleImagesUrl(name);
+    }
+  } catch {
+    // Not a URL: leave it as given.
+  }
+  return credit.url;
 }

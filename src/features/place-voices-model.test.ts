@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  creditHref,
   excerpt,
   failureNote,
+  googleImagesUrl,
   reviewDate,
   reviewLine,
 } from "./place-voices-model.ts";
@@ -56,4 +58,30 @@ test("only a busy or broken answer is worth trying again", () => {
   assert.equal(failureNote("timeout").canRetry, true);
   assert.equal(failureNote("quota").canRetry, false);
   assert.equal(failureNote("auth").canRetry, false);
+});
+
+describe("creditHref", () => {
+  test("a Commons credit leads to a Google image search for the place", () => {
+    const href = creditHref(
+      {
+        text: "Someone · CC BY-SA 4.0",
+        url: "https://commons.wikimedia.org/wiki/File:Narikala.jpg",
+      },
+      "Narikala Fortress",
+    );
+    assert.equal(href, googleImagesUrl("Narikala Fortress"));
+    const url = new URL(href);
+    assert.equal(url.hostname, "www.google.com");
+    assert.equal(url.searchParams.get("q"), "Narikala Fortress");
+    assert.equal(url.searchParams.get("tbm"), "isch");
+  });
+
+  test("any other credit links where it says", () => {
+    const url = "https://www.tripadvisor.com/Attraction_Review-g1-d2";
+    assert.equal(creditHref({ text: "Tripadvisor", url }, "Café Leila"), url);
+  });
+
+  test("a credit that is not a URL is left as it is", () => {
+    assert.equal(creditHref({ text: "x", url: "nonsense" }, "A"), "nonsense");
+  });
 });
