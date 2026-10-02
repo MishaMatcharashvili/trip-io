@@ -36,6 +36,19 @@ export const env = createEnv({
      * between a busy day and the bill. Unset, the defaults apply.
      */
     TRIPADVISOR_USER_PER_DAY: z.coerce.number().int().positive().optional(),
+    /**
+     * How long what Tripadvisor said about a place is kept in Redis, in
+     * seconds. Unset, 12 hours. 0 keeps nothing: the one switch back to
+     * reading the provider on every visit.
+     */
+    TRIPADVISOR_CONTENT_TTL_S: z.coerce.number().int().min(0).optional(),
+    /**
+     * Upstash Redis, over REST (src/infra/upstash.ts): where that content is
+     * kept. Vercel's Redis integration sets both under these names. Unset,
+     * nothing is kept and every visit asks the provider.
+     */
+    UPSTASH_REDIS_REST_URL: z.url().optional(),
+    UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
     TRIPADVISOR_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
   },
   client: {

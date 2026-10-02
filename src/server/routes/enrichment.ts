@@ -1,9 +1,14 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { defaultLimits, enrichPlace } from "@/bll/place-enrichment.ts";
+import {
+  DEFAULT_CONTENT_TTL_S,
+  defaultLimits,
+  enrichPlace,
+} from "@/bll/place-enrichment.ts";
 import type { EnrichFailure } from "@/domain/catalogue/enrichment.ts";
 import { tripadvisor } from "@/infra/tripadvisor.ts";
+import { upstashContent } from "@/infra/upstash.ts";
 import { env } from "@/lib/env.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
@@ -11,8 +16,11 @@ import { requireSession, type SessionEnv } from "../auth.ts";
 // else; the rules on spending are in src/bll/place-enrichment.ts.
 //
 // Three things here come from the provider's terms, not from taste:
-//   * Nothing may be kept, so the answer says so to every cache between here
-//     and the screen: `no-store`.
+//   * It forbids keeping what it returns, so the response says `no-store` to
+//     every browser and CDN between here and the screen. What is kept is kept
+//     on purpose, server-side, in Redis, for a bounded time (see
+//     docs/tripadvisor.md, which says plainly that this goes against the
+//     letter of its caching policy).
 //   * Reviews must not be in a page's source, so they are fetched from here by
 //     script, and /api is disallowed in robots.txt (src/app/robots.ts).
 //   * It spends money, so it asks for a session. Public search and logos
@@ -34,6 +42,15 @@ const status = {
 
 const provider = tripadvisor({ key: env.TRIPADVISOR_API_KEY });
 
+// Without Redis nothing is kept and every visit asks the provider.
+const kept =
+  env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
+    ? upstashContent({
+        url: env.UPSTASH_REDIS_REST_URL,
+        token: env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : undefined;
+
 export const enrichment = new Hono<SessionEnv>().get(
   "/:id/enrichment",
   requireSession,
@@ -44,6 +61,9 @@ export const enrichment = new Hono<SessionEnv>().get(
       c.get("userId"),
       {
         provider,
+        kept,
+        contentTtlSeconds:
+          env.TRIPADVISOR_CONTENT_TTL_S ?? DEFAULT_CONTENT_TTL_S,
         limits: {
           ...defaultLimits,
           userPerDay: env.TRIPADVISOR_USER_PER_DAY ?? defaultLimits.userPerDay,
