@@ -68,6 +68,26 @@ export function TripBottomNav({
   );
 }
 
+/** The desktop bar's frame: one place for its height, its rule and its gutters. */
+export function BarShell({
+  transparent = false,
+  children,
+}: {
+  transparent?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <header
+      className={cx(
+        "relative z-30 hidden h-[58px] shrink-0 items-center gap-5 px-6 lg:flex",
+        transparent ? "bg-transparent" : "border-b border-hairline bg-surface",
+      )}
+    >
+      {children}
+    </header>
+  );
+}
+
 /**
  * The desktop bar. When a trip is open it carries the trip's identity and the
  * view switcher; everywhere else it is the product's own navigation.
@@ -86,12 +106,7 @@ export function TopBar({
   transparent?: boolean;
 }) {
   return (
-    <header
-      className={cx(
-        "relative z-30 hidden h-[58px] shrink-0 items-center gap-5 px-6 lg:flex",
-        transparent ? "bg-transparent" : "border-b border-hairline bg-surface",
-      )}
-    >
+    <BarShell transparent={transparent}>
       <Brand />
 
       {trip ? (
@@ -144,7 +159,7 @@ export function TopBar({
       {watch === "paused" ? <WatchChip state="paused" label="Paused" /> : null}
       <ThemeToggle />
       <AccountButton tripId={trip?.id} />
-    </header>
+    </BarShell>
   );
 }
 
@@ -189,21 +204,28 @@ export function MobileTitleBar({
   eyebrow,
   trailing,
 }: {
-  back: string;
+  /** Without one the arrow is drawn but goes nowhere: the shell before it is known. */
+  back?: string;
   title: string;
-  eyebrow: string;
+  eyebrow: React.ReactNode;
   trailing?: React.ReactNode;
 }) {
   return (
     <div className="sticky top-0 z-20 border-b border-hairline bg-surface lg:hidden">
       <div className="flex items-center gap-2.5 px-4 pb-2.5 pt-2">
-        <Link
-          href={back}
-          aria-label="Back"
-          className="-ml-1 p-1 text-ink-muted"
-        >
-          <Icon name="chevronLeft" size={20} strokeWidth={1.7} />
-        </Link>
+        {back ? (
+          <Link
+            href={back}
+            aria-label="Back"
+            className="-ml-1 p-1 text-ink-muted"
+          >
+            <Icon name="chevronLeft" size={20} strokeWidth={1.7} />
+          </Link>
+        ) : (
+          <span className="-ml-1 p-1 text-ink-muted">
+            <Icon name="chevronLeft" size={20} strokeWidth={1.7} />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <Title className="truncate text-[16px]">{title}</Title>
           <Eyebrow>{eyebrow}</Eyebrow>

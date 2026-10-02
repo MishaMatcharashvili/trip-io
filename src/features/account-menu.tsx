@@ -21,6 +21,18 @@ import { SignOutButton } from "./sign-out-button";
 /** Where the tab bar ends: a phone's sheet rests just above it. */
 const ABOVE_TAB_BAR = "bottom-[88px]";
 
+/** The Account tab's icon and label: also what the tab bar shows before it loads. */
+export function AccountTabFace({ open = false }: { open?: boolean }) {
+  return (
+    <>
+      <Icon name="user" size={21} strokeWidth={1.7} />
+      <span className={cx("text-[10.5px]", open && "font-semibold")}>
+        Account
+      </span>
+    </>
+  );
+}
+
 export function AccountMenu({
   tripId,
   variant = "avatar",
@@ -122,10 +134,7 @@ export function AccountMenu({
             open ? "text-agent" : "text-ink-faint",
           )}
         >
-          <Icon name="user" size={21} strokeWidth={1.7} />
-          <span className={cx("text-[10.5px]", open && "font-semibold")}>
-            Account
-          </span>
+          <AccountTabFace open={open} />
         </button>
       )}
 
