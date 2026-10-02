@@ -5,8 +5,9 @@ import { myTrips, type TripListRow, tripScreen } from "@/bll/trip-screen";
 import { passesHeldBy } from "@/bll/watch-pass";
 import { georgia, georgiaMapStops, type Trip } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
-import { TopBar } from "@/features/chrome";
+import { PageColumn } from "@/features/page-column";
 import { RoutedTripMap } from "@/features/routed-trip-map";
+import { SiteFrame } from "@/features/site-frame";
 import { dayHref } from "@/features/trip-links";
 import { dateRange, tripModel, tripStops } from "@/features/trip-model";
 import { getAuth } from "@/infra/auth";
@@ -16,8 +17,9 @@ import { Chip } from "@/ui/chip";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import type { MapStop } from "@/ui/map/trip-map";
-import { BottomNav, homeTabs } from "@/ui/nav";
-import { Display, Headline, Prose, Title } from "@/ui/text";
+import { Headline, Prose, Title } from "@/ui/text";
+
+import { HomeHeading } from "./home-heading";
 
 export const metadata: Metadata = { title: "Your trips" };
 
@@ -242,95 +244,80 @@ export default async function TripsHome() {
   );
 
   return (
-    <>
-      <TopBar active="Trips" />
+    <SiteFrame active="Trips" tab="Trips">
+      <PageColumn>
+        <HomeHeading
+          lead={
+            lives.length
+              ? `${lives.length === 1 ? "One trip is" : `${lives.length} trips are`} live right now.`
+              : rows.length
+                ? "Nothing live right now."
+                : "Nothing planned yet."
+          }
+        />
 
-      <main className="flex-1 pb-24 lg:pb-0">
-        <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-6 px-4 py-6 lg:gap-6 lg:px-0 lg:py-10">
-          <div className="flex items-start gap-4">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Display className="text-[25px] lg:text-[31px]">
-                Your trips
-              </Display>
-              <Prose className="hidden lg:block">
-                {lives.length
-                  ? `${lives.length === 1 ? "One trip is" : `${lives.length} trips are`} live right now.`
-                  : rows.length
-                    ? "Nothing live right now."
-                    : "Nothing planned yet."}
-              </Prose>
-            </div>
-            <ButtonLink href="/new" variant="primary" className="px-[18px]">
-              <span className="hidden lg:inline">New trip</span>
-              <span className="lg:hidden">New</span>
-            </ButtonLink>
-          </div>
+        {rows.length === 0 ? <Welcome signedIn={Boolean(session)} /> : null}
 
-          {rows.length === 0 ? <Welcome signedIn={Boolean(session)} /> : null}
+        {lives.length ? (
+          <section className="flex flex-col gap-3">
+            <SectionRule tone="agent">Travelling now</SectionRule>
+            {lives.map((l) => (
+              <LiveCard key={l.trip.id} live={l} />
+            ))}
+          </section>
+        ) : null}
 
-          {lives.length ? (
-            <section className="flex flex-col gap-3">
-              <SectionRule tone="agent">Travelling now</SectionRule>
-              {lives.map((l) => (
-                <LiveCard key={l.trip.id} live={l} />
+        {upcoming.length ? (
+          <section className="flex flex-col gap-3">
+            <SectionRule>Coming up</SectionRule>
+            <Card className="overflow-hidden">
+              {upcoming.map((row, i) => (
+                <div key={row.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <TripRow
+                    row={row}
+                    note={`${row.stops} stops · ${watched.has(row.id) ? "watch starts a day before you leave" : "not watched yet"}`}
+                    action={
+                      watched.has(row.id) ? null : (
+                        <ButtonLink
+                          href={`/trips/${row.id}/watch`}
+                          size="sm"
+                          className="hidden lg:inline-flex"
+                        >
+                          Start watching
+                        </ButtonLink>
+                      )
+                    }
+                  />
+                </div>
               ))}
-            </section>
-          ) : null}
+            </Card>
+          </section>
+        ) : null}
 
-          {upcoming.length ? (
-            <section className="flex flex-col gap-3">
-              <SectionRule>Coming up</SectionRule>
-              <Card className="overflow-hidden">
-                {upcoming.map((row, i) => (
-                  <div key={row.id}>
-                    {i > 0 ? <Divider /> : null}
-                    <TripRow
-                      row={row}
-                      note={`${row.stops} stops · ${watched.has(row.id) ? "watch starts a day before you leave" : "not watched yet"}`}
-                      action={
-                        watched.has(row.id) ? null : (
-                          <ButtonLink
-                            href={`/trips/${row.id}/watch`}
-                            size="sm"
-                            className="hidden lg:inline-flex"
-                          >
-                            Start watching
-                          </ButtonLink>
-                        )
-                      }
-                    />
-                  </div>
-                ))}
-              </Card>
-            </section>
-          ) : null}
+        {finished.length ? (
+          <section className="flex flex-col gap-3">
+            <SectionRule>Finished</SectionRule>
+            <Card className="overflow-hidden">
+              {finished.map((row, i) => (
+                <div key={row.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <TripRow
+                    row={row}
+                    note={`${row.applied} change${row.applied === 1 ? "" : "s"} handled`}
+                  />
+                </div>
+              ))}
+            </Card>
+          </section>
+        ) : null}
 
-          {finished.length ? (
-            <section className="flex flex-col gap-3">
-              <SectionRule>Finished</SectionRule>
-              <Card className="overflow-hidden">
-                {finished.map((row, i) => (
-                  <div key={row.id}>
-                    {i > 0 ? <Divider /> : null}
-                    <TripRow
-                      row={row}
-                      note={`${row.applied} change${row.applied === 1 ? "" : "s"} handled`}
-                    />
-                  </div>
-                ))}
-              </Card>
-            </section>
-          ) : null}
-
-          <div className="flex justify-center pt-2">
-            <Link href="/plans" className="text-small font-medium text-agent">
-              Planning is free · see what watching costs
-            </Link>
-          </div>
+        <div className="flex justify-center pt-2">
+          <Link href="/plans" className="text-small font-medium text-agent">
+            Planning is free · see what watching costs
+          </Link>
         </div>
-      </main>
-
-      <BottomNav items={homeTabs} active="Trips" />
-    </>
+      </PageColumn>
+    </SiteFrame>
   );
 }
