@@ -6,9 +6,11 @@ import {
   defaultLimits,
   enrichPlace,
 } from "@/bll/place-enrichment.ts";
+import { photosForPlace } from "@/bll/place-photos.ts";
 import type { EnrichFailure } from "@/domain/catalogue/enrichment.ts";
 import { tripadvisor } from "@/infra/tripadvisor.ts";
 import { upstashContent } from "@/infra/upstash.ts";
+import { wikimediaPhotos } from "@/infra/wikimedia.ts";
 import { env } from "@/lib/env.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
@@ -51,31 +53,79 @@ const kept =
       })
     : undefined;
 
-export const enrichment = new Hono<SessionEnv>().get(
-  "/:id/enrichment",
-  requireSession,
-  zValidator("param", z.object({ id: z.uuid() })),
-  async (c) => {
-    const outcome = await enrichPlace(
-      c.req.valid("param").id,
-      c.get("userId"),
-      {
-        provider,
-        kept,
-        contentTtlSeconds:
-          env.TRIPADVISOR_CONTENT_TTL_S ?? DEFAULT_CONTENT_TTL_S,
-        limits: {
-          ...defaultLimits,
-          userPerDay: env.TRIPADVISOR_USER_PER_DAY ?? defaultLimits.userPerDay,
-          globalPerDay:
-            env.TRIPADVISOR_GLOBAL_PER_DAY ?? defaultLimits.globalPerDay,
-        },
-      },
-    );
-    c.header("Cache-Control", "no-store");
-    c.header("X-Robots-Tag", "noindex, nofollow");
-    return outcome.ok
-      ? c.json(outcome, 200)
-      : c.json(outcome, status[outcome.reason]);
-  },
-);
+/**
+ * A failure inside the use case (a database that is missing a table, a provider
+ * that threw) is a reason the screen can show, not a 500 with no body: the panel
+ * reads the answer as JSON, and an HTML error page made every such failure look
+ * like a network problem. What went wrong is logged by name, never with a message
+ * that could carry a credential.
+ */
+function failed(error: unknown, what: string) {
+  console.error(
+    JSON.stringify({
+      category: `places.${what}`,
+      result: "error",
+      error: error instanceof Error ? error.name : "unknown",
+    }),
+  );
+  return { ok: false as const, reason: "upstream" as const };
+}
+
+const photoSource = wikimediaPhotos();
+
+export const enrichment = new Hono<SessionEnv>()
+  .get(
+    "/:id/photos",
+    requireSession,
+    zValidator("param", z.object({ id: z.uuid() })),
+    async (c) => {
+      let outcome: Awaited<ReturnType<typeof photosForPlace>>;
+      try {
+        outcome = await photosForPlace(
+          c.req.valid("param").id,
+          c.get("userId"),
+          { source: photoSource },
+        );
+      } catch (error) {
+        outcome = failed(error, "photos");
+      }
+      // Freely licensed and not the traveller's own, so the browser may keep it
+      // for a day; private, because the route is behind a session.
+      c.header(
+        "Cache-Control",
+        outcome.ok ? "private, max-age=86400" : "no-store",
+      );
+      if (outcome.ok) return c.json(outcome, 200);
+      return c.json(outcome, outcome.reason === "rate-limited" ? 429 : 502);
+    },
+  )
+  .get(
+    "/:id/enrichment",
+    requireSession,
+    zValidator("param", z.object({ id: z.uuid() })),
+    async (c) => {
+      let outcome: Awaited<ReturnType<typeof enrichPlace>>;
+      try {
+        outcome = await enrichPlace(c.req.valid("param").id, c.get("userId"), {
+          provider,
+          kept,
+          contentTtlSeconds:
+            env.TRIPADVISOR_CONTENT_TTL_S ?? DEFAULT_CONTENT_TTL_S,
+          limits: {
+            ...defaultLimits,
+            userPerDay:
+              env.TRIPADVISOR_USER_PER_DAY ?? defaultLimits.userPerDay,
+            globalPerDay:
+              env.TRIPADVISOR_GLOBAL_PER_DAY ?? defaultLimits.globalPerDay,
+          },
+        });
+      } catch (error) {
+        outcome = failed(error, "enrich");
+      }
+      c.header("Cache-Control", "no-store");
+      c.header("X-Robots-Tag", "noindex, nofollow");
+      return outcome.ok
+        ? c.json(outcome, 200)
+        : c.json(outcome, status[outcome.reason]);
+    },
+  );
