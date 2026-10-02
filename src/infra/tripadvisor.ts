@@ -281,6 +281,7 @@ export function tripadvisor(options: {
   }
 
   return {
+    provider: "tripadvisor",
     configured: Boolean(key),
 
     async search(place: PlaceIdentity): Promise<SearchOutcome> {

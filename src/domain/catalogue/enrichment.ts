@@ -95,6 +95,8 @@ export type SearchOutcome =
  * one is the common case, and permission to read it is asked for once.
  */
 export type PlaceEnricher = {
+  /** What the provider is called in storage: the key its identifiers are kept under. */
+  provider: string;
   configured: boolean;
   /** Places that might be this one. Few: each result returned is billed. */
   search(place: PlaceIdentity): Promise<SearchOutcome>;
