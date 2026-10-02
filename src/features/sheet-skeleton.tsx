@@ -12,6 +12,43 @@ const bar = (className: string) => (
   <div className={cx("rounded-[3px] bg-track", className)} />
 );
 
+/** What is inside a sheet: a heading, four figures and two sections of grey. */
+export function SheetBodySkeleton() {
+  return (
+    <>
+      <div className="flex flex-col gap-2.5 px-[18px] pb-3.5 pt-[18px]">
+        {bar("h-[9px] w-[130px]")}
+        {bar("h-[26px] w-[62%]")}
+        {bar("h-[10px] w-[85%]")}
+      </div>
+      <div className="flex border-b border-hairline px-[18px] pb-3.5">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex flex-1 flex-col gap-1.5">
+            {bar("h-[8px] w-[48px]")}
+            {bar("h-[12px] w-[44px]")}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-3 px-[18px] py-3.5">
+        {bar("h-[9px] w-[160px]")}
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-3">
+            <span className="size-[9px] rounded-full bg-track" />
+            {bar("h-[10px] flex-1")}
+            {bar("h-[9px] w-[64px]")}
+          </div>
+        ))}
+      </div>
+      <Divider />
+      <div className="flex flex-col gap-2.5 px-[18px] py-3.5">
+        {bar("h-[9px] w-[130px]")}
+        {bar("h-[10px] w-[90%]")}
+        {bar("h-[10px] w-[70%]")}
+      </div>
+    </>
+  );
+}
+
 export function SheetScreenSkeleton({
   mapHeight,
   sheetTop,
@@ -43,35 +80,7 @@ export function SheetScreenSkeleton({
           sheetTop,
         )}
       >
-        <div className="flex flex-col gap-2.5 px-[18px] pb-3.5 pt-[18px]">
-          {bar("h-[9px] w-[130px]")}
-          {bar("h-[26px] w-[62%]")}
-          {bar("h-[10px] w-[85%]")}
-        </div>
-        <div className="flex border-b border-hairline px-[18px] pb-3.5">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="flex flex-1 flex-col gap-1.5">
-              {bar("h-[8px] w-[48px]")}
-              {bar("h-[12px] w-[44px]")}
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col gap-3 px-[18px] py-3.5">
-          {bar("h-[9px] w-[160px]")}
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className="size-[9px] rounded-full bg-track" />
-              {bar("h-[10px] flex-1")}
-              {bar("h-[9px] w-[64px]")}
-            </div>
-          ))}
-        </div>
-        <Divider />
-        <div className="flex flex-col gap-2.5 px-[18px] py-3.5">
-          {bar("h-[9px] w-[130px]")}
-          {bar("h-[10px] w-[90%]")}
-          {bar("h-[10px] w-[70%]")}
-        </div>
+        <SheetBodySkeleton />
       </main>
     </div>
   );
