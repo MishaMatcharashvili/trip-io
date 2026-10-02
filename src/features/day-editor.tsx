@@ -208,7 +208,7 @@ function StopEditor({
     moved
       ? `Moved ${stop.title} to ${time}`
       : `Changed ${stop.title} to ${duration(length)}`
-  }${useShift ? `, shifted ${pushes} later stop${pushes === 1 ? "" : "s"}` : ""}`;
+  }${useShift ? `, moved ${pushes} later stop${pushes === 1 ? "" : "s"}` : ""}`;
 
   return (
     <form
@@ -252,7 +252,7 @@ function StopEditor({
       {!checking && pushes > 0 && preview ? (
         <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface px-3 py-2.5">
           <div className="text-small font-medium">
-            This pushes {pushes} later stop{pushes === 1 ? "" : "s"}
+            This moves {pushes} later stop{pushes === 1 ? "" : "s"}
           </div>
           <ul className="flex flex-col gap-0.5">
             {preview.pushed.map((p) => (
@@ -270,15 +270,15 @@ function StopEditor({
               checked={shift}
               onChange={(e) => setShift(e.target.checked)}
             />
-            Move them to make room
+            Move them to follow
           </label>
         </div>
       ) : null}
 
       {!checking && preview?.overflow ? (
         <p className="text-mini text-alert">
-          Making room would push stops past the end of the day, so only this one
-          changes.
+          Moving the rest of the day would push stops past its end, so only this
+          one changes.
         </p>
       ) : null}
 

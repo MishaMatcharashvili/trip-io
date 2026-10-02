@@ -424,7 +424,8 @@ export async function previewRetime(
 
   const places = await placeFacts(placeIdsOf(trip.doc));
   const ctx = { places, travel: straightLineTravel };
-  const out = retime(trip.doc, nodeId, edit, ctx);
+  // The traveller's own change of length takes the rest of their day with it.
+  const out = retime(trip.doc, nodeId, edit, { ...ctx, follow: true });
   const checked = validateProposal(trip.doc, out.ops, {
     ...ctx,
     author: "user",
