@@ -24,6 +24,19 @@ export const env = createEnv({
     ROUTES_USER_PER_DAY: z.coerce.number().int().positive().optional(),
     ROUTES_GLOBAL_PER_MINUTE: z.coerce.number().int().positive().optional(),
     ROUTES_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
+    /**
+     * Tripadvisor's Terra API key (src/infra/tripadvisor.ts), for the ratings,
+     * reviews and photos on a place. Server-only: it rides in a header to
+     * Tripadvisor and goes nowhere else. Unset, places show without them.
+     */
+    TRIPADVISOR_API_KEY: z.string().min(1).optional(),
+    /**
+     * What the place-enrichment use case will spend (src/bll/place-enrichment.ts).
+     * Each open place is about three billable calls, so these are what stand
+     * between a busy day and the bill. Unset, the defaults apply.
+     */
+    TRIPADVISOR_USER_PER_DAY: z.coerce.number().int().positive().optional(),
+    TRIPADVISOR_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
   },
   client: {
     /**
