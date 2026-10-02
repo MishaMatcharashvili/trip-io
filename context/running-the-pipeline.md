@@ -172,8 +172,22 @@ notes are still not cited to anyone — they are seed values to verify first.
 
 ### 7. Push — nothing to switch until the native shell exists
 
-The Expo adapter needs no secret: APNs and FCM credentials live in EAS, which is Phase 7, along with
-the app that registers a device at `POST /api/devices`. Until a phone is registered and a trip's
+The Expo adapter needs no secret: APNs and FCM credentials live in EAS. The app that registers a
+device at `POST /api/devices` is built (Phase 7, `mobile/`) but has not been put on a phone. To get
+there, in order:
+
+1. `cd mobile && npx eas-cli@latest init` — creates the EAS project and writes its id into
+   `app.json`. Push cannot get a token without it (`src/push.ts` reports "not configured" until then).
+2. `npx eas-cli@latest env:create` — `EXPO_PUBLIC_API_URL`, the deployed API's address, for the
+   `preview` and `production` environments. A build without it opens on a screen that says so.
+3. `npx eas-cli@latest build --profile development --platform android` for a first device build
+   (Expo Go cannot receive push on Android). iOS needs the Apple Developer account first.
+4. `credentials` (APNs key, FCM) through EAS, then `build --profile production` and
+   `submit` for TestFlight and the Android internal track (`track: internal` is set; the first Play
+   upload is by hand).
+
+`com.tripio.app` in `app.json` is a placeholder bundle id and package name: change it before the first
+store build, because it cannot be changed after. Until a phone is registered and a trip's
 watch has `push` among its channels (`PATCH /api/trips/{id}/watch`), every interrupt is sent to the
 briefing as `no-device` or `no-interrupt-channel`. `EXPO_ACCESS_TOKEN` is optional hardening, for
 after "enhanced push security" is enabled on the Expo project.

@@ -1,3 +1,4 @@
+import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins/anonymous";
@@ -55,7 +56,19 @@ function build() {
       enabled: true,
       minPasswordLength: 8,
     },
+    // The native shell signs in over the same endpoints, carrying its session
+    // in a cookie it keeps in the keychain. Its requests come from the app's
+    // URL scheme, not from a web origin, so Better Auth must be told that
+    // origin is ours. Expo Go's own `exp://` origins are allowed in
+    // development only: a production build has no reason to accept them.
+    trustedOrigins: [
+      "trip-io://",
+      ...(process.env.NODE_ENV === "development"
+        ? ["exp://", "exp://**", "exp://192.168.*.*:*/**"]
+        : []),
+    ],
     plugins: [
+      expo(),
       anonymous({
         // "No accounts until save": the visitor plans a trip anonymously, and
         // signing up hands it over (src/dal/trips.ts).

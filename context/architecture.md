@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 0–5 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+Status: Phases 0–7 built (see `context/progress-tracker.md`). Reflects the decisions of record in
 `docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
 update it when an architectural decision changes; don't let it drift from the code.
 
@@ -35,7 +35,7 @@ schema and cron design this section summarizes.
 | Email | Resend | daily briefing |
 | Push | expo-notifications + EAS | APNs + FCM; credential setup starts week 1, latency doesn't compress |
 | Telegram | grammY, webhook | manual road-corridor report form (detector #2) |
-| Native | Expo in `mobile/`, a pnpm workspace package, sharing the Hono client via `hc<AppType>()` | thin shell — trip list, intervention card, push registration, settings; heavy UI (map, editing) stays on web. It reads `AppType` as declarations built by `tsconfig.api.json`, and imports this package's types only (`src/mobile-boundary.test.ts`) |
+| Native | Expo in `mobile/`, a pnpm workspace package, sharing the Hono client via `hc<AppType>()` | thin shell — sign-in, trip list, a trip's days and alerts, intervention card, push registration, watch settings; heavy UI (map, editing) stays on web. Navigation is Expo Router; the session lives in the keychain (Better Auth's Expo client + `@better-auth/expo` on the server, trusting the `trip-io://` origin). It reads `AppType` as declarations built by `tsconfig.api.json`, and imports this package's types only (`src/mobile-boundary.test.ts`) |
 
 ## Layers
 

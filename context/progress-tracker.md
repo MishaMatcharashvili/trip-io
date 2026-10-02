@@ -1,6 +1,6 @@
 # Progress tracker
 
-Last updated: 2026-09-27 (Phase 6).
+Last updated: 2026-10-01 (Phase 7).
 
 `context/running-the-pipeline.md` is the switch list: what is still switched off, why, and what
 turning each one on unblocks.
@@ -11,7 +11,7 @@ Phase 5 built the interrupt path, the budget enforced at send time, the interven
 outcomes, and the road-report bot — and switched none of it on, deliberately. `INTERRUPT_ELIGIBLE` is
 still empty: its rule is a week of hand-audited briefing-only verdicts, and the judge has only just
 met a model (see below) — it has not yet judged a real trip. The bot needs a Telegram token, and
-push needs the Phase 7 app to register a phone. Everything between those edges is rehearsed against Neon by
+push needs the Phase 7 app (built, not yet on a phone) to register one. Everything between those edges is rehearsed against Neon by
 `smoke:interrupt`, `smoke:road` and `smoke:telegram`, which found three real bugs on the way.
 
 Phases 3 and 4 are built end to end and have run against the real database: sense → match → queue →
@@ -145,6 +145,15 @@ From `docs/implementation-plan.md` §13:
 
 ## Log
 
+- **2026-10-01** — Phase 7 built, not yet run on a phone. The Expo app is a thin shell on Expo Router:
+  sign-in and sign-up, the trips list, a trip's days and alerts, the intervention card (apply, keep, mute),
+  watch settings (channels, quiet hours, sources, verbosity) and push registration. It reaches the server
+  through the same `hc<AppType>()` client, with Better Auth's session in the keychain sent as a cookie.
+  Server side: `@better-auth/expo` trusts the `trip-io://` origin, and `GET /api/trips/{id}/alerts`
+  exposes the alert list. Checked: type-check, lint, tests, an Android and iOS bundle, and the auth,
+  devices, trips and alerts routes over HTTP with a throwaway user (deleted). **Not checked:** any screen
+  on a device or simulator, a real push token, an EAS build. Known: `expo-doctor` reports duplicate
+  installs, because the web package's `@better-auth/expo` pulls its own copy of the Expo packages.
 - **2026-09-27** — Phase 6 built. Curation made optional: generation takes curated places first and
   fills from the verified tier, so trips can be planned with 0 of 600 curated (the fallback planner's
   slot overflow, which this exposed, is fixed). Watching is gated by a per-trip pass — first free, then

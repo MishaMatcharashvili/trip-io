@@ -34,6 +34,7 @@
     "design:mobile": "tsx scripts/design/mobile/build.ts"
   },
   "dependencies": {
+    "@better-auth/expo": "1.7.4",
     "@hono/zod-validator": "^0.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@t3-oss/env-nextjs": "^0.13.11",
