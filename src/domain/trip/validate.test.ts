@@ -7,6 +7,7 @@ import { straightLineTravel } from "./travel.ts";
 import {
   type Author,
   affectedDays,
+  isTimeProblem,
   newViolations,
   type Violation,
   validateDay,
@@ -396,5 +397,30 @@ describe("validateProposal", () => {
     assert.equal(result.ok, false);
     if (result.ok) throw new Error("unreachable");
     assert.equal(result.kind, "invalid");
+  });
+});
+
+describe("isTimeProblem", () => {
+  test("separates what is about when from what is about the place", () => {
+    const v = (rule: Violation["rule"]): Violation => ({
+      rule,
+      severity: "warning",
+      nodeIds: [],
+      day: DAY,
+      message: "",
+    });
+    for (const rule of [
+      "overlap",
+      "travel",
+      "closed",
+      "darkness",
+      "window",
+      "pace",
+    ] as const) {
+      assert.equal(isTimeProblem(v(rule)), true, rule);
+    }
+    for (const rule of ["tier", "hours-unknown"] as const) {
+      assert.equal(isTimeProblem(v(rule)), false, rule);
+    }
   });
 });
