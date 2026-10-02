@@ -262,8 +262,8 @@ export function tripadvisor(options: {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
-        // The answer is read for one screen. Nothing may keep it, here or in
-        // Next's data cache.
+        // Next's fetch cache must not keep it: what is kept is kept on purpose,
+        // with a lifetime, in the store behind KeptContent.
         cache: "no-store",
       });
     } catch (error) {

@@ -20,9 +20,10 @@ import {
 // Three rules from the provider's terms shape this file:
 //   * Reviews are fetched by script and drawn from state, never rendered into
 //     the page, so they are never in its source.
-//   * Nothing is kept. There is no cache here, in a module or in storage: the
-//     answer lives in this component's state while it is on screen and goes
-//     with it. A place opened again is asked for again.
+//   * Nothing is kept in the browser: no module cache, no storage, and the
+//     route answers `no-store`. The answer lives in this component's state while
+//     it is on screen and goes with it. A place opened again is asked of the
+//     server again; whether the server keeps it is its business (Redis).
 //   * Every figure, picture and review says whose it is, and links back.
 //
 // What is spent is guarded here as well as on the server: nothing is asked for
