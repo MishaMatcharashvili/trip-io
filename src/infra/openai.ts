@@ -4,8 +4,9 @@ import type { ResponseFormatTextJSONSchemaConfig } from "openai/resources/respon
 // The OpenAI client, shared by the calls this product makes: the trip
 // composer (src/infra/openai-composer.ts), the watch layer's judge
 // (src/infra/openai-judge.ts), the briefing composer
-// (src/infra/openai-briefing.ts) and the answer to a traveller's question
-// about their trip (src/infra/openai-ask.ts).
+// (src/infra/openai-briefing.ts), the answer to a traveller's question about
+// their trip (src/infra/openai-ask.ts) and the choice among checked changes to
+// one stop (src/infra/openai-suggest.ts).
 //
 // The model id lives here rather than in each of them because it is one
 // decision, not three. When it lived in two places and the pinned model was

@@ -7,6 +7,7 @@ import { summariseHours } from "@/domain/catalogue/opening-hours";
 import { PlaceVoices } from "@/features/place-voices";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { SaveToggle } from "@/features/save-toggle";
+import { StopSuggestions } from "@/features/stop-suggestions";
 import { RemoveStopButton } from "@/features/trip-actions";
 import { dayHref } from "@/features/trip-links";
 import { duration, mapStops, timeRange } from "@/features/trip-model";
@@ -421,6 +422,15 @@ export function PlaceBody({
             </a>
           ) : null}
         </div>
+      ) : null}
+
+      {node.kind === "visit" || node.kind === "meal" ? (
+        <StopSuggestions
+          tripId={trip.id}
+          nodeId={stop.id}
+          head={view.head}
+          editHref={dayHref(trip.id, day.id)}
+        />
       ) : null}
 
       <div className="flex flex-col gap-2.5 px-[18px] py-3.5">

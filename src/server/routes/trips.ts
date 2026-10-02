@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
+import { suggestForStop } from "@/bll/suggestions.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -260,6 +261,38 @@ export const trips = new Hono<SessionEnv>()
       return preview.ok
         ? c.json(preview)
         : c.json({ error: preview.reason }, 404);
+    },
+  )
+
+  // Ways to change one stop. Read-only: the traveller applies one through
+  // /patches, as they would an edit of their own.
+  .post(
+    "/:id/suggest",
+    zValidator("param", params),
+    zValidator(
+      "json",
+      z.object({
+        nodeId: z.uuid(),
+        wish: z.string().trim().max(200).optional(),
+      }),
+    ),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const { nodeId, wish } = c.req.valid("json");
+      const outcome = await suggestForStop(
+        id,
+        c.get("userId"),
+        nodeId,
+        wish || null,
+      );
+      if (outcome.ok) return c.json(outcome);
+      return c.json(
+        { ok: false as const, reason: outcome.reason },
+        outcome.reason === "rate-limited" ? 429 : 404,
+      );
     },
   )
 
