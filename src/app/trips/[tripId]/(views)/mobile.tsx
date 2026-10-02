@@ -92,25 +92,35 @@ function MobileApplied({
   );
 }
 
+/** One line until opened: the card floats over the map, which is what is wanted. */
 function MobileCalm({ view }: { view: OverviewView }) {
   return (
     <Panel accent="ok" className="overflow-hidden">
-      <div className="flex flex-col gap-2.5 px-4 pb-4 pt-4">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-[26px] items-center justify-center rounded-full bg-ok-tint text-ok">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3.5 py-3 marker:hidden [&::-webkit-details-marker]:hidden">
+          <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-ok-tint text-ok">
             <Icon name="check" size={14} strokeWidth={2.2} />
           </span>
-          <Eyebrow tone="ok">Nothing needs your attention</Eyebrow>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <Eyebrow tone="ok">Nothing needs your attention</Eyebrow>
+            <Title className="truncate text-[15px]">{view.calmHeadline}</Title>
+          </div>
+          <Icon
+            name="chevronDown"
+            size={14}
+            className="shrink-0 text-ink-faint transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="flex flex-col gap-2.5 px-4 pb-4">
+          <Prose>{view.calmNote}</Prose>
+          <Link
+            href={`/trips/${view.trip.id}/watch`}
+            className="text-small font-medium text-agent"
+          >
+            What I watch
+          </Link>
         </div>
-        <Headline>{view.calmHeadline}</Headline>
-        <Prose>{view.calmNote}</Prose>
-        <Link
-          href={`/trips/${view.trip.id}/watch`}
-          className="text-small font-medium text-agent"
-        >
-          What I watch
-        </Link>
-      </div>
+      </details>
     </Panel>
   );
 }
