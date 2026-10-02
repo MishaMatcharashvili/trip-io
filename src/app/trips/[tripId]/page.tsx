@@ -13,7 +13,7 @@ import {
   watchStrip,
 } from "@/data/trip";
 import type { LonLat } from "@/domain/geo";
-import { TopBar } from "@/features/chrome";
+import { TopBar, TripBottomNav } from "@/features/chrome";
 import { forecastRibbon } from "@/features/shared-reads";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
 import {
@@ -24,7 +24,7 @@ import {
   mapStops,
   weatherView,
 } from "@/features/trip-model";
-import { BottomNav, tripTabs } from "@/ui/nav";
+import { tripTabs } from "@/ui/nav";
 import { ActiveTripDesktop } from "./desktop";
 import { type LoadedTrip, loadTrip, pickDay } from "./load";
 import { ActiveTripMobile } from "./mobile";
@@ -280,7 +280,7 @@ export default async function ActiveTripPage({
         <ActiveTripMobile view={view} />
       </div>
 
-      <BottomNav items={tripTabs(view.trip.id)} active="Map" />
+      <TripBottomNav tripId={view.trip.id} active="Map" />
     </div>
   );
 }

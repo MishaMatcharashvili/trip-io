@@ -3,9 +3,10 @@ import type { Trip } from "@/data/trip";
 import { Chip, WatchChip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
-import { type NavItem, PillNav } from "@/ui/nav";
+import { BottomNav, type NavItem, PillNav, tripTabs } from "@/ui/nav";
 import { Eyebrow, Title } from "@/ui/text";
 import { ThemeToggle } from "@/ui/theme";
+import { AccountMenu } from "./account-menu";
 
 export function Brand({
   size = 20,
@@ -23,34 +24,47 @@ export function Brand({
 }
 
 /**
- * The way into your account — and, when you don't have one yet, into sign-in
- * and sign-up. It carries the person glyph so it reads as a button rather than
- * an empty placeholder waiting for a photo.
+ * The way into your account, and what is kept there: the AI's record, the
+ * watch's settings, sign-in and out. It opens in place rather than leaving the
+ * page, and carries the trip's own pages when a trip is open. The person glyph
+ * keeps it from reading as an empty placeholder waiting for a photo.
  */
 export function AccountButton({
   size = 30,
   floating = false,
+  tripId,
   className,
 }: {
   size?: number;
   /** Over the map: surface fill and lift, like the other floating controls. */
   floating?: boolean;
+  tripId?: string;
   className?: string;
 }) {
   return (
-    <Link
-      href="/account"
-      aria-label="Your account"
-      title="Your account"
-      style={{ width: size, height: size }}
-      className={cx(
-        "flex shrink-0 items-center justify-center rounded-full border border-control text-ink-muted transition-colors hover:text-ink",
-        floating ? "bg-surface shadow-chip" : "bg-fill",
-        className,
-      )}
-    >
-      <Icon name="user" size={Math.round(size * 0.53)} strokeWidth={1.7} />
-    </Link>
+    <AccountMenu
+      tripId={tripId}
+      size={size}
+      floating={floating}
+      className={className}
+    />
+  );
+}
+
+/** The phone's tab bar inside a trip: its two views, and the account menu. */
+export function TripBottomNav({
+  tripId,
+  active,
+}: {
+  tripId: string;
+  active: string;
+}) {
+  return (
+    <BottomNav
+      items={tripTabs(tripId)}
+      active={active}
+      menu={<AccountMenu variant="tab" tripId={tripId} />}
+    />
   );
 }
 
@@ -114,7 +128,7 @@ export function TopBar({
       )}
 
       <div className="flex-1" />
-      {tabs && active ? <PillNav items={tabs} active={active} /> : null}
+      {tabs ? <PillNav items={tabs} active={active ?? ""} /> : null}
       <div className="flex-1" />
 
       {watch === "watching" ? (
@@ -129,7 +143,7 @@ export function TopBar({
       ) : null}
       {watch === "paused" ? <WatchChip state="paused" label="Paused" /> : null}
       <ThemeToggle />
-      <AccountButton />
+      <AccountButton tripId={trip?.id} />
     </header>
   );
 }

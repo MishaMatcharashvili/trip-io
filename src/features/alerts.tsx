@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { Trip } from "@/data/trip";
-import { TopBar } from "@/features/chrome";
+import { TopBar, TripBottomNav } from "@/features/chrome";
 import { Card, SectionRule } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { cx, type Tone } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
-import { BottomNav, tripTabs } from "@/ui/nav";
+import { tripTabs } from "@/ui/nav";
 import { Eyebrow, Num, Title } from "@/ui/text";
 
 /**
@@ -44,7 +44,7 @@ export function AlertsScreen({ view }: { view: AlertsView }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar trip={view.trip} tabs={tripTabs(view.tripId)} active="AI" />
+      <TopBar trip={view.trip} tabs={tripTabs(view.tripId)} active="" />
 
       <div className="border-b border-hairline bg-surface lg:border-0 lg:bg-transparent">
         <div className="mx-auto w-full max-w-[720px] px-4 pb-3 pt-2.5 lg:pt-8">
@@ -147,7 +147,7 @@ export function AlertsScreen({ view }: { view: AlertsView }) {
         </div>
       </main>
 
-      <BottomNav items={tripTabs(view.tripId)} active="AI" />
+      <TripBottomNav tripId={view.tripId} active="" />
     </div>
   );
 }

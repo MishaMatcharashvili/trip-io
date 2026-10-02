@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTrip, proposal, unchangedNodes } from "@/data/trip";
-import { TopBar } from "@/features/chrome";
+import { TopBar, TripBottomNav } from "@/features/chrome";
 import { Button, ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
 import { BasemapWeather } from "@/ui/map/basemap-weather";
-import { BottomNav, tripTabs } from "@/ui/nav";
+import { tripTabs } from "@/ui/nav";
 import { Eyebrow, Headline, Num } from "@/ui/text";
 import { loadTrip } from "../load";
 
@@ -191,7 +191,7 @@ export default async function ReplanPage({
         </Panel>
       </main>
 
-      <BottomNav items={tripTabs(trip.id)} active="Map" />
+      <TripBottomNav tripId={trip.id} active="Map" />
     </div>
   );
 }

@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTrip } from "@/data/trip";
-import { MobileTitleBar, TopBar } from "@/features/chrome";
+import { MobileTitleBar, TopBar, TripBottomNav } from "@/features/chrome";
 import { RestoreButton, UndoButton } from "@/features/trip-actions";
 import { ago } from "@/features/trip-model";
 import { Card, Divider } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Dot } from "@/ui/dot";
-import { BottomNav, tripTabs } from "@/ui/nav";
+import { tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num, Prose } from "@/ui/text";
 import { loadTrip } from "../load";
 
@@ -106,7 +106,7 @@ export default async function HistoryPage({
         </Card>
       </main>
 
-      <BottomNav items={tripTabs(trip.id)} active="Trip" />
+      <TripBottomNav tripId={trip.id} active="Trip" />
     </div>
   );
 }

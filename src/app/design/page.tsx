@@ -274,10 +274,8 @@ export default function DesignSystemPage() {
         <Spec title="Navigation">
           <PillNav
             items={[
-              { label: "Today", href: "/design" },
-              { label: "Map", href: "/design" },
               { label: "Trip", href: "/design" },
-              { label: "AI", href: "/design" },
+              { label: "Map", href: "/design" },
             ]}
             active="Map"
           />

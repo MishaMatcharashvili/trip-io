@@ -11,7 +11,7 @@ export type NavItem = {
   badge?: boolean;
 };
 
-/** The desktop view switcher: Today · Map · Trip · AI. */
+/** The desktop view switcher: a trip's views. */
 export function PillNav({
   items,
   active,
@@ -47,9 +47,12 @@ export function PillNav({
 export function BottomNav({
   items,
   active,
+  menu,
 }: {
   items: NavItem[];
   active: string;
+  /** A last slot that is not a page: the account menu, which opens in place. */
+  menu?: React.ReactNode;
 }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex h-20 border-t border-hairline bg-surface px-2 pb-[22px] lg:hidden">
@@ -81,16 +84,19 @@ export function BottomNav({
           </Link>
         );
       })}
+      {menu ? <div className="flex flex-1">{menu}</div> : null}
     </nav>
   );
 }
 
-/** The tabs a trip is read through. */
+/**
+ * The tabs a trip is read through: its plan, and its map. The AI's record and
+ * the watch's settings are in the account menu, not here, because they are
+ * about the traveller and the watch, not the trip's days.
+ */
 export const tripTabs = (tripId: string): NavItem[] => [
-  { label: "Today", href: `/trips/${tripId}/day/today`, icon: "calendar" },
-  { label: "Map", href: `/trips/${tripId}`, icon: "map" },
   { label: "Trip", href: `/trips/${tripId}/trip`, icon: "list" },
-  { label: "AI", href: `/trips/${tripId}/alerts`, icon: "sparkle" },
+  { label: "Map", href: `/trips/${tripId}`, icon: "map" },
 ];
 
 /** The tabs outside a trip. */

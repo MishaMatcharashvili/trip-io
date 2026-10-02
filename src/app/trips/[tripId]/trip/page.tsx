@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { georgiaMapStops, getTrip, type Trip } from "@/data/trip";
-import { TopBar } from "@/features/chrome";
+import { TopBar, TripBottomNav } from "@/features/chrome";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { AddDayButton } from "@/features/trip-actions";
 import { duration, tripStops } from "@/features/trip-model";
@@ -12,7 +12,7 @@ import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import type { MapStop } from "@/ui/map/trip-map";
-import { BottomNav, tripTabs } from "@/ui/nav";
+import { tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num } from "@/ui/text";
 import { loadTrip } from "../load";
 
@@ -164,7 +164,7 @@ function WholeTrip({
         </aside>
       </div>
 
-      <BottomNav items={tripTabs(trip.id)} active="Trip" />
+      <TripBottomNav tripId={trip.id} active="Trip" />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   type Trip,
   todayWeather,
 } from "@/data/trip";
-import { MobileTitleBar, TopBar } from "@/features/chrome";
+import { MobileTitleBar, TopBar, TripBottomNav } from "@/features/chrome";
 import { DayEditor } from "@/features/day-editor";
 import { CheckpointList } from "@/features/itinerary";
 import { forecastRibbon } from "@/features/shared-reads";
@@ -18,7 +18,7 @@ import { Button, ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
-import { BottomNav, tripTabs } from "@/ui/nav";
+import { tripTabs } from "@/ui/nav";
 import { Display, Eyebrow } from "@/ui/text";
 import { loadTrip, pickDay } from "../../load";
 
@@ -50,7 +50,7 @@ function DayScreen({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBar trip={trip} tabs={tripTabs(trip.id)} active="Today" />
+      <TopBar trip={trip} tabs={tripTabs(trip.id)} active="Trip" />
 
       <MobileTitleBar
         back={`/trips/${trip.id}/trip`}
@@ -138,7 +138,7 @@ function DayScreen({
         </Link>
       </div>
 
-      <BottomNav items={tripTabs(trip.id)} active="Today" />
+      <TripBottomNav tripId={trip.id} active="Trip" />
     </div>
   );
 }
