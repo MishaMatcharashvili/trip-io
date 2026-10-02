@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { applyOps } from "./patch.ts";
-import { draftSuggestions, readPicks, type SwapCandidate } from "./suggest.ts";
+import {
+  draftSuggestions,
+  rankForWish,
+  readPicks,
+  type SwapCandidate,
+} from "./suggest.ts";
 import { at, DAY, kazbegiDoc, N, P, places } from "./test-fixtures.ts";
 import { straightLineTravel } from "./travel.ts";
 import { validateProposal } from "./validate.ts";
@@ -261,5 +266,37 @@ describe("readPicks", () => {
     assert.equal(readPicks({ nope: 1 }, valid), null);
     assert.equal(readPicks("text", valid), null);
     assert.equal(readPicks({ picks: [{ id: "a" }] }, valid), null);
+  });
+});
+
+describe("rankForWish", () => {
+  const lunch = () =>
+    draftSuggestions(kazbegiDoc(), N.lunch, [swapCandidate(P.verifiedCafe)], {
+      ...ctx,
+      wet: new Set([12]),
+    });
+
+  test("with no wish the order is the rules' own", () => {
+    const drafts = lunch();
+    assert.deepEqual(
+      rankForWish(drafts, null).map((d) => d.id),
+      drafts.map((d) => d.id),
+    );
+  });
+
+  test("somewhere indoors puts an indoor place first", () => {
+    const [first] = rankForWish(lunch(), "somewhere indoors please");
+    assert.equal(first.kind, "swap");
+  });
+
+  test("earlier puts an earlier start first", () => {
+    const [first] = rankForWish(lunch(), "can we do it earlier?");
+    assert.equal(first.kind, "time");
+    assert.match(first.reason, /^Earlier/);
+  });
+
+  test("it never drops or adds an option", () => {
+    const drafts = lunch();
+    assert.equal(rankForWish(drafts, "whatever").length, drafts.length);
   });
 });

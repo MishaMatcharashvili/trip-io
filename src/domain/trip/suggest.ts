@@ -316,6 +316,62 @@ export function draftSuggestions(
   ];
 }
 
+/**
+ * What the traveller asked for, read in the plainest way, for when no model is
+ * there to read it: "indoors", "earlier", "later", "shorter", "longer". The
+ * options that answer it come first; the rest keep their order.
+ */
+export function rankForWish(
+  drafts: readonly SuggestionDraft[],
+  wish: string | null,
+): SuggestionDraft[] {
+  const text = (wish ?? "").toLowerCase();
+  const score = (d: SuggestionDraft) => {
+    let n = 0;
+    if (
+      /indoor|inside|rain|wet|cold/.test(text) &&
+      d.kind === "swap" &&
+      /indoors/.test(d.facts)
+    )
+      n += 2;
+    if (/rain|wet|dry/.test(text) && /rain/i.test(d.reason)) n += 2;
+    if (
+      /earlier|early|morning|before/.test(text) &&
+      d.kind === "time" &&
+      /^Earlier/.test(d.reason)
+    )
+      n += 2;
+    if (
+      /later|late|after|evening/.test(text) &&
+      d.kind === "time" &&
+      /^Later/.test(d.reason)
+    )
+      n += 2;
+    if (
+      /short|quick|less|brief/.test(text) &&
+      d.kind === "length" &&
+      /need less/.test(d.reason)
+    )
+      n += 2;
+    if (
+      /long|more|stay|extra/.test(text) &&
+      d.kind === "length" &&
+      /stay longer/.test(d.reason)
+    )
+      n += 2;
+    if (
+      /else|another|different|instead|swap|alternative/.test(text) &&
+      d.kind === "swap"
+    )
+      n += 1;
+    return n;
+  };
+  return drafts
+    .map((d, i) => ({ d, i, n: score(d) }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .map((x) => x.d);
+}
+
 // The model's part -------------------------------------------------------------
 
 export const picksSchema = z.object({
