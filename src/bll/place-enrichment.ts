@@ -223,10 +223,6 @@ async function resolveAndRead(
       await deps.save(placeId, provider.provider, { status: "none" });
       return { ok: false, reason: "no-match" };
     }
-    // Remembered only once it can be read: an id that was found but not
-    // allowed would otherwise be trusted and fail on every visit after.
-    const allowed = await provider.allow(match.id);
-    if (!allowed.ok) return allowed;
     await deps.save(placeId, provider.provider, {
       status: "matched",
       externalId: match.id,

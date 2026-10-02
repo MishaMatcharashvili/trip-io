@@ -28,8 +28,11 @@ import {
 //     coordinates by the domain (chooseMatch), not trusted.
 //   * `size` as small as will do. A billable unit is one location returned, so
 //     a search for one place that asks for twenty is paid for twenty times.
-//   * An allowlist append before the first read. Terra answers a read for a
-//     place that is not on it with a 404, found or not.
+//   * No allowlist. Terra's reference says a place must be on it to be read, and
+//     its allowlist endpoint is rate-limited so hard that appending one id on demand
+//     answers 429 at once, but a Discover key reads any place: checked live
+//     (details and reviews answered 200 for a place that was never allowed), so
+//     the step, and the limit it hit, are gone.
 //   * Details, reviews and photos as three calls, and the last two may fail
 //     without losing the first: a rating with no pictures is worth showing.
 // Not used: the feeds, the recommendations search, multi-get details.
@@ -299,15 +302,6 @@ export function tripadvisor(options: {
       } catch {
         return { ok: false, reason: "malformed" };
       }
-    },
-
-    async allow(placeId) {
-      const reply = await call(
-        "/allowlist",
-        {},
-        { operation_type: "APPEND", allowlist: [Number(placeId)] },
-      );
-      return reply.ok ? { ok: true } : reply;
     },
 
     async read(placeId): Promise<EnrichOutcome> {

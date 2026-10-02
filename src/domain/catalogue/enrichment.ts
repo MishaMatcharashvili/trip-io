@@ -95,9 +95,9 @@ export type SearchOutcome =
   | { ok: false; reason: EnrichFailure };
 
 /**
- * The provider behind the port. The three calls are separate because they are
+ * The provider behind the port. The two calls are separate because they are
  * paid for, and limited, separately: finding a place is rare and slow, reading
- * one is the common case, and permission to read it is asked for once.
+ * one is the common case.
  */
 export type PlaceEnricher = {
   /** What the provider is called in storage: the key its identifiers are kept under. */
@@ -105,10 +105,6 @@ export type PlaceEnricher = {
   configured: boolean;
   /** Places that might be this one. Few: each result returned is billed. */
   search(place: PlaceIdentity): Promise<SearchOutcome>;
-  /** Make a found place readable. Idempotent. */
-  allow(
-    id: string,
-  ): Promise<{ ok: true } | { ok: false; reason: EnrichFailure }>;
   /** The place as it is now. Never kept by the caller. */
   read(id: string): Promise<EnrichOutcome>;
 };
