@@ -329,6 +329,15 @@ export function mapStops(day: Day): MapStop[] {
   );
 }
 
+/** The middle of a day's stops: where to ask the forecast, and where to search near. */
+export function centroid(stops: readonly MapStop[]): LonLat | null {
+  if (stops.length === 0) return null;
+  return [
+    stops.reduce((sum, s) => sum + s.lonLat[0], 0) / stops.length,
+    stops.reduce((sum, s) => sum + s.lonLat[1], 0) / stops.length,
+  ];
+}
+
 /** Every stop of the trip, for the whole-trip map. */
 export function tripStops(trip: Trip): MapStop[] {
   return trip.days.flatMap(mapStops);

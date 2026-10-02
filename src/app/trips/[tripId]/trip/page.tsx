@@ -1,20 +1,30 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { georgiaMapStops, getTrip, type Trip } from "@/data/trip";
+import { georgiaMapStops, getTrip, type Trip, todayWeather } from "@/data/trip";
+import { dayKey } from "@/domain/trip/document";
 import { TopBar, TripBottomNav } from "@/features/chrome";
+import { DayAccordion, type DayRow } from "@/features/day-accordion";
+import { DayEditor } from "@/features/day-editor";
+import { CheckpointList } from "@/features/itinerary";
 import { RoutedTripMap } from "@/features/routed-trip-map";
+import { forecastRibbon } from "@/features/shared-reads";
 import { AddDayButton } from "@/features/trip-actions";
-import { duration, tripStops } from "@/features/trip-model";
-import { DayShape } from "@/ui/bars";
+import { firstParam, worthForecasting } from "@/features/trip-links";
+import {
+  centroid,
+  duration,
+  mapStops,
+  tripStops,
+  weatherView,
+} from "@/features/trip-model";
 import { Button, ButtonLink } from "@/ui/button";
-import { Card, Divider, SectionRule } from "@/ui/card";
+import { Card, SectionRule } from "@/ui/card";
 import { cx } from "@/ui/cx";
-import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import type { MapStop } from "@/ui/map/trip-map";
 import { tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num } from "@/ui/text";
-import { loadTrip } from "../load";
+import { loadTrip, pickDay } from "../load";
+import { DayPanel } from "./day-panel";
 
 export const metadata: Metadata = { title: "The whole trip" };
 
@@ -25,12 +35,15 @@ function WholeTrip({
   stats,
   totals,
   stops,
+  days,
   actions,
 }: {
   trip: Trip;
   stats: Stat[];
   totals: Stat[];
   stops: MapStop[];
+  /** The days, each opening in place. */
+  days: React.ReactNode;
   actions: React.ReactNode;
 }) {
   return (
@@ -62,75 +75,12 @@ function WholeTrip({
           </div>
 
           {/*
-            Every day with a watch status each. This is the table where the
+            Every day, with a watch status each. This is the table where the
             product stops being a planner: every row says not just what you are
-            doing, but whether anything has moved under it.
+            doing, but whether anything has moved under it. A day opens in
+            place into its weather and its stops, and today opens first.
           */}
-          <Card className="overflow-hidden">
-            <div className="hidden items-center gap-3.5 border-b border-hairline bg-surface-subtle px-[18px] py-2.5 lg:flex">
-              <Eyebrow className="flex-1">Day</Eyebrow>
-              <Eyebrow className="w-[250px]">Shape of the day</Eyebrow>
-              <Eyebrow className="w-[120px]">Watch status</Eyebrow>
-            </div>
-
-            {trip.days.map((day, i) => (
-              <div key={day.id}>
-                {i > 0 ? <Divider /> : null}
-                <Link
-                  href={`/trips/${trip.id}/day/${day.id}`}
-                  className={cx(
-                    "flex flex-col gap-2.5 px-4 py-3 transition-colors lg:flex-row lg:items-center lg:gap-3.5 lg:px-[18px]",
-                    day.state === "past" && "opacity-55",
-                    day.state === "today" &&
-                      "border-l-[3px] border-agent bg-agent-tint",
-                    day.state !== "today" && "hover:bg-canvas",
-                  )}
-                >
-                  <div className="flex flex-1 flex-col gap-0.5">
-                    <Num
-                      className={cx(
-                        "text-mini",
-                        day.state === "today"
-                          ? "font-semibold text-agent"
-                          : "text-ink-faint",
-                      )}
-                    >
-                      {day.stamp}
-                    </Num>
-                    <span
-                      className={cx(
-                        "text-small",
-                        day.state === "today" ? "font-semibold" : "font-medium",
-                      )}
-                    >
-                      {day.summary}
-                    </span>
-                  </div>
-
-                  <DayShape
-                    segments={day.shape}
-                    className="w-full lg:w-[250px]"
-                  />
-
-                  <div className="flex w-[120px] items-center gap-2">
-                    <Dot tone={day.watch.tone} />
-                    <span
-                      className={cx(
-                        "text-mini",
-                        day.watch.tone === "alert"
-                          ? "font-medium text-alert"
-                          : day.watch.tone === "agent"
-                            ? "text-agent"
-                            : "text-ink-faint",
-                      )}
-                    >
-                      {day.watch.label}
-                    </span>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </Card>
+          {days}
 
           <div className="flex flex-wrap items-center gap-2.5">{actions}</div>
         </main>
@@ -171,8 +121,11 @@ function WholeTrip({
 
 export default async function FullTripPage({
   params,
+  searchParams,
 }: PageProps<"/trips/[tripId]/trip">) {
   const { tripId } = await params;
+  const query = await searchParams;
+  const wanted = firstParam(query.day);
 
   const fixture = getTrip(tripId);
   if (fixture) {
@@ -191,6 +144,51 @@ export default async function FullTripPage({
           { label: "Changes I proposed", value: "8 · 6 applied" },
         ]}
         stops={georgiaMapStops}
+        days={
+          <DayAccordion
+            tripId={fixture.id}
+            rows={fixture.days.map((day): DayRow => {
+              const conflict = day.checkpoints.some((c) => c.conflict);
+              return {
+                day,
+                // The reference trip's "today" is its third day.
+                open: day.id === (!wanted || wanted === "today" ? "3" : wanted),
+                panel: (
+                  <DayPanel
+                    weather={
+                      conflict
+                        ? { hours: todayWeather, caption: "Rain 15:30–19:00" }
+                        : null
+                    }
+                    recommended={
+                      conflict ? `/trips/${fixture.id}/replan` : null
+                    }
+                    briefingHref={
+                      day.state === "today"
+                        ? `/trips/${fixture.id}/briefing`
+                        : null
+                    }
+                  >
+                    <Card className="overflow-hidden">
+                      <CheckpointList
+                        day={day}
+                        trip={fixture}
+                        divided
+                        linkPlaces
+                      />
+                    </Card>
+                    <div className="flex gap-2.5 pt-1">
+                      <Button className="flex-1 lg:flex-none">
+                        Add a stop
+                      </Button>
+                      <Button className="flex-1 lg:flex-none">Reorder</Button>
+                    </div>
+                  </DayPanel>
+                ),
+              };
+            })}
+          />
+        }
         actions={
           <>
             <Button>Add a day</Button>
@@ -222,6 +220,54 @@ export default async function FullTripPage({
     .size;
   const { told, applied } = screen.alerts;
 
+  const openDay = pickDay(trip, wanted) ?? trip.days[trip.currentDay - 1];
+  const today = dayKey(new Date());
+  // An open recommendation touches the days its matched stops are on.
+  const recommendation = screen.alerts.alerts.find((a) => a.outcome === null);
+
+  const rows = await Promise.all(
+    trip.days.map(async (day): Promise<DayRow> => {
+      const near = centroid(mapStops(day));
+      const forecast =
+        near && day.date && worthForecasting(day.date, today)
+          ? await forecastRibbon(near, day.date)
+          : null;
+      const touched = new Set(day.checkpoints.map((c) => c.id));
+      const conflicted = screen.matches.some((m) => touched.has(m.nodeId));
+      const isOpen = day.id === openDay?.id;
+
+      return {
+        day,
+        open: isOpen,
+        panel: (
+          <DayPanel
+            weather={forecast ? weatherView(forecast) : null}
+            recommended={
+              recommendation && conflicted
+                ? `/trips/${trip.id}/alerts/${recommendation.id}`
+                : null
+            }
+            briefingHref={
+              day.state === "today" ? `/trips/${trip.id}/briefing` : null
+            }
+          >
+            {day.date ? (
+              <DayEditor
+                tripId={trip.id}
+                head={screen.head}
+                date={day.date}
+                stops={day.checkpoints}
+                near={near}
+                openAdd={isOpen && firstParam(query.add) === "1"}
+                initialQuery={isOpen ? firstParam(query.q) : undefined}
+              />
+            ) : null}
+          </DayPanel>
+        ),
+      };
+    }),
+  );
+
   return (
     <WholeTrip
       trip={trip}
@@ -248,6 +294,7 @@ export default async function FullTripPage({
         },
       ]}
       stops={stops}
+      days={<DayAccordion tripId={trip.id} rows={rows} />}
       actions={
         <>
           <AddDayButton
