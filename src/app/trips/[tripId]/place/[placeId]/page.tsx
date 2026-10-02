@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { savedPlaceIds } from "@/bll/saved";
 import { type Checkpoint, type Day, getTrip, type Trip } from "@/data/trip";
 import { summariseHours } from "@/domain/catalogue/opening-hours";
+import { PlaceVoices } from "@/features/place-voices";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { SaveToggle } from "@/features/save-toggle";
 import { RemoveStopButton } from "@/features/trip-actions";
@@ -373,6 +374,13 @@ export default async function PlacePage({
             ))}
           </div>
         </div>
+
+        {node.placeId ? (
+          <PlaceVoices
+            placeId={node.placeId}
+            name={place?.name ?? stop.title}
+          />
+        ) : null}
 
         {place?.website || place?.phone ? (
           <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-hairline px-[18px] py-3">
