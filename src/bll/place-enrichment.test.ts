@@ -47,11 +47,10 @@ type World = ReturnType<typeof world>;
 function world(over: { limits?: Partial<EnrichLimits> } = {}) {
   const stored = new Map<string, ExternalRow>();
   const counts = new Map<string, number>();
-  const asked = { search: 0, allow: 0, read: 0 };
+  const asked = { search: 0, read: 0 };
   const provider: PlaceEnricher & {
     answers: {
       search: SearchOutcome;
-      allow: { ok: true } | { ok: false; reason: "upstream" };
       read: () => Promise<EnrichOutcome>;
     };
   } = {
@@ -59,16 +58,11 @@ function world(over: { limits?: Partial<EnrichLimits> } = {}) {
     configured: true,
     answers: {
       search: hit,
-      allow: { ok: true },
       read: async () => ({ ok: true, enrichment }),
     },
     async search() {
       asked.search++;
       return provider.answers.search;
-    },
-    async allow() {
-      asked.allow++;
-      return provider.answers.allow;
     },
     async read() {
       asked.read++;
@@ -114,17 +108,17 @@ describe("finding a place", () => {
     w = world();
   });
 
-  test("the first visit finds it, allows it, remembers the id, and reads it", async () => {
+  test("the first visit finds it, remembers the id, and reads it", async () => {
     const outcome = await run(w);
     assert.ok(outcome.ok);
-    assert.deepEqual(w.asked, { search: 1, allow: 1, read: 1 });
+    assert.deepEqual(w.asked, { search: 1, read: 1 });
     assert.deepEqual(w.stored.get(PLACE)?.externalId, "777");
   });
 
-  test("the second visit goes straight to the read: no search, no allow", async () => {
+  test("the second visit goes straight to the read: no search", async () => {
     await run(w);
     await run(w);
-    assert.deepEqual(w.asked, { search: 1, allow: 1, read: 2 });
+    assert.deepEqual(w.asked, { search: 1, read: 2 });
   });
 
   test("without a store, what is shown is read again each time", async () => {
@@ -162,13 +156,6 @@ describe("finding a place", () => {
     await run(w);
     assert.equal(w.asked.search, 1);
     assert.equal(w.stored.get(PLACE)?.status, "matched");
-  });
-
-  test("an id that could not be allowed is not remembered", async () => {
-    w.provider.answers.allow = { ok: false, reason: "upstream" };
-    assert.deepEqual(await run(w), { ok: false, reason: "upstream" });
-    assert.equal(w.stored.has(PLACE), false);
-    assert.equal(w.asked.read, 0);
   });
 
   test("a failed search is not remembered as an absence", async () => {

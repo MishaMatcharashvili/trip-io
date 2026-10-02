@@ -1,13 +1,13 @@
 // Exercises the Tripadvisor Terra adapter against the LIVE API: finds four
 // well-known Georgian places by name, decides which result is each (the same
-// chooseMatch the app uses), allows them, and reads their rating, reviews and
-// photos. Run with `pnpm smoke:tripadvisor`. Needs TRIPADVISOR_API_KEY in .env;
+// chooseMatch the app uses), and reads their rating, reviews and photos. Run with `pnpm smoke:tripadvisor`. Needs TRIPADVISOR_API_KEY in .env;
 // it touches no database.
 //
 // What it costs: a search returns up to five locations and a read about three,
-// every one a billable entity — roughly 35 for the run, against the Discover
-// tier's 1,000 free. It also APPENDS the matched ids to your allowlist, which
-// is the point (a place cannot be read until it is on it) and is harmless.
+// every one a billable entity — roughly 20 for the run, against the Discover
+// tier's 1,000 free. There is no allowlist step: a Discover key reads any place,
+// which was checked live, and the allowlist endpoint's own rate limit answers
+// 429 to a single append.
 //
 // The unit tests in src/infra/tripadvisor.test.ts use replies shaped from
 // Terra's reference. This is the only check that Terra answers in those
@@ -53,13 +53,13 @@ const places: PlaceIdentity[] = [
   {
     name: "Fabrika",
     nameKa: "ფაბრიკა",
-    lonLat: [44.8076, 41.7167],
+    lonLat: [44.8028, 41.7095],
     category: "hotel",
   },
   {
     name: "Georgian National Museum",
     nameKa: null,
-    lonLat: [44.7983, 41.7154],
+    lonLat: [44.8002, 41.6959],
     category: "museum",
   },
 ];
@@ -84,10 +84,6 @@ for (const place of places) {
   expect(match !== null, "one candidate is this place");
   if (!match) continue;
   console.log(`   matched ${match.id} at ${match.confidence.toFixed(2)}`);
-
-  const allowed = await provider.allow(match.id);
-  expect(allowed.ok, `allowed${allowed.ok ? "" : ` (${allowed.reason})`}`);
-  if (!allowed.ok) continue;
 
   const read = await provider.read(match.id);
   expect(read.ok, `read${read.ok ? "" : ` (${read.reason})`}`);

@@ -216,17 +216,6 @@ describe("the calls", () => {
     assert.equal(init.cache, "no-store");
   });
 
-  test("allowing a place appends it as a number", async () => {
-    const { fetch, calls } = fake({ "/allowlist": { added: 1 } });
-    const result = await tripadvisor({ key: "k", fetch }).allow("12345");
-    assert.equal(result.ok, true);
-    assert.equal(calls[0].init.method, "POST");
-    assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
-      operation_type: "APPEND",
-      allowlist: [12345],
-    });
-  });
-
   test("reading a place gathers the rating, reviews and photos", async () => {
     const { fetch } = fake({
       "/locations": details,
