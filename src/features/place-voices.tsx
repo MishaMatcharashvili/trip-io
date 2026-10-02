@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Enrichment } from "@/domain/catalogue/enrichment";
+import type { Enrichment, Photo } from "@/domain/catalogue/enrichment";
 import { apiClient } from "@/lib/hono-client";
 import { SkeletonLine } from "@/ui/bars";
 import { Button } from "@/ui/button";
@@ -37,13 +37,59 @@ const SETTLE_MS = 400;
 /** How far below the fold counts as near. */
 const NEAR = "200px";
 
+/** What the review provider said: reviews, nothing to say, or why it could not. */
+type Reviews =
+  | { kind: "ok"; enrichment: Enrichment }
+  | { kind: "none" }
+  | { kind: "failed"; reason: string };
+
 type State =
   | { status: "waiting" }
   | { status: "loading" }
-  | { status: "ready"; enrichment: Enrichment }
-  // Nothing to show, and nothing to say about it.
-  | { status: "empty" }
-  | { status: "failed"; reason: string };
+  | { status: "ready"; reviews: Reviews; photos: Photo[] };
+
+async function askReviews(
+  placeId: string,
+  signal: AbortSignal,
+): Promise<Reviews> {
+  try {
+    const res = await apiClient.api.places[":id"].enrichment.$get(
+      { param: { id: placeId } },
+      { init: { signal } },
+    );
+    const body = (await res.json()) as
+      | { ok: true; enrichment: Enrichment }
+      | { ok: false; reason: string };
+    if (body.ok) return { kind: "ok", enrichment: body.enrichment };
+    return body.reason === "no-match" || body.reason === "not-configured"
+      ? { kind: "none" }
+      : { kind: "failed", reason: body.reason };
+  } catch {
+    if (signal.aborted) throw new DOMException("aborted", "AbortError");
+    // The answer was not JSON, or never came: the server, not the traveller.
+    return { kind: "failed", reason: "upstream" };
+  }
+}
+
+/** Photographs are free and independent of the reviews: a failure is simply none. */
+async function askPhotos(
+  placeId: string,
+  signal: AbortSignal,
+): Promise<Photo[]> {
+  try {
+    const res = await apiClient.api.places[":id"].photos.$get(
+      { param: { id: placeId } },
+      { init: { signal } },
+    );
+    const body = (await res.json()) as
+      | { ok: true; photos: Photo[] }
+      | { ok: false };
+    return body.ok ? body.photos : [];
+  } catch {
+    if (signal.aborted) throw new DOMException("aborted", "AbortError");
+    return [];
+  }
+}
 
 export function PlaceVoices({
   placeId,
@@ -73,8 +119,8 @@ export function PlaceVoices({
     return () => watcher.disconnect();
   }, [near]);
 
-  // Wanted: debounced, then fetched, then dropped if the panel goes first.
-  // `attempt` re-runs it for a retry; `placeId` for a different place.
+  // Wanted: debounced, then both asked at once, then dropped if the panel goes
+  // first. `attempt` re-runs it for a retry; `placeId` for a different place.
   // biome-ignore lint/correctness/useExhaustiveDependencies: attempt only re-runs it
   useEffect(() => {
     if (!near) return;
@@ -84,29 +130,13 @@ export function PlaceVoices({
     const timer = setTimeout(async () => {
       setState({ status: "loading" });
       try {
-        const res = await apiClient.api.places[":id"].enrichment.$get(
-          { param: { id: placeId } },
-          { init: { signal: controller.signal } },
-        );
-        const body = (await res.json()) as
-          | { ok: true; enrichment: Enrichment }
-          | { ok: false; reason: string };
-        if (body.ok) {
-          setState({ status: "ready", enrichment: body.enrichment });
-        } else if (
-          body.reason === "no-match" ||
-          body.reason === "not-configured"
-        ) {
-          setState({ status: "empty" });
-        } else {
-          setState({ status: "failed", reason: body.reason });
-        }
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setState({
-          status: "failed",
-          reason: error instanceof Error ? "timeout" : "upstream",
-        });
+        const [reviews, photos] = await Promise.all([
+          askReviews(placeId, controller.signal),
+          askPhotos(placeId, controller.signal),
+        ]);
+        setState({ status: "ready", reviews, photos });
+      } catch {
+        // Dropped because the panel went: nothing to show.
       }
     }, SETTLE_MS);
 
@@ -120,17 +150,37 @@ export function PlaceVoices({
 
   // The box is always there to be watched, and takes no room until it has
   // something to show.
-  if (state.status === "empty") return <div ref={box} />;
+  if (state.status === "ready") {
+    const { reviews, photos } = state;
+    const all = [
+      ...(reviews.kind === "ok"
+        ? reviews.enrichment.photos.map((p) => ({
+            ...p,
+            credit: {
+              text: reviews.enrichment.source.name,
+              url: reviews.enrichment.url,
+            },
+          }))
+        : []),
+      ...photos,
+    ];
+    if (reviews.kind === "none" && all.length === 0) return <div ref={box} />;
+    return (
+      <div ref={box} className={className}>
+        <Photos photos={all} name={name} />
+        {reviews.kind === "ok" ? (
+          <Reviews enrichment={reviews.enrichment} name={name} />
+        ) : null}
+        {reviews.kind === "failed" ? (
+          <Failed reason={reviews.reason} onRetry={retry} />
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div ref={box} className={className}>
-      {state.status === "waiting" || state.status === "loading" ? (
-        <Loading />
-      ) : state.status === "failed" ? (
-        <Failed reason={state.reason} onRetry={retry} />
-      ) : (
-        <Ready enrichment={state.enrichment} name={name} />
-      )}
+      <Loading />
     </div>
   );
 }
@@ -171,9 +221,57 @@ function Failed({ reason, onRetry }: { reason: string; onRetry: () => void }) {
   );
 }
 
-function Ready({ enrichment, name }: { enrichment: Enrichment; name: string }) {
-  const { rating, ranking, reviews, photos, source, url } = enrichment;
-  if (!rating && !reviews.length && !photos.length) return null;
+/** Photographs, each with who took it: the licence asks for the credit, and so does the review site's. */
+function Photos({ photos, name }: { photos: Photo[]; name: string }) {
+  if (photos.length === 0) return null;
+  return (
+    <section
+      aria-label={`Photos of ${name}`}
+      className="flex flex-col gap-2 border-b border-hairline px-[18px] py-3.5"
+    >
+      <Eyebrow>Photos</Eyebrow>
+      <ul className="-mx-[18px] flex gap-2.5 overflow-x-auto px-[18px] pb-1">
+        {photos.map((photo) => (
+          <li key={photo.id} className="flex w-[150px] shrink-0 flex-col gap-1">
+            {/* biome-ignore lint/performance/noImgElement: a photograph from its own host, credited to its author; it is not ours to proxy or resize */}
+            <img
+              src={photo.url}
+              alt={photo.caption ?? `A photo of ${name}`}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              width={150}
+              height={112}
+              className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
+            />
+            {photo.credit ? (
+              <a
+                href={photo.credit.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={photo.credit.text}
+                className="truncate text-micro text-ink-faint hover:text-ink"
+              >
+                {photo.credit.text}
+              </a>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The review site's rating and reviews, each saying whose it is and linking back. */
+function Reviews({
+  enrichment,
+  name,
+}: {
+  enrichment: Enrichment;
+  name: string;
+}) {
+  const { rating, ranking, reviews, source, url } = enrichment;
+  if (!rating && !reviews.length) return null;
 
   return (
     <section
@@ -218,26 +316,6 @@ function Ready({ enrichment, name }: { enrichment: Enrichment; name: string }) {
         </a>
       ) : null}
       {ranking ? <p className="text-mini text-ink-faint">{ranking}</p> : null}
-
-      {photos.length ? (
-        <ul className="-mx-[18px] flex gap-2 overflow-x-auto px-[18px] pb-1">
-          {photos.map((photo) => (
-            <li key={photo.id} className="shrink-0">
-              {/* biome-ignore lint/performance/noImgElement: the provider's own CDN, which must serve it; it may not be copied through ours */}
-              <img
-                src={photo.url}
-                alt={photo.caption ?? `A photo of ${name}`}
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-                width={150}
-                height={112}
-                className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
-              />
-            </li>
-          ))}
-        </ul>
-      ) : null}
 
       {reviews.length ? (
         <ul className="flex flex-col">

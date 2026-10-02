@@ -113,6 +113,50 @@ describe("selectPhotos", () => {
     assert.deepEqual(out, []);
   });
 
+  test("a place named after a village is not the landmark in the village", () => {
+    // A hotel in the village of Gergeti, and the church there: both say Gergeti.
+    const hotel = {
+      name: "Gergeti woods",
+      nameKa: null,
+      lonLat: NEAR,
+      category: "hotel",
+    };
+    const out = selectPhotos(hotel, [
+      cand(
+        "church",
+        "File:Kazbegi, Gergeti Trinity Church and Mt Kazbek.jpg",
+        NEAR,
+      ),
+      cand("view", "File:Gergeti from Stepantsminda view.jpg", NEAR),
+    ]);
+    assert.deepEqual(out, []);
+    // Its own photograph says both words.
+    assert.deepEqual(
+      selectPhotos(hotel, [
+        cand("own", "File:Gergeti woods hotel.jpg", NEAR),
+      ]).map((p) => p.id),
+      ["own"],
+    );
+  });
+
+  test("a landmark is found by its own name without its kind: Narikala for Narikala Fortress", () => {
+    const out = selectPhotos(NARIKALA, [cand("n", "File:Narikala.jpg", NEAR)]);
+    assert.deepEqual(
+      out.map((p) => p.id),
+      ["n"],
+    );
+  });
+
+  test("a name of kinds only has nothing to match", () => {
+    assert.deepEqual(
+      selectPhotos(
+        { name: "Old Fortress", nameKa: null, lonLat: NEAR, category: "fort" },
+        [cand("f", "File:Old fortress wall.jpg", NEAR)],
+      ),
+      [],
+    );
+  });
+
   test("a long name is matched by enough of it", () => {
     const hotel = {
       name: "Hilton Garden Inn Tbilisi Chavchavadze",
@@ -150,9 +194,17 @@ describe("selectPhotos", () => {
   });
 
   test("a photo with no location needs the whole name, not a part of it", () => {
-    const part = selectPhotos(NARIKALA, [cand("p", "File:Narikala.jpg", null)]);
-    const whole = selectPhotos(NARIKALA, [
-      cand("w", "File:Narikala Fortress - Tbilisi.jpg", null),
+    const hotel = {
+      name: "Hilton Garden Inn Chavchavadze",
+      nameKa: null,
+      lonLat: NEAR,
+      category: "hotel",
+    };
+    const part = selectPhotos(hotel, [
+      cand("p", "File:Hilton Garden lobby.jpg", null),
+    ]);
+    const whole = selectPhotos(hotel, [
+      cand("w", "File:Hilton Garden Inn Chavchavadze, entrance.jpg", null),
     ]);
     assert.deepEqual(part, []);
     assert.deepEqual(
