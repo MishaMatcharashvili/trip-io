@@ -24,8 +24,10 @@ import type { OverviewView } from "./view";
 // uses the same strings, so a panel arriving does not move.
 export const ITINERARY_FRAME =
   "absolute left-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[352px] flex-col overflow-hidden";
+// Its cards keep their height (`shrink-0`): shrunk to fit, a card clips its own
+// content and the column never has anything to scroll.
 export const RIGHT_COLUMN_FRAME =
-  "absolute right-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[376px] flex-col gap-3 overflow-y-auto";
+  "absolute right-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[376px] flex-col gap-3 overflow-y-auto [&>*]:shrink-0";
 export const WATCH_STRIP_FRAME = "absolute bottom-[30px] left-6 z-20";
 export const COMMAND_BAR_FRAME =
   "absolute bottom-[30px] left-1/2 z-20 w-[520px] -translate-x-1/2";
