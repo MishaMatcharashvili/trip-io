@@ -93,6 +93,55 @@ describe("selectPhotos", () => {
     assert.deepEqual(out, []);
   });
 
+  test("the city's name identifies nothing: every photograph in Tbilisi says Tbilisi", () => {
+    const hotel = {
+      name: "Hilton Garden Inn Tbilisi Chavchavadze",
+      nameKa: null,
+      lonLat: NEAR,
+      category: "hotel",
+    };
+    const out = selectPhotos(hotel, [
+      cand(
+        "stairs",
+        "File:2023-09-17 Stairs up from 35 Nino Ramishvili Street, Tbilisi.jpg",
+        NEAR,
+      ),
+      cand("vake", "File:Vake District, Tbilisi, Georgia.jpg", NEAR),
+      // Chavchavadze is a street: one word of a four-word name is not the hotel.
+      cand("avenue", "File:Chavchavadze Avenue, Tbilisi.jpg", NEAR),
+    ]);
+    assert.deepEqual(out, []);
+  });
+
+  test("a long name is matched by enough of it", () => {
+    const hotel = {
+      name: "Hilton Garden Inn Tbilisi Chavchavadze",
+      nameKa: null,
+      lonLat: NEAR,
+      category: "hotel",
+    };
+    const out = selectPhotos(hotel, [
+      cand("h", "File:Hilton Garden Inn lobby.jpg", NEAR),
+    ]);
+    assert.deepEqual(
+      out.map((p) => p.id),
+      ["h"],
+    );
+  });
+
+  test("a name made only of such words has no photographs to find", () => {
+    const out = selectPhotos(
+      {
+        name: "Old Town",
+        nameKa: null,
+        lonLat: NEAR,
+        category: "public_plaza",
+      },
+      [cand("o", "File:Old Town Tbilisi.jpg", NEAR)],
+    );
+    assert.deepEqual(out, []);
+  });
+
   test("a name match far away is another place of the same name", () => {
     const out = selectPhotos(NARIKALA, [
       cand("far", "File:Narikala Fortress.jpg", [44.2, 41.9]),
