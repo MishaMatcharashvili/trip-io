@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { Checkpoint } from "@/data/trip";
+import type { LonLat } from "@/domain/geo";
+import { suggestSlot } from "@/domain/trip/slot";
+import { straightLineTravel } from "@/domain/trip/travel";
 import { apiClient } from "@/lib/hono-client";
 import { Button } from "@/ui/button";
 import { Card, Divider } from "@/ui/card";
@@ -10,8 +13,10 @@ import { cx } from "@/ui/cx";
 import { TextField } from "@/ui/field";
 import { Icon } from "@/ui/icon";
 import { Eyebrow, Num } from "@/ui/text";
+import type { Gap, ProblemView } from "./day-timing";
 import { CheckpointRow } from "./itinerary";
 import { UndoButton } from "./trip-actions";
+import { duration } from "./trip-model";
 
 // Editing a day. Every change is one patch against the head the page was read
 // at: the server validates the whole day again, refuses what would break it,
@@ -21,7 +26,8 @@ import { UndoButton } from "./trip-actions";
 type PatchOp =
   | { op: "add"; path: string; value: unknown }
   | { op: "remove"; path: string }
-  | { op: "replace"; path: string; value: unknown };
+  | { op: "replace"; path: string; value: unknown }
+  | { op: "test"; path: string; value: unknown };
 
 type Hit = {
   id: string;
@@ -30,7 +36,16 @@ type Hit = {
   group: string;
   tier: string;
   outdoor: boolean;
+  lonLat: LonLat | null;
   distanceM: number | null;
+};
+
+/** What /retime answers: the edit's ops, what it pushes, and what is left wrong. */
+type Preview = {
+  ops: PatchOp[];
+  pushed: { id: string; title: string; from: string; to: string }[];
+  overflow: boolean;
+  remaining: { message: string }[];
 };
 
 /** An instant from a Tbilisi date and wall-clock time. */
@@ -93,6 +108,7 @@ function usePatch(tripId: string, head: string | null) {
 }
 
 function StopEditor({
+  tripId,
   stop,
   date,
   onSave,
@@ -100,9 +116,11 @@ function StopEditor({
   onCancel,
   pending,
 }: {
+  tripId: string;
   stop: Checkpoint;
   date: string;
-  onSave: (startsAt: string, durationMin: number) => void;
+  /** The ops to apply: the edit, with the later stops it pushes when asked to. */
+  onSave: (ops: PatchOp[], intent: string) => void;
   onRemove: () => void;
   onCancel: () => void;
   pending: boolean;
@@ -110,13 +128,95 @@ function StopEditor({
   const node = stop.node;
   const [time, setTime] = useState(node ? clock(node.startsAt) : "09:00");
   const [minutes, setMinutes] = useState(String(node?.durationMin ?? 60));
+  const [shift, setShift] = useState(true);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const length = Number(minutes);
+  const valid = Number.isInteger(length) && length >= 5 && length <= 720;
+  const moved = node ? clock(node.startsAt) !== time : false;
+  const resized = node ? node.durationMin !== length : false;
+  const changed = moved || resized;
+  const endsAt = valid
+    ? clock(
+        new Date(
+          Date.parse(instant(date, time)) + length * 60_000,
+        ).toISOString(),
+      )
+    : null;
+
+  // What this edit would push, asked of the server (which knows the whole day
+  // and the way between its stops) once the traveller has stopped typing. A
+  // keystroke does not ask; a stale answer is dropped when a new one is wanted.
+  useEffect(() => {
+    if (!changed || !valid) {
+      setPreview(null);
+      setChecking(false);
+      return;
+    }
+    const controller = new AbortController();
+    setChecking(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient.api.trips[":id"].retime.$post(
+          {
+            param: { id: tripId },
+            json: {
+              nodeId: stop.id,
+              startsAt: instant(date, time),
+              durationMin: length,
+            },
+          },
+          { init: { signal: controller.signal } },
+        );
+        setPreview(res.ok ? ((await res.json()) as Preview) : null);
+      } catch {
+        if (!controller.signal.aborted) setPreview(null);
+      } finally {
+        if (!controller.signal.aborted) setChecking(false);
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [changed, valid, tripId, stop.id, date, time, length]);
+
+  const pushes = preview?.pushed.length ?? 0;
+  const baseOps: PatchOp[] = [
+    ...(moved
+      ? [
+          {
+            op: "replace" as const,
+            path: `/nodes/${stop.id}/startsAt`,
+            value: instant(date, time),
+          },
+        ]
+      : []),
+    ...(resized
+      ? [
+          {
+            op: "replace" as const,
+            path: `/nodes/${stop.id}/durationMin`,
+            value: length,
+          },
+        ]
+      : []),
+  ];
+  const useShift = shift && pushes > 0 && preview;
+  const intent = `${
+    moved
+      ? `Moved ${stop.title} to ${time}`
+      : `Changed ${stop.title} to ${duration(length)}`
+  }${useShift ? `, shifted ${pushes} later stop${pushes === 1 ? "" : "s"}` : ""}`;
 
   return (
     <form
       className="flex flex-col gap-3 bg-canvas px-4 py-3"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(instant(date, time), Number(minutes));
+        if (!changed || !valid) return onCancel();
+        onSave(useShift && preview ? preview.ops : baseOps, intent);
       }}
     >
       <Eyebrow>Change “{stop.title}”</Eyebrow>
@@ -139,10 +239,64 @@ function StopEditor({
           onChange={(e) => setMinutes(e.target.value)}
           required
           className="flex-1"
+          hint={endsAt ? `Ends ${endsAt}` : undefined}
         />
       </div>
+
+      {checking ? (
+        <p className="text-mini text-ink-faint">
+          Checking the rest of the day…
+        </p>
+      ) : null}
+
+      {!checking && pushes > 0 && preview ? (
+        <div className="flex flex-col gap-2 rounded-control border border-hairline bg-surface px-3 py-2.5">
+          <div className="text-small font-medium">
+            This pushes {pushes} later stop{pushes === 1 ? "" : "s"}
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {preview.pushed.map((p) => (
+              <li key={p.id} className="flex gap-2 text-mini text-ink-muted">
+                <span className="min-w-0 flex-1 truncate">{p.title}</span>
+                <Num>
+                  {clock(p.from)} → {clock(p.to)}
+                </Num>
+              </li>
+            ))}
+          </ul>
+          <label className="flex items-center gap-2 text-small">
+            <input
+              type="checkbox"
+              checked={shift}
+              onChange={(e) => setShift(e.target.checked)}
+            />
+            Move them to make room
+          </label>
+        </div>
+      ) : null}
+
+      {!checking && preview?.overflow ? (
+        <p className="text-mini text-alert">
+          Making room would push stops past the end of the day, so only this one
+          changes.
+        </p>
+      ) : null}
+
+      {!checking && preview && preview.remaining.length > 0 ? (
+        <ul className="flex flex-col gap-1 text-mini text-alert">
+          {preview.remaining.slice(0, 3).map((v) => (
+            <li key={v.message}>{v.message}</li>
+          ))}
+        </ul>
+      ) : null}
+
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" size="sm" disabled={pending}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="sm"
+          disabled={pending || checking || !valid}
+        >
           Save
         </Button>
         <Button size="sm" onClick={onCancel} disabled={pending}>
@@ -163,9 +317,26 @@ function StopEditor({
   );
 }
 
+type Drive = { startsAt: string; durationMin: number };
+
+/** The last stop of a day so far: when it ends and where, for the next to follow. */
+function lastOf(stops: Checkpoint[]) {
+  let last: { endsAt: number; at: LonLat | null; title: string } | null = null;
+  for (const stop of stops) {
+    if (!stop.node) continue;
+    const endsAt =
+      Date.parse(stop.node.startsAt) + stop.node.durationMin * 60_000;
+    if (!last || endsAt > last.endsAt) {
+      last = { endsAt, at: stop.node.lonLat, title: stop.title };
+    }
+  }
+  return last;
+}
+
 function AddStop({
   date,
   near,
+  stops,
   pending,
   initialQuery = "",
   onAdd,
@@ -174,12 +345,15 @@ function AddStop({
   date: string;
   initialQuery?: string;
   near: [number, number] | null;
+  /** The day so far, for the new stop to go after. */
+  stops: Checkpoint[];
   pending: boolean;
   onAdd: (
     hit: Hit,
     kind: "visit" | "meal",
     time: string,
     minutes: number,
+    drive: Drive | null,
   ) => void;
   onClose: () => void;
 }) {
@@ -189,6 +363,27 @@ function AddStop({
   const [picked, setPicked] = useState<Hit | null>(null);
   const [time, setTime] = useState("12:00");
   const [minutes, setMinutes] = useState("60");
+  // A drive to add with the stop, when it is too far from the last to walk to.
+  const [drive, setDrive] = useState<Drive | null>(null);
+  const last = lastOf(stops);
+
+  // Where the stop goes and for how long, as a first guess for the traveller to
+  // change: after the last stop with the way there allowed for, for as long as
+  // that kind of place usually takes. Not noon for an hour whatever it is.
+  const pick = (hit: Hit) => {
+    const slot = suggestSlot(
+      {
+        day: date,
+        last: last && { endsAt: last.endsAt, at: last.at },
+        place: { lonLat: hit.lonLat, category: hit.category },
+      },
+      straightLineTravel,
+    );
+    setPicked(hit);
+    setTime(clock(slot.startsAt));
+    setMinutes(String(slot.durationMin));
+    setDrive(slot.transfer ?? null);
+  };
 
   useEffect(() => {
     if (q.trim().length < 2) {
@@ -232,7 +427,7 @@ function AddStop({
           className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            onAdd(picked, kind, time, Number(minutes));
+            onAdd(picked, kind, time, Number(minutes), drive);
           }}
         >
           <div className="flex items-center gap-2 rounded-control bg-agent-tint px-3 py-2">
@@ -269,6 +464,13 @@ function AddStop({
               className="flex-1"
             />
           </div>
+          {drive && last ? (
+            <p className="text-mini text-ink-muted">
+              Too far to walk from {last.title}: this adds a{" "}
+              {duration(drive.durationMin)} drive first, leaving at{" "}
+              {clock(drive.startsAt)}.
+            </p>
+          ) : null}
           <Button type="submit" variant="primary" disabled={pending}>
             {pending ? "Adding…" : "Add to the day"}
           </Button>
@@ -290,7 +492,7 @@ function AddStop({
                   {i > 0 ? <Divider /> : null}
                   <button
                     type="button"
-                    onClick={() => setPicked(hit)}
+                    onClick={() => pick(hit)}
                     className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-canvas"
                   >
                     <span className="flex-1">
@@ -328,6 +530,8 @@ export function DayEditor({
   date,
   stops,
   near,
+  problems = [],
+  gaps = {},
   openAdd = false,
   initialQuery,
 }: {
@@ -336,6 +540,10 @@ export function DayEditor({
   date: string;
   stops: Checkpoint[];
   near: [number, number] | null;
+  /** What is wrong with this day's times, each with the shift that fixes it. */
+  problems?: ProblemView[];
+  /** The note before a stop, keyed by that stop's id: the way and the room. */
+  gaps?: Record<string, Gap>;
   openAdd?: boolean;
   /** A place to look for as the add panel opens: "add to trip" from Explore. */
   initialQuery?: string;
@@ -346,6 +554,43 @@ export function DayEditor({
 
   return (
     <div className="flex flex-col gap-3">
+      {problems.length > 0 ? (
+        <Card tint accent="alert" className="flex flex-col gap-2.5 px-3.5 py-3">
+          <Eyebrow tone="alert">
+            {problems.length === 1
+              ? "Something about this day's times"
+              : `${problems.length} things about this day's times`}
+          </Eyebrow>
+          {problems.map((problem) => (
+            <div key={problem.id} className="flex flex-col gap-1.5">
+              <p className="text-small">{problem.message}</p>
+              {problem.fix ? (
+                <div className="flex flex-col gap-1.5">
+                  <ul className="flex flex-col gap-0.5">
+                    {problem.fix.moves.map((move) => (
+                      <li key={move} className="text-mini text-ink-muted">
+                        {move}
+                      </li>
+                    ))}
+                  </ul>
+                  <div>
+                    <Button
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        send(problem.fix?.label ?? "", problem.fix?.ops ?? [])
+                      }
+                    >
+                      {problem.fix.label}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </Card>
+      ) : null}
+
       <Card className="overflow-hidden">
         {stops.length === 0 ? (
           <p className="px-4 py-3 text-small text-ink-faint">
@@ -354,7 +599,23 @@ export function DayEditor({
         ) : null}
         {stops.map((stop, i) => (
           <div key={stop.id}>
-            {i > 0 ? <Divider /> : null}
+            {i > 0 ? (
+              gaps[stop.id] ? (
+                <div
+                  className={cx(
+                    "flex items-center gap-1.5 border-y border-hairline px-4 py-1 text-mini",
+                    gaps[stop.id]?.tone === "alert"
+                      ? "bg-alert-tint text-alert"
+                      : "bg-surface-subtle text-ink-faint",
+                  )}
+                >
+                  <Icon name="arrowRight" size={11} className="rotate-90" />
+                  {gaps[stop.id]?.text}
+                </div>
+              ) : (
+                <Divider />
+              )
+            ) : null}
             <div className="flex items-stretch">
               <CheckpointRow
                 checkpoint={stop}
@@ -375,27 +636,13 @@ export function DayEditor({
             </div>
             {editing === stop.id ? (
               <StopEditor
+                tripId={tripId}
                 stop={stop}
                 date={date}
                 pending={pending}
                 onCancel={() => setEditing(null)}
-                onSave={(startsAt, durationMin) =>
-                  send(
-                    `Moved ${stop.title} to ${clock(startsAt)}`,
-                    [
-                      {
-                        op: "replace",
-                        path: `/nodes/${stop.id}/startsAt`,
-                        value: startsAt,
-                      },
-                      {
-                        op: "replace",
-                        path: `/nodes/${stop.id}/durationMin`,
-                        value: durationMin,
-                      },
-                    ],
-                    () => setEditing(null),
-                  )
+                onSave={(ops, intent) =>
+                  send(intent, ops, () => setEditing(null))
                 }
                 onRemove={() =>
                   send(
@@ -420,15 +667,35 @@ export function DayEditor({
         <AddStop
           date={date}
           near={near}
+          stops={stops}
           initialQuery={initialQuery}
           pending={pending}
           onClose={() => setAdding(false)}
-          onAdd={(hit, kind, time, minutes) => {
+          onAdd={(hit, kind, time, minutes, drive) => {
             const title =
               kind === "meal" ? `${mealTitle(time)} · ${hit.name}` : hit.name;
             send(
               `Added ${title}`,
               [
+                // Too far to walk to: the drive goes in first, ending where the
+                // stop starts.
+                ...(drive && hit.lonLat
+                  ? [
+                      {
+                        op: "add" as const,
+                        path: `/nodes/${crypto.randomUUID()}`,
+                        value: {
+                          kind: "transfer",
+                          placeId: null,
+                          lonLat: hit.lonLat,
+                          startsAt: drive.startsAt,
+                          durationMin: drive.durationMin,
+                          indoor: false,
+                          meta: { title: `Drive to ${hit.name}`, urban: false },
+                        },
+                      },
+                    ]
+                  : []),
                 {
                   op: "add",
                   path: `/nodes/${crypto.randomUUID()}`,

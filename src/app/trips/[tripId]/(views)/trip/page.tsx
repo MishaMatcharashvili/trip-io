@@ -3,6 +3,7 @@ import { georgiaMapStops, getTrip, type Trip, todayWeather } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { DayAccordion, type DayRow } from "@/features/day-accordion";
 import { DayEditor } from "@/features/day-editor";
+import { dayTiming } from "@/features/day-timing";
 import { CheckpointList } from "@/features/itinerary";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { forecastRibbon } from "@/features/shared-reads";
@@ -167,6 +168,10 @@ export default async function FullTripPage({
   // An open recommendation touches the days its matched stops are on.
   const recommendation = screen.alerts.alerts.find((a) => a.outcome === null);
 
+  // What is wrong with each day's times, and the room between its stops: one
+  // read of the document, for every day's panel.
+  const timing = dayTiming(screen.doc, screen.places);
+
   const rows = await Promise.all(
     trip.days.map(async (day): Promise<DayRow> => {
       const near = centroid(mapStops(day));
@@ -200,6 +205,12 @@ export default async function FullTripPage({
                 date={day.date}
                 stops={day.checkpoints}
                 near={near}
+                problems={timing.problems.get(day.date) ?? []}
+                gaps={Object.fromEntries(
+                  day.checkpoints.flatMap((c) =>
+                    timing.gaps[c.id] ? [[c.id, timing.gaps[c.id]]] : [],
+                  ),
+                )}
                 openAdd={isOpen && firstParam(query.add) === "1"}
                 initialQuery={isOpen ? firstParam(query.q) : undefined}
               />
