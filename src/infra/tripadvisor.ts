@@ -187,6 +187,7 @@ export function toPhotos(body: unknown): Photo[] {
     width: p.photo.original_width ?? 4,
     height: p.photo.original_height ?? 3,
     caption: p.caption?.trim() || null,
+    credit: null,
     by:
       p.source?.name === "Management"
         ? "venue"

@@ -40,6 +40,11 @@ export type Photo = {
   caption: string | null;
   /** The venue's own picture, or a traveller's. */
   by: "venue" | "traveller" | null;
+  /**
+   * Who took it and under what licence, with a link to where it lives. Every
+   * freely licensed photograph carries one; the licence asks for it.
+   */
+  credit: { text: string; url: string } | null;
 };
 
 export type Enrichment = {
@@ -122,6 +127,16 @@ export type KeptContent = {
     outcome: EnrichOutcome,
     ttlSeconds: number,
   ): Promise<void>;
+};
+
+/** Photographs of a place from a source that is not a review site. */
+export type PhotoOutcome =
+  | { ok: true; photos: Photo[] }
+  | { ok: false; reason: EnrichFailure };
+
+export type PhotoSource = {
+  /** Photographs of this place, and only of it: nothing that merely is nearby. */
+  find(place: PlaceIdentity): Promise<PhotoOutcome>;
 };
 
 // Matching ------------------------------------------------------------------
