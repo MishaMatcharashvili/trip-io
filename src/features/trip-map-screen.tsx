@@ -60,11 +60,14 @@ export function TripMapScreen({
   stops,
   events = [],
   cards,
+  routed = true,
   dimmed = false,
 }: {
   stops: MapStop[];
   events?: MapEvent[];
   cards: StopCard[];
+  /** Draw the road between the stops: only for one day's, never several days'. */
+  routed?: boolean;
   dimmed?: boolean;
 }) {
   const router = useRouter();
@@ -82,8 +85,8 @@ export function TripMapScreen({
     selected: chosen,
     select: pickRoute,
     refresh,
-  } = useTripRoute(stops, {
-    alternatives: stops.length === 2,
+  } = useTripRoute(routed ? stops : [], {
+    alternatives: routed && stops.length === 2,
   });
   const view = describeRoute(route, chosen, stops, new Date());
   const mapsUrl = googleMapsDirectionsUrl(stops.map((s) => s.lonLat));

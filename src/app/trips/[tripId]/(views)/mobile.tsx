@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MobileHeader } from "@/features/chrome";
 import { CommandBar } from "@/features/command-bar";
+import { DayStrip } from "@/features/day-strip";
 import {
   ConnectionSwitch,
   KeepPlanAction,
@@ -9,7 +10,6 @@ import {
 import { dayHref } from "@/features/trip-links";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
-import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
 import { Sheet } from "@/ui/sheet";
 import { Eyebrow, Headline, Num, Prose, Title } from "@/ui/text";
@@ -117,10 +117,9 @@ function MobileCalm({ view }: { view: OverviewView }) {
 
 export function ActiveTripMobile({ view }: { view: OverviewView }) {
   const { trip, day, state } = view;
+  const all = view.mode === "all";
   const now = day.checkpoints.find((c) => c.state === "now");
   const next = day.checkpoints.find((c) => c.state === "upcoming");
-  const done = day.checkpoints.filter((c) => c.state === "done").length;
-  const left = day.checkpoints.length - done - (now ? 1 : 0);
 
   return (
     <div className="lg:hidden">
@@ -149,9 +148,17 @@ export function ActiveTripMobile({ view }: { view: OverviewView }) {
         <div className="flex items-start gap-2.5 px-4 pb-2.5 pt-1">
           <div className="flex flex-1 flex-col gap-0.5">
             <Eyebrow tone="agent">
-              {now ? "Now" : day.state === "today" ? "Today" : day.stamp}
+              {all
+                ? "Whole trip"
+                : now
+                  ? "Now"
+                  : day.state === "today"
+                    ? "Today"
+                    : day.stamp}
             </Eyebrow>
-            <Title className="text-[16px]">{now?.title ?? day.summary}</Title>
+            <Title className="text-[16px]">
+              {all ? `${trip.dayCount} days` : (now?.title ?? day.summary)}
+            </Title>
           </div>
           {view.next ? (
             <div className="flex flex-col items-end gap-0.5">
@@ -185,17 +192,18 @@ export function ActiveTripMobile({ view }: { view: OverviewView }) {
           </Link>
         ) : null}
 
-        <div className="flex items-center gap-2 px-4 pb-2.5">
-          <Chip size="sm">{done} done</Chip>
-          <Chip size="sm">
-            {left} left {day.state === "today" ? "today" : ""}
-          </Chip>
-          <div className="flex-1" />
+        <div className="flex items-center gap-3 px-4 pb-2.5">
+          <DayStrip
+            tripId={trip.id}
+            chips={view.days}
+            selected={view.selected}
+            className="min-w-0 flex-1"
+          />
           <Link
-            href={dayHref(trip.id, day.id)}
-            className="text-mini font-medium text-agent"
+            href={all ? `/trips/${trip.id}/trip` : dayHref(trip.id, day.id)}
+            className="shrink-0 text-mini font-medium text-agent"
           >
-            Expand itinerary
+            {all ? "Plan" : "Open day"}
           </Link>
         </div>
 

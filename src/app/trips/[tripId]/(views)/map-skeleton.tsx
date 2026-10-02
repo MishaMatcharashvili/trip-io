@@ -1,7 +1,6 @@
 import { WatchStrip } from "@/features/watch-strip";
 import { Button } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
-import { Chip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
 import { Sheet } from "@/ui/sheet";
@@ -95,6 +94,14 @@ export function MapSkeleton() {
             </div>
             <div className="pt-3">{bar("h-[9px] w-[52px]")}</div>
           </div>
+          <div className="flex gap-1.5 overflow-hidden px-4 pb-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="h-[42px] w-[44px] shrink-0 rounded-[10px] bg-track"
+              />
+            ))}
+          </div>
           <div className="px-4 pb-3">
             <div className="h-[52px] rounded-[6px] bg-track" />
           </div>
@@ -165,16 +172,17 @@ export function MapSkeleton() {
             </div>
             <Icon name="chevronRight" size={16} className="text-ink-faint" />
           </div>
-          <div className="flex items-center gap-2 px-4 pb-2.5">
-            <Chip size="sm">
-              <span className="h-[9px] w-[34px] rounded-[3px] bg-track" />
-            </Chip>
-            <Chip size="sm">
-              <span className="h-[9px] w-[42px] rounded-[3px] bg-track" />
-            </Chip>
-            <div className="flex-1" />
-            <span className="text-mini font-medium text-agent">
-              Expand itinerary
+          <div className="flex items-center gap-3 px-4 pb-2.5">
+            <div className="flex min-w-0 flex-1 gap-1.5 overflow-hidden">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="h-[42px] w-[44px] shrink-0 rounded-[10px] bg-track"
+                />
+              ))}
+            </div>
+            <span className="shrink-0 text-mini font-medium text-agent">
+              Open day
             </span>
           </div>
           <CommandBarShell compact className="mx-4 mb-3.5" />

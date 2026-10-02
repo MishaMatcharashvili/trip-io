@@ -13,6 +13,7 @@ import {
   watchStrip,
 } from "@/data/trip";
 import type { LonLat } from "@/domain/geo";
+import { chipsFor } from "@/features/day-strip-model";
 import { forecastRibbon } from "@/features/shared-reads";
 import { dayHref } from "@/features/trip-links";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
@@ -23,6 +24,7 @@ import {
   duration,
   mapStops,
   timeRange,
+  tripStops,
   weatherView,
 } from "@/features/trip-model";
 import { type LoadedTrip, loadTrip, pickDay } from "../load";
@@ -43,15 +45,6 @@ const kindWords: Record<string, string> = {
   stay: "Stay",
 };
 
-function dayNav(trip: Trip, day: Day) {
-  const href = (d: Day | undefined) =>
-    d ? `/trips/${trip.id}?day=${d.id}` : null;
-  return {
-    previous: href(trip.days[day.index - 2]),
-    next: href(trip.days[day.index]),
-  };
-}
-
 function stopCards(trip: Trip, day: Day, alertHref?: string): StopCard[] {
   return day.checkpoints.map((c) => ({
     id: c.id,
@@ -66,11 +59,18 @@ function stopCards(trip: Trip, day: Day, alertHref?: string): StopCard[] {
 }
 
 /** The canvas's Georgia trip: the reference render `/design` links to. */
-function fixtureView(trip: Trip, rawState: string | string[] | undefined) {
+function fixtureView(
+  trip: Trip,
+  rawState: string | string[] | undefined,
+  wantedDay: string | undefined,
+) {
   const state = parseState(rawState);
+  const all = wantedDay === "all";
   // The calm state is a different day on purpose: day 5 is what most days look
   // like, and the screen has to look deliberate rather than empty.
-  const day = trip.days[state === "calm" ? 4 : 2];
+  const day =
+    trip.days.find((d) => d.id === wantedDay) ??
+    trip.days[state === "calm" ? 4 : 2];
   const view: OverviewView = {
     trip,
     day,
@@ -110,7 +110,9 @@ function fixtureView(trip: Trip, rawState: string | string[] | undefined) {
       { name: "Transport", seen: "Last seen 12:48" },
       { name: "Local events", seen: "Last seen 12:20" },
     ],
-    dayNav: { previous: null, next: null },
+    days: chipsFor(trip.days),
+    selected: all ? "all" : day.id,
+    mode: all ? "all" : "day",
     addStopHref: dayHref(trip.id, day.id),
     next: { time: "15:10", label: "38 km left" },
   };
@@ -118,7 +120,9 @@ function fixtureView(trip: Trip, rawState: string | string[] | undefined) {
     view,
     stops: georgiaMapStops,
     route: undefined,
-    cards: stopCards(trip, trip.days[2]),
+    cards: all
+      ? trip.days.flatMap((d) => stopCards(trip, d))
+      : stopCards(trip, trip.days[2]),
     events: [],
   };
 }
@@ -130,8 +134,14 @@ async function realView(
   now: Date,
 ) {
   const offer = await offerFor(trip.id, userId);
-  const day = pickDay(trip, wantedDay) ?? trip.days[trip.currentDay - 1];
-  const stops = mapStops(day);
+  // "All": every day on the map at once. The panel and the sheet still need a
+  // day for what is about today (the next stop, the calm note), so the trip's
+  // current one stands in for them.
+  const all = wantedDay === "all";
+  const day = all
+    ? trip.days[trip.currentDay - 1]
+    : (pickDay(trip, wantedDay) ?? trip.days[trip.currentDay - 1]);
+  const stops = all ? tripStops(trip) : mapStops(day);
 
   // The newest thing still waiting for an answer, if any: the advisory card.
   const open = screen.alerts.alerts.find((a) => a.outcome === null);
@@ -147,12 +157,13 @@ async function realView(
       ? changeRows(screen.before, screen.doc)
       : null;
 
-  const centre = stops.length
-    ? ([
-        stops.reduce((s, p) => s + p.lonLat[0], 0) / stops.length,
-        stops.reduce((s, p) => s + p.lonLat[1], 0) / stops.length,
-      ] as LonLat)
-    : null;
+  const centre =
+    stops.length && !all
+      ? ([
+          stops.reduce((s, p) => s + p.lonLat[0], 0) / stops.length,
+          stops.reduce((s, p) => s + p.lonLat[1], 0) / stops.length,
+        ] as LonLat)
+      : null;
   const forecast =
     centre && day.date ? await forecastRibbon(centre, day.date) : null;
 
@@ -229,7 +240,9 @@ async function realView(
         name: s.name,
         seen: screen.lastCheck ? `Last checked ${checked}` : "Not checked yet",
       })),
-    dayNav: dayNav(trip, day),
+    days: chipsFor(trip.days),
+    selected: all ? "all" : day.id,
+    mode: all ? "all" : "day",
     addStopHref: dayHref(trip.id, day.id, { add: true }),
     next: next ? { time: next.time, label: "Next stop" } : null,
   };
@@ -237,7 +250,9 @@ async function realView(
   return {
     view,
     stops,
-    cards: stopCards(trip, day, alertHref),
+    cards: all
+      ? trip.days.flatMap((d) => stopCards(trip, d, alertHref))
+      : stopCards(trip, day, alertHref),
     events: screen.events,
   };
 }
@@ -251,7 +266,7 @@ export default async function ActiveTripPage({
 
   const fixture = getTrip(tripId);
   const { view, stops, cards, events } = fixture
-    ? fixtureView(fixture, state)
+    ? fixtureView(fixture, state, typeof day === "string" ? day : undefined)
     : await realView(
         await loadTrip(tripId),
         typeof day === "string" ? day : undefined,
@@ -267,6 +282,8 @@ export default async function ActiveTripPage({
         stops={stops}
         events={events}
         cards={cards}
+        // One road for one day: across the whole trip it would join the days.
+        routed={view.mode === "day"}
         dimmed={view.forcePaused}
       />
       <ActiveTripDesktop view={view} />

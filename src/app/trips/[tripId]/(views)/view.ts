@@ -1,5 +1,6 @@
 import type { WatchOffer } from "@/bll/watch-pass";
 import type { Advisory, Day, Opportunity, Trip } from "@/data/trip";
+import type { DayChip } from "@/features/day-strip-model";
 import type { ChangeRow } from "@/features/trip-model";
 import type { WeatherHour } from "@/ui/bars";
 import type { Tone } from "@/ui/cx";
@@ -52,8 +53,11 @@ export type OverviewView = {
   calmHeadline: string;
   calmNote: string;
   pausedSources: { name: string; seen: string }[];
-  /** Neighbouring days of the itinerary panel, as links. */
-  dayNav: { previous: string | null; next: string | null };
+  /** The strip of days along the map, and which is chosen ("all" or a day's id). */
+  days: DayChip[];
+  selected: string;
+  /** One day on the map and in the panel, or every day at once. */
+  mode: "day" | "all";
   addStopHref: string;
   /** The sheet's right-hand figure on a phone: the next stop's time. */
   next: { time: string; label: string } | null;

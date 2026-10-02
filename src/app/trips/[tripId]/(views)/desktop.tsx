@@ -5,13 +5,17 @@ import {
   OpportunityCard,
 } from "@/features/advisory";
 import { CommandBar } from "@/features/command-bar";
+import { DayStrip } from "@/features/day-strip";
+import { hrefFor } from "@/features/day-strip-model";
 import { CheckpointList } from "@/features/itinerary";
 import { ConnectionSwitch, UndoButton } from "@/features/trip-actions";
+import { dayHref } from "@/features/trip-links";
 import { WatchPassCard } from "@/features/watch-pass";
 import { WatchStrip } from "@/features/watch-strip";
 import { WeatherRibbon } from "@/ui/bars";
 import { Button, ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
+import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import { Eyebrow, Headline, Num } from "@/ui/text";
 import type { OverviewView } from "./view";
@@ -26,46 +30,83 @@ export const WATCH_STRIP_FRAME = "absolute bottom-[30px] left-6 z-20";
 export const COMMAND_BAR_FRAME =
   "absolute bottom-[30px] left-1/2 z-20 w-[520px] -translate-x-1/2";
 
-/** The day, floating over the map: weather ribbon first, then the nodes. */
+/** The days of the trip as one list: what "all" shows in place of a single day. */
+function AllDays({ view }: { view: OverviewView }) {
+  const { trip } = view;
+  return (
+    <div className="min-h-0 overflow-y-auto">
+      {trip.days.map((d, i) => (
+        <div key={d.id}>
+          {i > 0 ? <Divider /> : null}
+          <Link
+            href={hrefFor(trip.id, d.id)}
+            replace
+            scroll={false}
+            className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-canvas"
+          >
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <Num
+                className={
+                  d.state === "today"
+                    ? "text-mini font-semibold text-agent"
+                    : "text-mini text-ink-faint"
+                }
+              >
+                {d.stamp}
+              </Num>
+              <span className="truncate text-small font-medium">
+                {d.summary}
+              </span>
+              <span className="truncate text-mini text-ink-faint">
+                {d.route}
+              </span>
+            </div>
+            <Dot tone={d.watch.tone} />
+            <Icon name="chevronRight" size={14} className="text-ink-faint" />
+          </Link>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The day, floating over the map: its days to choose from, weather first, then the nodes. */
 function ItineraryPanel({ view }: { view: OverviewView }) {
-  const { trip, day, weather, dayNav } = view;
+  const { trip, day, weather } = view;
+  const all = view.mode === "all";
   const done = day.checkpoints.filter((c) => c.state === "done").length;
+  const stopCount = trip.days.reduce((n, d) => n + d.checkpoints.length, 0);
 
   return (
     <Panel className={ITINERARY_FRAME}>
-      <div className="flex items-start gap-2.5 px-4 pb-[11px] pt-3.5">
+      <div className="flex items-start gap-2.5 px-4 pb-2.5 pt-3.5">
         <div className="flex flex-1 flex-col gap-0.5">
           <Eyebrow>
-            {day.state === "today" ? "Today" : `Day ${day.index}`}
+            {all
+              ? "Whole trip"
+              : day.state === "today"
+                ? `Today · day ${day.index} of ${trip.dayCount}`
+                : `Day ${day.index} of ${trip.dayCount} · ${day.route}`}
           </Eyebrow>
-          <Headline>{day.title}</Headline>
+          <Headline>
+            {all ? `${trip.dayCount} days, ${stopCount} stops` : day.title}
+          </Headline>
         </div>
-        <div className="flex items-center gap-1 pt-3">
-          <Num className="mr-1 text-mini text-ink-faint">
+        {all ? null : (
+          <Num className="pt-3 text-mini text-ink-faint">
             {done}/{day.checkpoints.length}
           </Num>
-          {dayNav.previous ? (
-            <Link
-              href={dayNav.previous}
-              aria-label="Previous day"
-              className="text-ink-faint hover:text-ink"
-            >
-              <Icon name="chevronRight" size={15} className="rotate-180" />
-            </Link>
-          ) : null}
-          {dayNav.next ? (
-            <Link
-              href={dayNav.next}
-              aria-label="Next day"
-              className="text-ink-faint hover:text-ink"
-            >
-              <Icon name="chevronRight" size={15} />
-            </Link>
-          ) : null}
-        </div>
+        )}
       </div>
 
-      {weather ? (
+      <DayStrip
+        tripId={trip.id}
+        chips={view.days}
+        selected={view.selected}
+        className="px-4 pb-3"
+      />
+
+      {!all && weather ? (
         <div className="px-4 pb-3">
           <WeatherRibbon
             hours={weather.hours}
@@ -76,28 +117,34 @@ function ItineraryPanel({ view }: { view: OverviewView }) {
       ) : null}
 
       <Divider />
-      <div className="min-h-0 overflow-y-auto">
-        {day.checkpoints.length ? (
-          <CheckpointList day={day} trip={trip} linkPlaces />
-        ) : (
-          <p className="px-4 py-3 text-small text-ink-faint">
-            Nothing planned this day.
-          </p>
-        )}
-      </div>
+      {all ? (
+        <AllDays view={view} />
+      ) : (
+        <div className="min-h-0 overflow-y-auto">
+          {day.checkpoints.length ? (
+            <CheckpointList day={day} trip={trip} linkPlaces />
+          ) : (
+            <p className="px-4 py-3 text-small text-ink-faint">
+              Nothing planned this day.
+            </p>
+          )}
+        </div>
+      )}
       <Divider />
 
       <div className="flex items-center gap-2 px-4 py-2.5">
         <Link
-          href={`/trips/${trip.id}/trip`}
+          href={all ? `/trips/${trip.id}/trip` : dayHref(trip.id, day.id)}
           className="text-small font-medium text-agent"
         >
-          Open full trip
+          {all ? "Open the plan" : "Open this day"}
         </Link>
         <div className="flex-1" />
-        <ButtonLink href={view.addStopHref} size="sm">
-          Add stop
-        </ButtonLink>
+        {all ? null : (
+          <ButtonLink href={view.addStopHref} size="sm">
+            Add stop
+          </ButtonLink>
+        )}
       </div>
     </Panel>
   );
