@@ -99,7 +99,7 @@ function SeasonFind() {
           weekend.
         </Prose>
         <div>
-          <ButtonLink href="/new" size="sm">
+          <ButtonLink href="/#plan" size="sm">
             Plan a Kakheti weekend
           </ButtonLink>
         </div>

@@ -58,7 +58,7 @@ function AddToTrip({ hit, trips }: { hit: Hit; trips: TripRef[] | null }) {
         size="sm"
         onClick={() => {
           if (trips === null) router.push("/sign-in?next=/explore");
-          else if (current.length === 0) router.push("/new");
+          else if (current.length === 0) router.push("/#plan");
           else if (current.length === 1) go(current[0]);
           else setOpen((v) => !v);
         }}
