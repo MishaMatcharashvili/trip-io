@@ -1,5 +1,5 @@
 import { SkeletonLine } from "@/ui/bars";
-import { Card, Divider, Panel } from "@/ui/card";
+import { Card, Divider } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { BottomNav, homeTabs } from "@/ui/nav";
 import { TopBar } from "./chrome";
@@ -27,14 +27,27 @@ function Lines({ widths }: { widths: string[] }) {
   );
 }
 
-/** A page outside the map: a heading and a column of cards. */
-export function PageSkeleton() {
+/**
+ * A page outside a trip: a heading and a column of cards. `max` is the page's
+ * own column width and `active` the top-bar link it belongs under, so a page
+ * that is narrower than the usual one is drawn narrower while it loads.
+ */
+export function PageSkeleton({
+  max = "1080px",
+  active,
+}: {
+  max?: string;
+  active?: string;
+}) {
   return (
     <>
-      <TopBar watch="none" />
+      <TopBar watch="none" active={active} />
       <main className="flex-1 pb-24 lg:pb-0" aria-busy="true">
         <span className="sr-only">Loading</span>
-        <div className="mx-auto flex w-full max-w-[1080px] animate-breathe flex-col gap-6 px-4 py-6 lg:px-0 lg:py-10">
+        <div
+          style={{ maxWidth: max }}
+          className="mx-auto flex w-full animate-breathe flex-col gap-6 px-4 py-6 lg:px-0 lg:py-10"
+        >
           <div className="flex flex-col gap-3">
             <Bar className="h-[26px] w-[42%] lg:h-[31px] lg:w-[28%]" />
             <SkeletonLine width="56%" />
@@ -61,33 +74,5 @@ export function PageSkeleton() {
       </main>
       <BottomNav items={homeTabs} active="" />
     </>
-  );
-}
-
-/**
- * The trip's map screen: the map's ground colour where the map will be, and
- * the day panel (the sheet, on a phone) floating over it. The map itself
- * arrives with the page, borrowed from the pool, so there is nothing to fake.
- */
-export function TripMapSkeleton() {
-  return (
-    <div className="flex h-dvh flex-col">
-      <TopBar watch="none" />
-      <div className="relative flex-1 overflow-hidden bg-map-ground">
-        <span className="sr-only">Loading</span>
-        <Panel className="absolute bottom-6 left-6 top-5 hidden w-[350px] animate-breathe flex-col gap-5 p-4 lg:flex">
-          <div className="flex flex-col gap-2.5">
-            <SkeletonLine width="22%" />
-            <Bar className="h-[20px] w-[64%]" />
-          </div>
-          <Bar className="h-[26px] w-full" />
-          <Lines widths={["74%", "58%", "81%", "49%", "66%"]} />
-        </Panel>
-        <div className="absolute inset-x-0 bottom-0 flex animate-breathe flex-col gap-4 rounded-t-sheet border-t border-hairline bg-surface px-5 pb-28 pt-5 shadow-sheet lg:hidden">
-          <Bar className="h-[20px] w-[58%]" />
-          <Lines widths={["78%", "61%", "70%"]} />
-        </div>
-      </div>
-    </div>
   );
 }

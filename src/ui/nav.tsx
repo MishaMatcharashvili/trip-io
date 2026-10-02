@@ -5,13 +5,14 @@ import { Icon, type IconName } from "./icon";
 
 export type NavItem = {
   label: string;
-  href: string;
+  /** Without one the tab is drawn but is not a link: the shell before it is known. */
+  href?: string;
   icon?: IconName;
   /** A coral pip on the tab, for something waiting on a decision. */
   badge?: boolean;
 };
 
-/** The desktop view switcher: Today · Map · Trip · AI. */
+/** The desktop view switcher: a trip's views. */
 export function PillNav({
   items,
   active,
@@ -23,20 +24,25 @@ export function PillNav({
     <nav className="flex gap-0.5 rounded-[10px] bg-track-pill p-[3px]">
       {items.map((item) => {
         const on = item.label === active;
-        return (
+        const className = cx(
+          "flex h-[30px] items-center rounded-control px-3.5 text-[13px] transition-colors",
+          on
+            ? "bg-surface font-medium text-ink shadow-card"
+            : "text-ink-muted hover:text-ink",
+        );
+        return item.href ? (
           <Link
             key={item.label}
             href={item.href}
             aria-current={on ? "page" : undefined}
-            className={cx(
-              "flex h-[30px] items-center rounded-control px-3.5 text-[13px] transition-colors",
-              on
-                ? "bg-surface font-medium text-ink shadow-card"
-                : "text-ink-muted hover:text-ink",
-            )}
+            className={className}
           >
             {item.label}
           </Link>
+        ) : (
+          <span key={item.label} className={className}>
+            {item.label}
+          </span>
         );
       })}
     </nav>
@@ -47,24 +53,23 @@ export function PillNav({
 export function BottomNav({
   items,
   active,
+  menu,
 }: {
   items: NavItem[];
   active: string;
+  /** A last slot that is not a page: the account menu, which opens in place. */
+  menu?: React.ReactNode;
 }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex h-20 border-t border-hairline bg-surface px-2 pb-[22px] lg:hidden">
       {items.map((item) => {
         const on = item.label === active;
-        return (
-          <Link
-            key={item.label}
-            href={item.href}
-            aria-current={on ? "page" : undefined}
-            className={cx(
-              "relative flex flex-1 flex-col items-center gap-1 pt-2.5",
-              on ? "text-agent" : "text-ink-faint",
-            )}
-          >
+        const className = cx(
+          "relative flex flex-1 flex-col items-center gap-1 pt-2.5",
+          on ? "text-agent" : "text-ink-faint",
+        );
+        const body = (
+          <>
             {item.icon ? (
               <Icon name={item.icon} size={21} strokeWidth={1.7} />
             ) : null}
@@ -78,19 +83,42 @@ export function BottomNav({
                 className="absolute right-[30px] top-1.5"
               />
             ) : null}
+          </>
+        );
+        return item.href ? (
+          <Link
+            key={item.label}
+            href={item.href}
+            aria-current={on ? "page" : undefined}
+            className={className}
+          >
+            {body}
           </Link>
+        ) : (
+          <span key={item.label} className={className}>
+            {body}
+          </span>
         );
       })}
+      {menu ? <div className="flex flex-1">{menu}</div> : null}
     </nav>
   );
 }
 
-/** The tabs a trip is read through. */
+/**
+ * The tabs a trip is read through: its plan, and its map. The AI's record and
+ * the watch's settings are in the account menu, not here, because they are
+ * about the traveller and the watch, not the trip's days.
+ */
 export const tripTabs = (tripId: string): NavItem[] => [
-  { label: "Today", href: `/trips/${tripId}/day/today`, icon: "calendar" },
-  { label: "Map", href: `/trips/${tripId}`, icon: "map" },
   { label: "Trip", href: `/trips/${tripId}/trip`, icon: "list" },
-  { label: "AI", href: `/trips/${tripId}/alerts`, icon: "sparkle" },
+  { label: "Map", href: `/trips/${tripId}`, icon: "map" },
+];
+
+/** The same two tabs before the trip is known: drawn, not yet links. */
+export const tripTabsShell: NavItem[] = [
+  { label: "Trip", icon: "list" },
+  { label: "Map", icon: "map" },
 ];
 
 /** The tabs outside a trip. */

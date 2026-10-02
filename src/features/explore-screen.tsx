@@ -2,14 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { prominence } from "@/domain/catalogue/prominence";
+import { dayHref } from "@/features/trip-links";
 import { apiClient } from "@/lib/hono-client";
 import { Button } from "@/ui/button";
 import { Card, Divider, Panel } from "@/ui/card";
 import { FilterChip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
+import { MapStyleSwitch } from "@/ui/map/map-style-switch";
 import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { Eyebrow, Headline, Prose, Title } from "@/ui/text";
+import { GROUPS, groupName } from "./explore-model";
+import { ExploreSkeleton } from "./explore-skeleton";
 import { SaveToggle } from "./save-toggle";
 
 // Explore: the catalogue searched live, on the map as it is filtered. The map
@@ -24,21 +29,13 @@ type Hit = {
   group: string;
   tier: "curated" | "verified" | "raw";
   lonLat: [number, number];
+  confidence?: number | null;
+  websites?: number;
 };
 
 type TripRef = { id: string; title: string; startsAt: string; endsAt: string };
 
 export type AreaChip = { slug: string; name: string; count: number };
-
-const GROUPS = [
-  ["heritage", "Heritage"],
-  ["nature", "Nature"],
-  ["food", "Food & wine"],
-  ["culture", "Culture"],
-  ["lodging", "Stay"],
-] as const;
-
-const groupName = Object.fromEntries(GROUPS) as Record<string, string>;
 
 const tierLine = {
   curated: "Checked by hand",
@@ -53,9 +50,7 @@ function AddToTrip({ hit, trips }: { hit: Hit; trips: TripRef[] | null }) {
   const current = (trips ?? []).filter((t) => t.endsAt.slice(0, 10) >= today);
 
   const go = (trip: TripRef) =>
-    router.push(
-      `/trips/${trip.id}/day/today?add=1&q=${encodeURIComponent(hit.name)}`,
-    );
+    router.push(dayHref(trip.id, "today", { add: true, q: hit.name }));
 
   return (
     <div className="relative">
@@ -63,7 +58,7 @@ function AddToTrip({ hit, trips }: { hit: Hit; trips: TripRef[] | null }) {
         size="sm"
         onClick={() => {
           if (trips === null) router.push("/sign-in?next=/explore");
-          else if (current.length === 0) router.push("/new");
+          else if (current.length === 0) router.push("/#plan");
           else if (current.length === 1) go(current[0]);
           else setOpen((v) => !v);
         }}
@@ -313,6 +308,14 @@ export function ExploreScreen({
     lonLat: h.lonLat,
     label: h.name,
     state: "upcoming",
+    // When pins are too close to draw apart, the one that stands for them is
+    // the place a traveller is most likely to be looking for.
+    weight: prominence({
+      category: h.category,
+      tier: h.tier,
+      confidence: h.confidence ?? null,
+      websites: h.websites ?? 0,
+    }),
   }));
 
   const select = (id: string) => {
@@ -344,8 +347,10 @@ export function ExploreScreen({
     />
   );
 
+  // Until the layout is known, the same shell the page's loading state draws,
+  // with the real regions and aside: nothing moves when the map arrives.
   if (desktop === null) {
-    return <div className="flex-1 bg-map-ground" aria-hidden="true" />;
+    return <ExploreSkeleton areas={areas} total={total} aside={aside} />;
   }
 
   return desktop ? (
@@ -374,6 +379,8 @@ export function ExploreScreen({
       <div className="absolute right-6 top-5 z-20 flex w-[340px] flex-col gap-3">
         {aside}
       </div>
+
+      <MapStyleSwitch className="absolute bottom-[30px] right-6 z-20 w-[260px] border border-hairline-strong bg-surface shadow-panel" />
     </div>
   ) : (
     /* Mobile — the map as a header, the catalogue as the sheet. */

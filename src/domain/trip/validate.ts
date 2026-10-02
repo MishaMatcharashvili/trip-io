@@ -65,6 +65,23 @@ export type Violation = {
   message: string;
 };
 
+/**
+ * The rules that are about when: a stop that overlaps another, a way too short
+ * to be travelled, a place that is closed or dark, a day that runs outside the
+ * trip or is too full. What is shown to a traveller after they edit a time;
+ * `tier` and `hours-unknown` are about the place, not the time.
+ */
+export const TIME_RULES: readonly Rule[] = [
+  "overlap",
+  "travel",
+  "closed",
+  "darkness",
+  "window",
+  "pace",
+];
+
+export const isTimeProblem = (v: Violation) => TIME_RULES.includes(v.rule);
+
 /** Legs longer than this need an explicit transfer node. */
 export const IMPLICIT_LEG_MAX_MIN = 30;
 /** Slack on top of travel time between consecutive stops: parking, paying, finding the door. */

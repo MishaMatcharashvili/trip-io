@@ -52,6 +52,7 @@ describe("the browser's Mapbox variables", () => {
     assert.deepEqual([...names].sort(), [
       "NEXT_PUBLIC_MAPBOX_STYLE_DARK",
       "NEXT_PUBLIC_MAPBOX_STYLE_LIGHT",
+      "NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN",
       "NEXT_PUBLIC_MAPBOX_TOKEN",
     ]);
   });

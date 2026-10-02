@@ -29,3 +29,18 @@ export function clusterIndex(stops: readonly StopPoint[]) {
   );
   return index;
 }
+
+export type Weighted = { id: string; weight?: number };
+
+/**
+ * Which of a group of stops stands for it. The one that matters most: the
+ * heaviest, and the earliest of equals so the same group always picks the same
+ * one and its pin does not jump between renders.
+ */
+export function leader<T extends Weighted>(members: readonly T[]): T {
+  let best = members[0];
+  for (const member of members) {
+    if ((member.weight ?? 0) > (best.weight ?? 0)) best = member;
+  }
+  return best;
+}

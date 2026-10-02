@@ -3,6 +3,7 @@ import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
 import { alertsPage } from "@/bll/interventions.ts";
+import { suggestForStop } from "@/bll/suggestions.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -13,6 +14,7 @@ import {
   duplicateTrip,
   history,
   previewPatch,
+  previewRetime,
   restoreTo,
   tripView,
   undoLast,
@@ -227,6 +229,71 @@ export const trips = new Hono<SessionEnv>()
         });
       }
       return c.json(result);
+    },
+  )
+
+  // An edit to one stop's time or length, and what it would push: a dry run for
+  // the day editor's preview. The ops it returns are applied through /patches.
+  .post(
+    "/:id/retime",
+    zValidator("param", params),
+    zValidator(
+      "json",
+      z
+        .object({
+          nodeId: z.uuid(),
+          startsAt: z.iso.datetime({ offset: true }).optional(),
+          durationMin: z.number().int().min(5).max(720).optional(),
+        })
+        .refine(
+          (b) => b.startsAt !== undefined || b.durationMin !== undefined,
+          {
+            message: "a start or a length",
+          },
+        ),
+    ),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const { nodeId, ...edit } = c.req.valid("json");
+      const preview = await previewRetime(id, nodeId, edit);
+      return preview.ok
+        ? c.json(preview)
+        : c.json({ error: preview.reason }, 404);
+    },
+  )
+
+  // Ways to change one stop. Read-only: the traveller applies one through
+  // /patches, as they would an edit of their own.
+  .post(
+    "/:id/suggest",
+    zValidator("param", params),
+    zValidator(
+      "json",
+      z.object({
+        nodeId: z.uuid(),
+        wish: z.string().trim().max(200).optional(),
+      }),
+    ),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const { nodeId, wish } = c.req.valid("json");
+      const outcome = await suggestForStop(
+        id,
+        c.get("userId"),
+        nodeId,
+        wish || null,
+      );
+      if (outcome.ok) return c.json(outcome);
+      return c.json(
+        { ok: false as const, reason: outcome.reason },
+        outcome.reason === "rate-limited" ? 429 : 404,
+      );
     },
   )
 

@@ -24,6 +24,32 @@ export const env = createEnv({
     ROUTES_USER_PER_DAY: z.coerce.number().int().positive().optional(),
     ROUTES_GLOBAL_PER_MINUTE: z.coerce.number().int().positive().optional(),
     ROUTES_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
+    /**
+     * Tripadvisor's Terra API key (src/infra/tripadvisor.ts), for the ratings,
+     * reviews and photos on a place. Server-only: it rides in a header to
+     * Tripadvisor and goes nowhere else. Unset, places show without them.
+     */
+    TRIPADVISOR_API_KEY: z.string().min(1).optional(),
+    /**
+     * What the place-enrichment use case will spend (src/bll/place-enrichment.ts).
+     * Each open place is about three billable calls, so these are what stand
+     * between a busy day and the bill. Unset, the defaults apply.
+     */
+    TRIPADVISOR_USER_PER_DAY: z.coerce.number().int().positive().optional(),
+    /**
+     * How long what Tripadvisor said about a place is kept in Redis, in
+     * seconds. Unset, 12 hours. 0 keeps nothing: the one switch back to
+     * reading the provider on every visit.
+     */
+    TRIPADVISOR_CONTENT_TTL_S: z.coerce.number().int().min(0).optional(),
+    /**
+     * Upstash Redis, over REST (src/infra/upstash.ts): where that content is
+     * kept. Vercel's Redis integration sets both under these names. Unset,
+     * nothing is kept and every visit asks the provider.
+     */
+    UPSTASH_REDIS_REST_URL: z.url().optional(),
+    UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+    TRIPADVISOR_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
   },
   client: {
     /**
@@ -49,11 +75,18 @@ export const env = createEnv({
       .string()
       .startsWith("mapbox://styles/")
       .optional(),
+    /** A Studio style for the Terrain choice; unset, Mapbox's outdoors style. */
+    NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN: z
+      .string()
+      .startsWith("mapbox://styles/")
+      .optional(),
   },
   experimental__runtimeEnv: {
     NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
     NEXT_PUBLIC_MAPBOX_STYLE_LIGHT: process.env.NEXT_PUBLIC_MAPBOX_STYLE_LIGHT,
     NEXT_PUBLIC_MAPBOX_STYLE_DARK: process.env.NEXT_PUBLIC_MAPBOX_STYLE_DARK,
+    NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN:
+      process.env.NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN,
   },
   // `.env.example` lists every key with an empty value; empty means unset.
   emptyStringAsUndefined: true,

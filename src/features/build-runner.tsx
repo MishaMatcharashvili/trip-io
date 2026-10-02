@@ -142,7 +142,7 @@ export function BuildRunner({
         <div className="mx-6 mb-6 flex flex-col gap-3 rounded-control bg-alert-tint px-3.5 py-3">
           <span className="text-small text-alert">{state.message}</span>
           <div>
-            <ButtonLink href="/new" size="sm">
+            <ButtonLink href="/#plan" size="sm">
               Change what I asked for
             </ButtonLink>
           </div>

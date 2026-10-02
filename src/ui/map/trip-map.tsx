@@ -16,13 +16,14 @@ import { env } from "../../lib/env.ts";
 import { cx } from "../cx.ts";
 import { mountOverlays, type Overlays } from "./overlays.ts";
 import {
-  applyScheme,
+  applyStyle,
   borrow,
   giveBack,
   type Lease,
   setInteractive,
 } from "./pool.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
+import { useMapStyle } from "./use-map-style.ts";
 
 // The real map: Mapbox GL JS, in Mapbox's light or dark style. The trip on top of it
 // follows the canvas — the route in periwinkle, because it is the plan the
@@ -52,6 +53,11 @@ export type MapStop = {
   category?: string;
   /** The place's own logo, drawn in the pin instead of a glyph when it loads. */
   logo?: string;
+  /**
+   * How much it matters, for the one that stands for a group when pins are too
+   * close to draw apart. Higher wins; nothing, 0.
+   */
+  weight?: number;
 };
 
 /**
@@ -208,11 +214,12 @@ export function TripMap({
     };
   }, [interactive]);
 
-  // A theme change restyles the map it is on: the style drops the trip's
-  // layers, and the overlays put them back when it has loaded.
+  // A theme or style change restyles the map it is on: the style drops the
+  // trip's layers, and the overlays put them back when it has loaded.
+  const style = useMapStyle();
   useEffect(() => {
-    if (lease) applyScheme(lease, theme === "dark" ? "dark" : "light");
-  }, [lease, theme]);
+    if (lease) applyStyle(lease, style, theme === "dark" ? "dark" : "light");
+  }, [lease, theme, style]);
 
   // The stops (stops.tsx): mounted once per borrowed map, then told what
   // changed. Removed again before the next borrower mounts its own.

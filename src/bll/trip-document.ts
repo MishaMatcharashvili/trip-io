@@ -29,9 +29,11 @@ import {
   patchOps,
   placeIdsInOps,
 } from "../domain/trip/patch.ts";
+import { type NodeEdit, type Pushed, retime } from "../domain/trip/retime.ts";
 import { straightLineTravel } from "../domain/trip/travel.ts";
 import {
   type Author,
+  isTimeProblem,
   type ProposalResult,
   type Violation,
   validateDoc,
@@ -391,6 +393,52 @@ export async function checkOps(
     travel: straightLineTravel,
     author,
   });
+}
+
+export type RetimePreview =
+  | {
+      ok: true;
+      /** The edit, then each later stop pushed: apply them as one patch. */
+      ops: PatchOp[];
+      pushed: Pushed[];
+      /** The push would cross midnight or the trip's end, so none is offered. */
+      overflow: boolean;
+      /** Everything about time still wrong on the affected days once applied. */
+      remaining: Violation[];
+    }
+  | { ok: false; reason: "not-found" | "no-such-stop" };
+
+/**
+ * An edit to one stop's time or length, with the pushes that make the day hold,
+ * and what would still be wrong after them. A dry run: nothing is written, and
+ * the traveller applies the ops through the ordinary patch route, as one change.
+ */
+export async function previewRetime(
+  tripId: string,
+  nodeId: string,
+  edit: NodeEdit,
+): Promise<RetimePreview> {
+  const trip = await loadTrip(tripId);
+  if (!trip) return { ok: false, reason: "not-found" };
+  if (!trip.doc.nodes[nodeId]) return { ok: false, reason: "no-such-stop" };
+
+  const places = await placeFacts(placeIdsOf(trip.doc));
+  const ctx = { places, travel: straightLineTravel };
+  const out = retime(trip.doc, nodeId, edit, ctx);
+  const checked = validateProposal(trip.doc, out.ops, {
+    ...ctx,
+    author: "user",
+  });
+
+  return {
+    ok: true,
+    ops: out.ops,
+    pushed: out.pushed,
+    overflow: out.overflow,
+    // For a traveller's own edit nothing but a place they may not use blocks,
+    // so this is the common case; the edit that does not apply has nothing to show.
+    remaining: checked.ok ? checked.violations.filter(isTimeProblem) : [],
+  };
 }
 
 /** The patch log, newest first. */

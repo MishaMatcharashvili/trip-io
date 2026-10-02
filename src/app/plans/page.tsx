@@ -6,17 +6,16 @@ import { myTrips } from "@/bll/trip-screen";
 import { passesHeldBy } from "@/bll/watch-pass";
 import { money, WATCH_PRICE } from "@/domain/billing/pricing";
 import { dayKey } from "@/domain/trip/document";
-import { TopBar } from "@/features/chrome";
+import { SiteFrame } from "@/features/site-frame";
 import { dateRange } from "@/features/trip-model";
 import { getAuth } from "@/infra/auth";
 import { Button, ButtonLink } from "@/ui/button";
 import { Card, Divider } from "@/ui/card";
-import { Chip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
-import { BottomNav, homeTabs } from "@/ui/nav";
 import { Display, Eyebrow, Headline, Num, Prose } from "@/ui/text";
+import { PlansColumn } from "./column";
 
 export const metadata: Metadata = { title: "Plans" };
 
@@ -90,27 +89,8 @@ export default async function PlansPage() {
   ];
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopBar watch="none" />
-
-      <main className="mx-auto flex w-full max-w-[980px] flex-1 flex-col items-center gap-7 px-4 pb-28 pt-8 lg:pb-14 lg:pt-11">
-        <div className="flex flex-col items-center gap-3">
-          <Chip>
-            <Dot tone="agent" />
-            Your plan
-          </Chip>
-          {/* The business model, stated plainly. */}
-          <Display className="text-center text-[28px] lg:text-[35px]">
-            Planning is free.
-            <br />
-            Watching is what you pay for.
-          </Display>
-          <Prose className="max-w-[520px] text-center">
-            Build as many trips as you like. When one becomes real, turn on the
-            watch layer and I will follow it for you until you are home.
-          </Prose>
-        </div>
-
+    <SiteFrame tab="Profile" watch="none">
+      <PlansColumn>
         <div className="grid w-full gap-[18px] lg:grid-cols-2">
           <Card className="flex flex-col gap-4 p-6">
             <div className="flex flex-col gap-1">
@@ -204,7 +184,7 @@ export default async function PlansPage() {
                 ))}
               </div>
             ) : (
-              <ButtonLink href="/new" variant="primary" block size="lg">
+              <ButtonLink href="/#plan" variant="primary" block size="lg">
                 {session ? "Plan a trip to watch" : "Plan your first trip"}
               </ButtonLink>
             )}
@@ -263,9 +243,7 @@ export default async function PlansPage() {
             ))}
           </Card>
         ) : null}
-      </main>
-
-      <BottomNav items={homeTabs} active="Profile" />
-    </div>
+      </PlansColumn>
+    </SiteFrame>
   );
 }

@@ -67,7 +67,8 @@ export function FilterChip({
   className,
 }: {
   selected: boolean;
-  onClick: () => void;
+  /** Without one the chip is drawn but does nothing: the shell before the page is live. */
+  onClick?: () => void;
   children: React.ReactNode;
   size?: "sm" | "md";
   className?: string;

@@ -108,6 +108,10 @@ shorter than the straight line across it, or a stop moved beyond its radius.
    does not stop a request. The application-level limits below do.
 3. **Style (optional).** To carry the Mist palette over, build a style in Mapbox Studio (light and
    dark) and set `NEXT_PUBLIC_MAPBOX_STYLE_LIGHT` / `_DARK` to their `mapbox://styles/...` URLs.
+   The traveller can also choose **Satellite** (`satellite-streets-v12`: imagery with the street names
+   on it) or **Terrain** (`outdoors-v12`: hillshade, contours, trails); those two look the same in
+   both themes. `NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN` swaps in a Studio style for Terrain; Satellite has no
+   custom variant. The choice is kept in the browser (`src/ui/map/map-style.ts`).
    Unset, Mapbox's `light-v11` and `dark-v11` are used.
 
 ## Environment
@@ -115,7 +119,7 @@ shorter than the straight line across it, or a stop moved beyond its radius.
 | Variable | Where | Purpose |
 |---|---|---|
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | browser, inlined at build | Public token (`pk.`), URL-restricted. Required on Vercel |
-| `NEXT_PUBLIC_MAPBOX_STYLE_LIGHT` / `_DARK` | browser, inlined at build | Optional Studio styles |
+| `NEXT_PUBLIC_MAPBOX_STYLE_LIGHT` / `_DARK` / `_TERRAIN` | browser, inlined at build | Optional Studio styles |
 | `MAPBOX_DIRECTIONS_TOKEN` | server only | Directions token. Unset → routes answer "not configured" |
 | `ROUTES_USER_PER_MINUTE` / `ROUTES_USER_PER_DAY` | server | Per-traveller limits (defaults 20 / 200) |
 | `ROUTES_GLOBAL_PER_MINUTE` | server | Directions calls for everyone per minute (default 200; Mapbox's own ceiling is 300) |
@@ -138,7 +142,7 @@ was verified from Mapbox's pricing while this was written.
 
 | Usage | Note |
 |---|---|
-| A map instantiated in the browser (a "map load") | Once per visit to a screen with a map, not per pan or zoom. The pool (`src/ui/map/pool.ts`) reuses one map across pages, and a theme change restyles it rather than building another |
+| A map instantiated in the browser (a "map load") | Once per visit to a screen with a map, not per pan or zoom. The pool (`src/ui/map/pool.ts`) reuses one map across pages, and a theme or base-map change (Map, Satellite, Terrain) restyles it rather than building another, so switching costs no map load |
 | A Directions request | One per change of a shown route's stops or mode (debounced 400 ms), or per press of *Refresh* / *Try again*. A trip of more than 25 stops asks once per 24 stretches |
 | The traffic layer | Vector tile requests. The layer is hidden by default, and a hidden layer requests no tiles; it asks nothing of Directions |
 

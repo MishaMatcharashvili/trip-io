@@ -1,5 +1,5 @@
 import type { ChangeRow } from "@/domain/watch/briefing";
-import { AccountButton } from "@/features/chrome";
+import { AccountButton, TripBottomNav } from "@/features/chrome";
 import { ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Chip } from "@/ui/chip";
@@ -7,7 +7,6 @@ import { cx, type Tone } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
 import { BasemapMobileRoute } from "@/ui/map/basemap-mobile-route";
-import { BottomNav, tripTabs } from "@/ui/nav";
 import { Display, Eyebrow, Num, Prose } from "@/ui/text";
 
 /**
@@ -61,7 +60,7 @@ export function BriefingScreen({ view }: { view: BriefingView }) {
           {view.sourceCount === 1 ? "source" : "sources"}
         </Chip>
         <div className="flex-1" />
-        <AccountButton floating />
+        <AccountButton floating tripId={view.tripId} />
       </div>
 
       <main className="relative z-10 mt-[214px] flex flex-1 flex-col rounded-t-[20px] border-t border-hairline bg-surface shadow-sheet lg:mx-auto lg:mt-[240px] lg:w-[560px] lg:rounded-[20px] lg:border">
@@ -157,7 +156,7 @@ export function BriefingScreen({ view }: { view: BriefingView }) {
       </main>
 
       <div className="h-20 lg:hidden" />
-      <BottomNav items={tripTabs(view.tripId)} active="Today" />
+      <TripBottomNav tripId={view.tripId} active="Trip" />
     </div>
   );
 }
