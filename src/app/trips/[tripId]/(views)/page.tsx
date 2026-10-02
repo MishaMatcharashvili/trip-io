@@ -22,6 +22,7 @@ import {
   detectorStrip,
   duration,
   mapStops,
+  timeRange,
   weatherView,
 } from "@/features/trip-model";
 import { type LoadedTrip, loadTrip, pickDay } from "../load";
@@ -55,7 +56,7 @@ function stopCards(trip: Trip, day: Day, alertHref?: string): StopCard[] {
   return day.checkpoints.map((c) => ({
     id: c.id,
     title: c.title,
-    time: c.time,
+    time: c.node ? timeRange(c.node) : c.time,
     duration: c.node ? duration(c.node.durationMin) : (c.detail ?? ""),
     kind: c.node ? kindWords[c.node.kind] : c.indoor ? "Indoors" : "Outdoors",
     conflict: c.conflict,

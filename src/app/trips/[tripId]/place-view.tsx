@@ -9,7 +9,7 @@ import { RoutedTripMap } from "@/features/routed-trip-map";
 import { SaveToggle } from "@/features/save-toggle";
 import { RemoveStopButton } from "@/features/trip-actions";
 import { dayHref } from "@/features/trip-links";
-import { duration, mapStops } from "@/features/trip-model";
+import { duration, mapStops, timeRange } from "@/features/trip-model";
 import { Button, ButtonLink } from "@/ui/button";
 import type { Tone } from "@/ui/cx";
 import { cx } from "@/ui/cx";
@@ -352,7 +352,7 @@ export function PlaceBody({
 
       <Stats
         items={[
-          { label: "Scheduled", value: stop.time },
+          { label: "Scheduled", value: timeRange(node) },
           { label: "Takes", value: duration(node.durationMin) },
           { label: "Kind", value: kindWords[node.kind] },
           {

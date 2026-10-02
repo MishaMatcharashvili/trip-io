@@ -296,7 +296,7 @@ export function TripMapScreen({
               <Title className="text-[15px]">{card.title}</Title>
               <div className="flex gap-3.5">
                 {[
-                  { label: "Starts", value: card.time },
+                  { label: "Time", value: card.time },
                   { label: "Takes", value: card.duration },
                   { label: "Kind", value: card.kind },
                 ].map((stat) => (

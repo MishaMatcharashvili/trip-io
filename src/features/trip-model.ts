@@ -12,6 +12,7 @@ import {
   nodeEnd,
   sortedNodes,
   type TripDoc,
+  type TripNode,
 } from "../domain/trip/document.ts";
 import { addDays } from "../domain/trip/generate/schedule.ts";
 import { at, kindLabel } from "../domain/watch/briefing.ts";
@@ -192,6 +193,38 @@ function daySegments(
   return segments;
 }
 
+/** When a stop ends, as a Tbilisi clock time: "12:30". */
+export const endClock = (
+  node: Pick<TripNode, "startsAt" | "durationMin">,
+): string =>
+  at(
+    new Date(Date.parse(node.startsAt) + node.durationMin * MIN).toISOString(),
+  );
+
+/** "11:00–12:30": a stop's whole time, for where one figure is all there is room for. */
+export const timeRange = (
+  node: Pick<TripNode, "startsAt" | "durationMin">,
+): string => `${at(node.startsAt)}–${endClock(node)}`;
+
+/**
+ * The line under a stop: how long, and until when. A row that showed only a
+ * start and a length made an overlap invisible — 11:00 for 90 minutes and the
+ * next at 11:30 read as two ordinary rows — so the end is always on it.
+ */
+export function stopDetail(
+  node: Pick<TripNode, "kind" | "startsAt" | "durationMin">,
+  category?: string,
+): string {
+  const until = `until ${endClock(node)}`;
+  if (node.kind === "stay") return "Your base tonight";
+  if (node.kind === "transfer") {
+    return `Drive · ${duration(node.durationMin)} · ${until}`;
+  }
+  return [duration(node.durationMin), until, category?.replace(/_/g, " ")]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** A real trip, shaped like the fixture the screens were built against. */
 export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
   const { doc } = screen;
@@ -215,14 +248,7 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
       const end = nodeEnd(node);
       const place = node.placeId ? screen.places[node.placeId] : undefined;
       const match = conflicts.get(id);
-      const detail =
-        node.kind === "transfer"
-          ? `Drive · ${duration(node.durationMin)}`
-          : node.kind === "stay"
-            ? "Your base tonight"
-            : [duration(node.durationMin), place?.category.replace(/_/g, " ")]
-                .filter(Boolean)
-                .join(" · ");
+      const detail = stopDetail(node, place?.category);
       return {
         id,
         time: at(node.startsAt),
