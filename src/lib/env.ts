@@ -75,11 +75,18 @@ export const env = createEnv({
       .string()
       .startsWith("mapbox://styles/")
       .optional(),
+    /** A Studio style for the Terrain choice; unset, Mapbox's outdoors style. */
+    NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN: z
+      .string()
+      .startsWith("mapbox://styles/")
+      .optional(),
   },
   experimental__runtimeEnv: {
     NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
     NEXT_PUBLIC_MAPBOX_STYLE_LIGHT: process.env.NEXT_PUBLIC_MAPBOX_STYLE_LIGHT,
     NEXT_PUBLIC_MAPBOX_STYLE_DARK: process.env.NEXT_PUBLIC_MAPBOX_STYLE_DARK,
+    NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN:
+      process.env.NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN,
   },
   // `.env.example` lists every key with an empty value; empty means unset.
   emptyStringAsUndefined: true,

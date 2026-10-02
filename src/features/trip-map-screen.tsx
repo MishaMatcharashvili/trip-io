@@ -8,6 +8,7 @@ import { Divider, Panel } from "@/ui/card";
 import { Toggle } from "@/ui/control";
 import { Dot } from "@/ui/dot";
 import { Icon } from "@/ui/icon";
+import { MapStyleSwitch } from "@/ui/map/map-style-switch";
 import { googleMapsDirectionsUrl } from "@/ui/map/open-in-maps";
 import {
   defaultLayers,
@@ -145,9 +146,10 @@ export function TripMapScreen({
         />
       ) : null}
 
-      {layout === "mobile" && stops.length >= 2 ? (
+      {layout === "mobile" ? (
         <div className="absolute bottom-[356px] right-3 z-20 flex max-w-[calc(100%-24px)] flex-col items-end gap-2 lg:hidden">
-          {routeOpen ? (
+          <MapStyleSwitch variant="step" />
+          {stops.length >= 2 && routeOpen ? (
             <Panel className="w-[264px] p-3">
               <RouteSection
                 view={view}
@@ -157,18 +159,20 @@ export function TripMapScreen({
               />
             </Panel>
           ) : null}
-          <button
-            type="button"
-            aria-expanded={routeOpen}
-            onClick={() => setRouteOpen((open) => !open)}
-            className="rounded-full border border-hairline-strong bg-surface px-3 py-1.5 text-mini font-medium shadow-panel"
-          >
-            {view.kind === "ready"
-              ? `${view.time} · ${view.distance}`
-              : view.kind === "loading"
-                ? "Finding the road…"
-                : "Route"}
-          </button>
+          {stops.length >= 2 ? (
+            <button
+              type="button"
+              aria-expanded={routeOpen}
+              onClick={() => setRouteOpen((open) => !open)}
+              className="rounded-full border border-hairline-strong bg-surface px-3 py-1.5 text-mini font-medium shadow-panel"
+            >
+              {view.kind === "ready"
+                ? `${view.time} · ${view.distance}`
+                : view.kind === "loading"
+                  ? "Finding the road…"
+                  : "Route"}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -214,6 +218,14 @@ export function TripMapScreen({
             mapsUrl={mapsUrl}
             className="px-3.5 py-2.5"
           />
+          <Divider />
+          <div className="px-3.5 py-2.5">
+            <Eyebrow>Base map</Eyebrow>
+          </div>
+          <Divider />
+          <div className="px-3.5 py-2.5">
+            <MapStyleSwitch />
+          </div>
           <Divider />
           <div className="px-3.5 py-2.5">
             <Eyebrow>Layers</Eyebrow>

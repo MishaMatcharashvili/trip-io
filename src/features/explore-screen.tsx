@@ -9,6 +9,7 @@ import { Card, Divider, Panel } from "@/ui/card";
 import { FilterChip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
+import { MapStyleSwitch } from "@/ui/map/map-style-switch";
 import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { Eyebrow, Headline, Prose, Title } from "@/ui/text";
 import { GROUPS, groupName } from "./explore-model";
@@ -367,6 +368,8 @@ export function ExploreScreen({
       <div className="absolute right-6 top-5 z-20 flex w-[340px] flex-col gap-3">
         {aside}
       </div>
+
+      <MapStyleSwitch className="absolute bottom-[30px] right-6 z-20 w-[260px] border border-hairline-strong bg-surface shadow-panel" />
     </div>
   ) : (
     /* Mobile — the map as a header, the catalogue as the sheet. */

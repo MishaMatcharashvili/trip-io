@@ -282,7 +282,10 @@ function StopPin({
   );
 
   const name = labelled ? (
-    <span className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap text-[12px] font-medium text-map-label-strong [text-shadow:0_0_3px_var(--color-map-ground),0_0_3px_var(--color-map-ground),0_0_6px_var(--color-map-ground)]">
+    <span
+      data-stop-label
+      className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap text-[12px] font-medium text-map-label-strong [text-shadow:0_0_3px_var(--color-map-ground),0_0_3px_var(--color-map-ground),0_0_6px_var(--color-map-ground)]"
+    >
       {stop.label}
     </span>
   ) : null;
