@@ -16,6 +16,13 @@ import { Eyebrow, Num } from "@/ui/text";
 // Which is open at first is the server's decision (the day in `?day=`, else
 // today's), and it is plain markup, so it is right before any script runs.
 
+/** A day's row, its frame: shared with its loading state so the two cannot differ. */
+const ROW =
+  "flex flex-col gap-2.5 px-4 py-3 lg:flex-row lg:items-center lg:gap-3.5 lg:px-[18px]";
+/** The heading above the rows. */
+const HEAD =
+  "hidden items-center gap-3.5 border-b border-hairline bg-surface-subtle px-[18px] py-2.5 lg:flex";
+
 export type DayRow = {
   day: Day;
   open: boolean;
@@ -32,7 +39,7 @@ export function DayAccordion({
 }) {
   return (
     <Card className="overflow-hidden">
-      <div className="hidden items-center gap-3.5 border-b border-hairline bg-surface-subtle px-[18px] py-2.5 lg:flex">
+      <div className={HEAD}>
         <Eyebrow className="flex-1">Day</Eyebrow>
       </div>
       {rows.map(({ day, open, panel }, i) => (
@@ -46,7 +53,7 @@ export function DayAccordion({
           >
             <summary
               className={cx(
-                "flex cursor-pointer list-none flex-col gap-2.5 px-4 py-3 transition-colors marker:hidden lg:flex-row lg:items-center lg:gap-3.5 lg:px-[18px] [&::-webkit-details-marker]:hidden",
+                `${ROW} cursor-pointer list-none transition-colors marker:hidden [&::-webkit-details-marker]:hidden`,
                 day.state === "past" && "opacity-55 group-open:opacity-100",
                 day.state === "today"
                   ? "border-l-[3px] border-agent bg-agent-tint"
@@ -101,6 +108,47 @@ export function DayAccordion({
             </summary>
             {panel}
           </details>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+/**
+ * The days before they are known: the same card, heading and rows, with a grey
+ * bar for each thing that is data. How many days there are is not known, so it
+ * draws the few a trip usually has.
+ */
+export function DayAccordionSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <Card className="overflow-hidden" aria-busy="true">
+      <div className={HEAD}>
+        <Eyebrow className="flex-1">Day</Eyebrow>
+      </div>
+      {Array.from({ length: rows }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders, never reordered
+        <div key={i}>
+          {i > 0 ? <Divider /> : null}
+          <div className={cx(ROW, "animate-breathe")}>
+            <div className="flex flex-1 items-start gap-2.5">
+              <Icon
+                name="chevronDown"
+                size={15}
+                className="mt-0.5 shrink-0 -rotate-90 text-ink-faint"
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="h-[9px] w-[88px] rounded-[3px] bg-track" />
+                <div className="h-[11px] w-[55%] rounded-[3px] bg-track" />
+              </div>
+            </div>
+            <div className="flex h-[22px] w-full items-center lg:w-[250px]">
+              <div className="h-[7px] w-full rounded-sm bg-track" />
+            </div>
+            <div className="flex w-[120px] items-center gap-2">
+              <span className="size-[9px] rounded-full bg-track" />
+              <div className="h-[9px] w-[64px] rounded-[3px] bg-track" />
+            </div>
+          </div>
         </div>
       ))}
     </Card>
