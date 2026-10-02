@@ -4,6 +4,7 @@ import type { ExternalRow } from "../dal/place-external.ts";
 import type {
   Enrichment,
   EnrichOutcome,
+  KeptContent,
   PlaceEnricher,
   PlaceIdentity,
   SearchOutcome,
@@ -91,6 +92,7 @@ function world(over: { limits?: Partial<EnrichLimits> } = {}) {
       counts.set(key, n);
       return n;
     },
+    contentTtlSeconds: 3_600,
     now: () => NOW,
     log: () => {},
     limits: {
@@ -125,7 +127,7 @@ describe("finding a place", () => {
     assert.deepEqual(w.asked, { search: 1, allow: 1, read: 2 });
   });
 
-  test("what is shown is read again each time, never kept", async () => {
+  test("without a store, what is shown is read again each time", async () => {
     let n = 0;
     w.provider.answers.read = async () => ({
       ok: true,
@@ -239,5 +241,105 @@ describe("spending", () => {
     // Gone once answered: the next visit asks again.
     await run(w, "c");
     assert.equal(w.asked.read, 2);
+  });
+});
+
+/** A store that records what it was asked, with a lifetime per entry. */
+function store() {
+  const held = new Map<string, EnrichOutcome>();
+  const ttls: number[] = [];
+  const calls = { get: 0, set: 0 };
+  let broken = false;
+  const kept: KeptContent = {
+    async get(id) {
+      calls.get++;
+      if (broken) throw new Error("store down");
+      return held.get(id) ?? null;
+    },
+    async set(id, outcome, ttl) {
+      calls.set++;
+      if (broken) throw new Error("store down");
+      ttls.push(ttl);
+      held.set(id, outcome);
+    },
+  };
+  return {
+    kept,
+    held,
+    ttls,
+    calls,
+    break: () => {
+      broken = true;
+    },
+  };
+}
+
+describe("keeping what was said", () => {
+  test("the second visit is served from the store: no provider call, no spend", async () => {
+    const w = world();
+    const s = store();
+    w.deps.kept = s.kept;
+    await run(w);
+    await run(w, "someone else");
+    assert.equal(w.asked.read, 1);
+    assert.equal(w.counts.get("enrich:all:d"), 1);
+  });
+
+  test("it is kept for the lifetime given, and the traveller is still counted", async () => {
+    const w = world({ limits: { userPerDay: 2 } });
+    const s = store();
+    w.deps.kept = s.kept;
+    await run(w);
+    await run(w);
+    assert.deepEqual(s.ttls, [3_600]);
+    // A hit is free for us but not exempt: the traveller's own limit stands.
+    assert.deepEqual(await run(w), { ok: false, reason: "rate-limited" });
+  });
+
+  test("a lifetime of zero keeps nothing, and does not even ask the store", async () => {
+    const w = world();
+    const s = store();
+    w.deps.kept = s.kept;
+    w.deps.contentTtlSeconds = 0;
+    await run(w);
+    await run(w);
+    assert.deepEqual(s.calls, { get: 0, set: 0 });
+    assert.equal(w.asked.read, 2);
+  });
+
+  test("a failure is kept for a moment, never for the full lifetime", async () => {
+    const w = world();
+    const s = store();
+    w.deps.kept = s.kept;
+    w.provider.answers.read = async () => ({ ok: false, reason: "upstream" });
+    await run(w);
+    assert.deepEqual(s.ttls, [30]);
+  });
+
+  test("nothing matched is kept for the full lifetime", async () => {
+    const w = world();
+    const s = store();
+    w.deps.kept = s.kept;
+    w.provider.answers.search = { ok: true, candidates: [] };
+    await run(w);
+    assert.deepEqual(s.ttls, [3_600]);
+  });
+
+  test("a store that is down costs a miss, not the page", async () => {
+    const w = world();
+    const s = store();
+    s.break();
+    w.deps.kept = s.kept;
+    assert.ok((await run(w)).ok);
+    assert.ok((await run(w)).ok);
+    assert.equal(w.asked.read, 2);
+  });
+
+  test("the entry is the place's, not the traveller's", async () => {
+    const w = world();
+    const s = store();
+    w.deps.kept = s.kept;
+    await run(w, "a");
+    assert.deepEqual([...s.held.keys()], [PLACE]);
   });
 });

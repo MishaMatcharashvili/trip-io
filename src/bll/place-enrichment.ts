@@ -4,6 +4,7 @@ import { countUse } from "../dal/usage.ts";
 import {
   chooseMatch,
   type EnrichOutcome,
+  type KeptContent,
   type PlaceEnricher,
   type PlaceIdentity,
 } from "../domain/catalogue/enrichment.ts";
@@ -12,12 +13,14 @@ import {
 // the HTTP handler comes through here, so the rules on spending, and on what
 // may be remembered, sit in one place.
 //
-// What may be remembered is the provider's identifier for the place and
-// nothing else — its caching policy forbids keeping the content — so there is
-// no cache here. Two travellers opening the same place at the same moment
-// share one call, which is a queue and not a store: the entry is gone as soon
-// as the answer is back. Everything shown is read again each time, which is
-// why the limits below matter.
+// What is remembered is the provider's identifier for the place (in Postgres,
+// for good) and what it said about the place (in a store with a lifetime, for
+// a few hours, when one is given). The second is a choice the provider's terms
+// do not obviously allow; see docs/tripadvisor.md. It is optional, bounded and
+// the one knob that turns it off: `contentTtlSeconds: 0`.
+//
+// Two travellers opening the same place at the same moment share one call
+// whether or not anything is kept: a queue, gone as soon as the answer is back.
 //
 // What it guards, in order: a request that cannot succeed is refused before it
 // costs anything; the traveller's own rate; identical requests already in
@@ -33,6 +36,11 @@ export type EnrichLimits = {
   /** Places opened, everyone together, per UTC day. */
   globalPerDay: number;
 };
+
+/** How long what the provider said is kept: long enough to matter, short of a day. */
+export const DEFAULT_CONTENT_TTL_S = 12 * 3_600;
+/** A refusal or a failure is kept briefly, so a struggling provider is not hammered. */
+const FAILURE_TTL_S = 30;
 
 export const defaultLimits: EnrichLimits = {
   userPerMinute: 10,
@@ -57,6 +65,10 @@ export type EnrichLog = {
 export type EnrichDeps = {
   provider: PlaceEnricher;
   identity: (placeId: string) => Promise<PlaceIdentity | null>;
+  /** Where what was said is kept. Without one, every visit asks the provider. */
+  kept?: KeptContent;
+  /** 0 keeps nothing, whatever `kept` is. */
+  contentTtlSeconds: number;
   find: typeof findExternal;
   save: typeof saveExternal;
   count: (key: string, windowSeconds: number, now: Date) => Promise<number>;
@@ -79,6 +91,7 @@ const defaults = (): Omit<EnrichDeps, "provider"> => ({
         }
       : null;
   },
+  contentTtlSeconds: DEFAULT_CONTENT_TTL_S,
   find: findExternal,
   save: saveExternal,
   count: countUse,
@@ -127,13 +140,54 @@ export async function enrichPlace(
   const shared = inflight.get(placeId);
   if (shared) return finish(await shared, "shared");
 
-  const call = resolveAndRead(placeId, deps, now);
+  const call = loadThrough(placeId, deps, now);
   inflight.set(placeId, call);
   try {
     return finish(await call);
   } finally {
     inflight.delete(placeId);
   }
+}
+
+/** A store that fails is a miss: it never takes the page with it. */
+async function quietly<T>(work: () => Promise<T>): Promise<T | null> {
+  try {
+    return await work();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What was kept if there is any, else the provider. Only the second spends, so
+ * a hit costs nothing in either sense: the provider is not asked and the day's
+ * total does not move.
+ */
+async function loadThrough(
+  placeId: string,
+  deps: EnrichDeps,
+  now: Date,
+): Promise<EnrichOutcome> {
+  const { kept, contentTtlSeconds } = deps;
+  const keeping = kept !== undefined && contentTtlSeconds > 0;
+
+  if (keeping) {
+    const hit = await quietly(() => kept.get(placeId));
+    if (hit) return hit;
+  }
+
+  const outcome = await resolveAndRead(placeId, deps, now);
+
+  if (keeping) {
+    // An absence is an answer worth keeping; so is the content. A failure is
+    // kept only a moment.
+    const ttl =
+      outcome.ok || outcome.reason === "no-match"
+        ? contentTtlSeconds
+        : Math.min(FAILURE_TTL_S, contentTtlSeconds);
+    await quietly(() => kept.set(placeId, outcome, ttl));
+  }
+  return outcome;
 }
 
 async function resolveAndRead(

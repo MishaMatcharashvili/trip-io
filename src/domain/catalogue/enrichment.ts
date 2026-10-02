@@ -108,6 +108,22 @@ export type PlaceEnricher = {
   read(id: string): Promise<EnrichOutcome>;
 };
 
+/**
+ * Somewhere to keep what the provider said, for a while. A port because where
+ * is not the use case's business (src/infra has the Redis one), and because a
+ * store that is down must cost a miss and never a page: implementations are
+ * expected to throw, and callers to carry on without.
+ */
+export type KeptContent = {
+  get(placeId: string): Promise<EnrichOutcome | null>;
+  /** Kept for `ttlSeconds` and then gone. */
+  set(
+    placeId: string,
+    outcome: EnrichOutcome,
+    ttlSeconds: number,
+  ): Promise<void>;
+};
+
 // Matching ------------------------------------------------------------------
 
 /** Words that say what a place is, not which one: "Cafe Leila" and "Leila". */
