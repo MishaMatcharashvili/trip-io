@@ -13,7 +13,6 @@ import {
   watchStrip,
 } from "@/data/trip";
 import type { LonLat } from "@/domain/geo";
-import { TopBar, TripBottomNav } from "@/features/chrome";
 import { forecastRibbon } from "@/features/shared-reads";
 import { dayHref } from "@/features/trip-links";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
@@ -25,9 +24,8 @@ import {
   mapStops,
   weatherView,
 } from "@/features/trip-model";
-import { tripTabs } from "@/ui/nav";
+import { type LoadedTrip, loadTrip, pickDay } from "../load";
 import { ActiveTripDesktop } from "./desktop";
-import { type LoadedTrip, loadTrip, pickDay } from "./load";
 import { ActiveTripMobile } from "./mobile";
 import { parseState } from "./state";
 import type { OverviewView } from "./view";
@@ -261,27 +259,17 @@ export default async function ActiveTripPage({
       );
 
   return (
-    <div className="flex h-dvh flex-col">
-      <TopBar
-        trip={view.trip}
-        tabs={tripTabs(view.trip.id)}
-        active="Map"
-        watch={view.forcePaused ? "paused" : "watching"}
+    // The bars are the layout's; the map is the canvas, and everything else
+    // floats over it.
+    <div className="relative flex-1 overflow-hidden">
+      <TripMapScreen
+        stops={stops}
+        events={events}
+        cards={cards}
+        dimmed={view.forcePaused}
       />
-
-      {/* The map is the canvas; everything else floats over it. */}
-      <div className="relative flex-1 overflow-hidden">
-        <TripMapScreen
-          stops={stops}
-          events={events}
-          cards={cards}
-          dimmed={view.forcePaused}
-        />
-        <ActiveTripDesktop view={view} />
-        <ActiveTripMobile view={view} />
-      </div>
-
-      <TripBottomNav tripId={view.trip.id} active="Map" />
+      <ActiveTripDesktop view={view} />
+      <ActiveTripMobile view={view} />
     </div>
   );
 }

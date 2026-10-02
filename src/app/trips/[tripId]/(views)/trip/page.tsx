@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { georgiaMapStops, getTrip, type Trip, todayWeather } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
-import { TopBar, TripBottomNav } from "@/features/chrome";
 import { DayAccordion, type DayRow } from "@/features/day-accordion";
 import { DayEditor } from "@/features/day-editor";
 import { CheckpointList } from "@/features/itinerary";
@@ -17,18 +16,20 @@ import {
   weatherView,
 } from "@/features/trip-model";
 import { Button, ButtonLink } from "@/ui/button";
-import { Card, SectionRule } from "@/ui/card";
-import { cx } from "@/ui/cx";
+import { Card } from "@/ui/card";
 import { Icon } from "@/ui/icon";
 import type { MapStop } from "@/ui/map/trip-map";
-import { tripTabs } from "@/ui/nav";
-import { Display, Eyebrow, Num } from "@/ui/text";
-import { loadTrip, pickDay } from "../load";
+import { loadTrip, pickDay } from "../../load";
 import { DayPanel } from "./day-panel";
+import {
+  type Figure,
+  figures,
+  STAT_LABELS,
+  TOTAL_LABELS,
+  WholeTripShell,
+} from "./shell";
 
 export const metadata: Metadata = { title: "The whole trip" };
-
-type Stat = { label: string; value: string };
 
 function WholeTrip({
   trip,
@@ -39,83 +40,24 @@ function WholeTrip({
   actions,
 }: {
   trip: Trip;
-  stats: Stat[];
-  totals: Stat[];
+  stats: Figure[];
+  totals: Figure[];
   stops: MapStop[];
   /** The days, each opening in place. */
   days: React.ReactNode;
   actions: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopBar trip={trip} tabs={tripTabs(trip.id)} active="Trip" />
-
-      <div className="flex min-h-0 flex-1 items-stretch">
-        <main className="flex min-w-0 flex-1 flex-col gap-5 px-4 pb-24 pt-6 lg:px-8 lg:py-7 lg:pb-7">
-          <div className="flex items-start gap-4">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Eyebrow>
-                {trip.dates} · {trip.dayCount} days · {trip.party}
-              </Eyebrow>
-              <Display className="text-[24px] lg:text-[29px]">
-                The whole trip
-              </Display>
-            </div>
-            <div className="hidden gap-5 lg:flex">
-              {stats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="flex flex-col items-end gap-0.5"
-                >
-                  <Eyebrow>{stat.label}</Eyebrow>
-                  <Num className="text-[16px] font-semibold">{stat.value}</Num>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/*
-            Every day, with a watch status each. This is the table where the
-            product stops being a planner: every row says not just what you are
-            doing, but whether anything has moved under it. A day opens in
-            place into its weather and its stops, and today opens first.
-          */}
-          {days}
-
-          <div className="flex flex-wrap items-center gap-2.5">{actions}</div>
-        </main>
-
-        <aside className="hidden w-[460px] shrink-0 flex-col border-l border-hairline bg-surface lg:flex">
-          <div className="relative h-[470px] overflow-hidden border-b border-hairline">
-            <RoutedTripMap
-              stops={stops}
-              className="absolute inset-0 size-full"
-            />
-          </div>
-          <div className="flex flex-col gap-4 px-[26px] py-[22px]">
-            <SectionRule>Across the whole trip</SectionRule>
-            <div className="flex flex-col">
-              {totals.map((total, i) => (
-                <div
-                  key={total.label}
-                  className={cx(
-                    "flex items-center gap-3 py-2.5",
-                    i > 0 && "border-t border-track",
-                  )}
-                >
-                  <span className="flex-1 text-small text-ink-muted">
-                    {total.label}
-                  </span>
-                  <Num className="text-small font-semibold">{total.value}</Num>
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      <TripBottomNav tripId={trip.id} active="Trip" />
-    </div>
+    <WholeTripShell
+      eyebrow={`${trip.dates} · ${trip.dayCount} days · ${trip.party}`}
+      stats={stats}
+      totals={totals}
+      map={
+        <RoutedTripMap stops={stops} className="absolute inset-0 size-full" />
+      }
+      days={days}
+      actions={actions}
+    />
   );
 }
 
@@ -271,28 +213,19 @@ export default async function FullTripPage({
   return (
     <WholeTrip
       trip={trip}
-      stats={[
-        { label: "Budget", value: screen.doc.trip.budget || "—" },
-        { label: "Places", value: String(places) },
-        { label: "Changes handled", value: String(applied) },
-      ]}
-      totals={[
-        {
-          label: "Driving",
-          value: driving ? `${duration(driving)} total` : "None planned",
-        },
-        {
-          label: "Busiest day",
-          value: busiest.visits
-            ? `Day ${busiest.index} · ${busiest.visits} visits`
-            : "—",
-        },
-        { label: "Stops", value: String(nodes.length) },
-        {
-          label: "Changes I proposed",
-          value: told ? `${told} · ${applied} applied` : "None yet",
-        },
-      ]}
+      stats={figures(STAT_LABELS, [
+        screen.doc.trip.budget || "—",
+        String(places),
+        String(applied),
+      ])}
+      totals={figures(TOTAL_LABELS, [
+        driving ? `${duration(driving)} total` : "None planned",
+        busiest.visits
+          ? `Day ${busiest.index} · ${busiest.visits} visits`
+          : "—",
+        String(nodes.length),
+        told ? `${told} · ${applied} applied` : "None yet",
+      ])}
       stops={stops}
       days={<DayAccordion tripId={trip.id} rows={rows} />}
       actions={

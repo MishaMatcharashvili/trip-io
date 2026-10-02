@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTrip, proposal, unchangedNodes } from "@/data/trip";
-import { TopBar, TripBottomNav } from "@/features/chrome";
 import { dayHref } from "@/features/trip-links";
 import { Button, ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
 import { BasemapWeather } from "@/ui/map/basemap-weather";
-import { tripTabs } from "@/ui/nav";
 import { Eyebrow, Headline, Num } from "@/ui/text";
-import { loadTrip } from "../load";
+import { loadTrip } from "../../load";
 
 export const metadata: Metadata = { title: "Replanning" };
 
@@ -55,13 +53,11 @@ export default async function ReplanPage({
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col">
-      <div className="pointer-events-none absolute inset-0 top-[58px] overflow-hidden">
+    <div className="relative flex flex-1 flex-col">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <BasemapWeather className="absolute inset-0 size-full" />
         <div className="absolute inset-0 bg-canvas/55" />
       </div>
-
-      <TopBar trip={trip} tabs={tripTabs(trip.id)} active="Map" />
 
       <main className="relative z-10 mx-auto w-full max-w-[1000px] px-4 pb-28 pt-5 lg:pb-10 lg:pt-11">
         <Panel className="overflow-hidden rounded-[16px]">
@@ -187,8 +183,6 @@ export default async function ReplanPage({
           </div>
         </Panel>
       </main>
-
-      <TripBottomNav tripId={trip.id} active="Map" />
     </div>
   );
 }

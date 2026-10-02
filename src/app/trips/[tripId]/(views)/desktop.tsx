@@ -16,13 +16,23 @@ import { Icon } from "@/ui/icon";
 import { Eyebrow, Headline, Num } from "@/ui/text";
 import type { OverviewView } from "./view";
 
+// Where each panel floats over the map. The loading state (map-skeleton.tsx)
+// uses the same strings, so a panel arriving does not move.
+export const ITINERARY_FRAME =
+  "absolute left-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[352px] flex-col overflow-hidden";
+export const RIGHT_COLUMN_FRAME =
+  "absolute right-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[376px] flex-col gap-3 overflow-y-auto";
+export const WATCH_STRIP_FRAME = "absolute bottom-[30px] left-6 z-20";
+export const COMMAND_BAR_FRAME =
+  "absolute bottom-[30px] left-1/2 z-20 w-[520px] -translate-x-1/2";
+
 /** The day, floating over the map: weather ribbon first, then the nodes. */
 function ItineraryPanel({ view }: { view: OverviewView }) {
   const { trip, day, weather, dayNav } = view;
   const done = day.checkpoints.filter((c) => c.state === "done").length;
 
   return (
-    <Panel className="absolute left-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[352px] flex-col overflow-hidden">
+    <Panel className={ITINERARY_FRAME}>
       <div className="flex items-start gap-2.5 px-4 pb-[11px] pt-3.5">
         <div className="flex flex-1 flex-col gap-0.5">
           <Eyebrow>
@@ -192,7 +202,7 @@ export function ActiveTripDesktop({ view }: { view: OverviewView }) {
       <div className="pointer-events-auto">
         <ItineraryPanel view={view} />
 
-        <div className="absolute right-6 top-5 z-20 flex max-h-[calc(100%-120px)] w-[376px] flex-col gap-3 overflow-y-auto">
+        <div className={RIGHT_COLUMN_FRAME}>
           <ConnectionSwitch
             sources={view.pausedSources}
             forceOffline={view.forcePaused}
@@ -201,16 +211,13 @@ export function ActiveTripDesktop({ view }: { view: OverviewView }) {
           </ConnectionSwitch>
         </div>
 
-        <WatchStrip
-          detectors={[...view.strip]}
-          className="absolute bottom-[30px] left-6 z-20"
-        />
+        <WatchStrip detectors={[...view.strip]} className={WATCH_STRIP_FRAME} />
 
         <CommandBar
           tripId={view.askTripId ?? undefined}
           initialQuestion={view.initialQuestion}
           suggestions={view.suggestions}
-          className="absolute bottom-[30px] left-1/2 z-20 w-[520px] -translate-x-1/2"
+          className={COMMAND_BAR_FRAME}
         />
       </div>
     </div>

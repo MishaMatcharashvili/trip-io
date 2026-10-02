@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/features/skeletons";
+import { AlertsSkeleton } from "@/features/alerts";
 
 export default function Loading() {
-  return <PageSkeleton />;
+  return <AlertsSkeleton />;
 }

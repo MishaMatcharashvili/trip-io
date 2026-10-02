@@ -4,7 +4,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { accessTrip } from "@/bll/trip-document";
 import { type TripScreen, tripScreen } from "@/bll/trip-screen";
-import type { Day, Trip } from "@/data/trip";
+import { type Day, getTrip, type Trip } from "@/data/trip";
 import { tripModel } from "@/features/trip-model";
 import { getAuth } from "@/infra/auth";
 
@@ -47,4 +47,13 @@ export function pickDay(
 ): Day | undefined {
   if (!wanted || wanted === "today") return trip.days[trip.currentDay - 1];
   return trip.days.find((d) => d.id === wanted);
+}
+
+/**
+ * The trip as its header shows it — a name, a day, a number of sources — for
+ * the chrome around its screens. The reference trip answers from its fixture;
+ * a real one through `loadTrip`, which the screen inside reads too, once.
+ */
+export async function tripHeader(tripId: string): Promise<Trip> {
+  return getTrip(tripId) ?? (await loadTrip(tripId)).trip;
 }

@@ -7,7 +7,7 @@ import { alertHistory, getTrip, watchLedger } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { at } from "@/domain/watch/briefing";
 import type { Outcome } from "@/domain/watch/interrupt";
-import { type AlertRowView, AlertsScreen } from "@/features/alerts";
+import { type AlertRowView, AlertsScreen, alertStats } from "@/features/alerts";
 import { getAuth } from "@/infra/auth.ts";
 import type { Tone } from "@/ui/cx";
 
@@ -130,12 +130,12 @@ export default async function AlertsPage({
       view={{
         tripId,
         eyebrow: page.title,
-        stats: [
-          { value: String(page.told), label: "Told you" },
-          { value: String(page.applied), label: "Applied", tone: "agent" },
-          { value: String(page.kept), label: "Kept your plan" },
-          { value: page.checks.toLocaleString("en-GB"), label: "Checks run" },
-        ],
+        stats: alertStats([
+          String(page.told),
+          String(page.applied),
+          String(page.kept),
+          page.checks.toLocaleString("en-GB"),
+        ]),
         groups,
         footer: `${page.checks.toLocaleString("en-GB")} checks run · ${page.told} worth telling you`,
       }}
