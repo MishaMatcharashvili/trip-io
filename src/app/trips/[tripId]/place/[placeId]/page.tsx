@@ -8,6 +8,7 @@ import { PlaceVoices } from "@/features/place-voices";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { SaveToggle } from "@/features/save-toggle";
 import { RemoveStopButton } from "@/features/trip-actions";
+import { dayHref } from "@/features/trip-links";
 import { duration, mapStops } from "@/features/trip-model";
 import { Button, ButtonLink } from "@/ui/button";
 import { cx } from "@/ui/cx";
@@ -68,7 +69,7 @@ function FixturePlace({
 
       <div className="absolute inset-x-4 top-13 z-20 flex items-center gap-2.5">
         <Link
-          href={`/trips/${trip.id}/day/${day.id}`}
+          href={dayHref(trip.id, day.id)}
           aria-label="Back to the day"
           className="flex size-[38px] items-center justify-center rounded-[10px] border border-hairline-strong bg-surface text-ink-muted shadow-panel"
         >
@@ -272,7 +273,7 @@ export default async function PlacePage({
 
       <div className="absolute inset-x-4 top-13 z-20 flex items-center gap-2.5">
         <Link
-          href={`/trips/${trip.id}/day/${day.id}`}
+          href={dayHref(trip.id, day.id)}
           aria-label="Back to the day"
           className="flex size-[38px] items-center justify-center rounded-[10px] border border-hairline-strong bg-surface text-ink-muted shadow-panel"
         >
@@ -344,7 +345,7 @@ export default async function PlacePage({
                 </ButtonLink>
               ) : null}
               <ButtonLink
-                href={`/trips/${trip.id}/day/${day.id}`}
+                href={dayHref(trip.id, day.id)}
                 size="lg"
                 className={open ? undefined : "flex-1"}
               >
@@ -439,7 +440,7 @@ export default async function PlacePage({
             head={screen.head}
             nodeId={stop.id}
             title={stop.title}
-            back={`/trips/${trip.id}/day/${day.id}`}
+            back={dayHref(trip.id, day.id)}
           />
         </div>
       </main>

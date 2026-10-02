@@ -6,6 +6,7 @@ import {
   KeepPlanAction,
   UndoButton,
 } from "@/features/trip-actions";
+import { dayHref } from "@/features/trip-links";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Chip } from "@/ui/chip";
@@ -191,7 +192,7 @@ export function ActiveTripMobile({ view }: { view: OverviewView }) {
           </Chip>
           <div className="flex-1" />
           <Link
-            href={`/trips/${trip.id}/day/${day.id}`}
+            href={dayHref(trip.id, day.id)}
             className="text-mini font-medium text-agent"
           >
             Expand itinerary

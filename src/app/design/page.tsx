@@ -135,7 +135,7 @@ const screens = [
   ["State · change applied", "/trips/georgia?state=applied"],
   ["State · watch layer paused", "/trips/georgia?state=paused"],
   ["The whole trip", "/trips/georgia/trip"],
-  ["Day detail", "/trips/georgia/day/3"],
+  ["Day detail", "/trips/georgia/trip?day=3"],
   ["Checkpoint detail", "/trips/georgia/place/3e"],
   ["Replanning", "/trips/georgia/replan"],
   ["Daily briefing", "/trips/georgia/briefing"],

@@ -6,6 +6,7 @@ import { accessTrip } from "@/bll/trip-document.ts";
 import { getTrip } from "@/data/trip";
 import { BriefingScreen } from "@/features/briefing";
 import { BriefingOpened } from "@/features/briefing-opened";
+import { dayHref } from "@/features/trip-links";
 import { getAuth } from "@/infra/auth.ts";
 import type { Tone } from "@/ui/cx";
 
@@ -78,7 +79,7 @@ export default async function BriefingPage({
               "Move the Gergeti hike to 11:30 and the museum to the afternoon. Everything else holds.",
             rows: [{ from: "16:00 HIKE", to: "11:30 HIKE" }],
           },
-          dayHref: `/trips/${fixture.id}/day/${day.id}`,
+          dayHref: dayHref(fixture.id, day.id),
           sourceCount: fixture.sourceCount,
           watchTone: "ok",
         }}

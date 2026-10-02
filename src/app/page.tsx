@@ -7,6 +7,7 @@ import { georgia, georgiaMapStops, type Trip } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { TopBar } from "@/features/chrome";
 import { RoutedTripMap } from "@/features/routed-trip-map";
+import { dayHref } from "@/features/trip-links";
 import { dateRange, tripModel, tripStops } from "@/features/trip-model";
 import { getAuth } from "@/infra/auth";
 import { ButtonLink } from "@/ui/button";
@@ -101,7 +102,7 @@ function LiveCard({ live }: { live: Live }) {
 
         <div className="flex items-center gap-2.5">
           <ButtonLink
-            href={`/trips/${trip.id}/day/${today?.id ?? "today"}`}
+            href={dayHref(trip.id, today?.id)}
             variant="primary"
             className="flex-1 lg:flex-none"
           >

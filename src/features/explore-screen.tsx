@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { dayHref } from "@/features/trip-links";
 import { apiClient } from "@/lib/hono-client";
 import { Button } from "@/ui/button";
 import { Card, Divider, Panel } from "@/ui/card";
@@ -53,9 +54,7 @@ function AddToTrip({ hit, trips }: { hit: Hit; trips: TripRef[] | null }) {
   const current = (trips ?? []).filter((t) => t.endsAt.slice(0, 10) >= today);
 
   const go = (trip: TripRef) =>
-    router.push(
-      `/trips/${trip.id}/day/today?add=1&q=${encodeURIComponent(hit.name)}`,
-    );
+    router.push(dayHref(trip.id, "today", { add: true, q: hit.name }));
 
   return (
     <div className="relative">

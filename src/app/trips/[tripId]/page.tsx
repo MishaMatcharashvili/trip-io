@@ -15,6 +15,7 @@ import {
 import type { LonLat } from "@/domain/geo";
 import { TopBar, TripBottomNav } from "@/features/chrome";
 import { forecastRibbon } from "@/features/shared-reads";
+import { dayHref } from "@/features/trip-links";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
 import {
   ago,
@@ -111,7 +112,7 @@ function fixtureView(trip: Trip, rawState: string | string[] | undefined) {
       { name: "Local events", seen: "Last seen 12:20" },
     ],
     dayNav: { previous: null, next: null },
-    addStopHref: `/trips/${trip.id}/day/${day.id}`,
+    addStopHref: dayHref(trip.id, day.id),
     next: { time: "15:10", label: "38 km left" },
   };
   return {
@@ -230,7 +231,7 @@ async function realView(
         seen: screen.lastCheck ? `Last checked ${checked}` : "Not checked yet",
       })),
     dayNav: dayNav(trip, day),
-    addStopHref: `/trips/${trip.id}/day/${day.id}?add=1`,
+    addStopHref: dayHref(trip.id, day.id, { add: true }),
     next: next ? { time: next.time, label: "Next stop" } : null,
   };
 

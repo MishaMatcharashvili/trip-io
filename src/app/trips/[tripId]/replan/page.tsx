@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTrip, proposal, unchangedNodes } from "@/data/trip";
 import { TopBar, TripBottomNav } from "@/features/chrome";
+import { dayHref } from "@/features/trip-links";
 import { Button, ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Chip } from "@/ui/chip";
@@ -50,11 +51,7 @@ export default async function ReplanPage({
     // before-and-after, or, with nothing proposed, the day editor.
     const { screen } = await loadTrip(tripId);
     const open = screen.alerts.alerts.find((a) => a.outcome === null);
-    redirect(
-      open
-        ? `/trips/${tripId}/alerts/${open.id}`
-        : `/trips/${tripId}/day/today`,
-    );
+    redirect(open ? `/trips/${tripId}/alerts/${open.id}` : dayHref(tripId));
   }
 
   return (
