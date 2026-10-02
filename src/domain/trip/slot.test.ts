@@ -79,7 +79,7 @@ describe("suggestSlot", () => {
     assert.equal(clock(Date.parse(s.startsAt)), "13:00");
   });
 
-  test("somewhere too far to walk is flagged: it needs a transfer, not just a later start", () => {
+  test("somewhere too far for a walk comes with the drive, which ends where the stop starts", () => {
     const s = suggestSlot(
       {
         day: "2026-09-16",
@@ -88,7 +88,24 @@ describe("suggestSlot", () => {
       },
       straightLineTravel,
     );
-    assert.ok(s.needsTransferMin && s.needsTransferMin > 30);
+    assert.ok(s.transfer);
+    // The drive starts when the last stop ends, on a five, and is long.
+    assert.equal(clock(Date.parse(s.transfer.startsAt)), "11:00");
+    assert.ok(s.transfer.durationMin > 30);
+    assert.equal(s.transfer.durationMin % 5, 0);
+    // The stop begins the moment it arrives.
+    assert.equal(
+      Date.parse(s.startsAt),
+      Date.parse(s.transfer.startsAt) + s.transfer.durationMin * 60_000,
+    );
+  });
+
+  test("a near place has no drive", () => {
+    const s = suggestSlot(
+      { day: "2026-09-16", last: { endsAt: T("11:00"), at: TBILISI }, place },
+      straightLineTravel,
+    );
+    assert.equal(s.transfer, undefined);
   });
 
   test("late in the day it is suggested anyway, for the traveller to judge", () => {

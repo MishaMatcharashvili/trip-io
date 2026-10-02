@@ -86,12 +86,12 @@ export type Slot = {
   startsAt: string;
   durationMin: number;
   /**
-   * The place is further from the last stop than an implicit leg allows: it
-   * needs a drive of this many minutes between them, which a later start does
-   * not provide. The start given allows for it, as a hint, but it is for the
-   * traveller to add the drive.
+   * The place is further from the last stop than an implicit leg allows, so
+   * something has to be driven in between: this is that drive, starting when the
+   * last stop ends, and `startsAt` is when it arrives. Adding the stop adds the
+   * drive with it.
    */
-  needsTransferMin?: number;
+  transfer?: { startsAt: string; durationMin: number };
 };
 
 export function suggestSlot(input: SlotInput, travel: TravelEstimator): Slot {
@@ -109,13 +109,26 @@ export function suggestSlot(input: SlotInput, travel: TravelEstimator): Slot {
 
   const need =
     last.at && place.lonLat ? travel.minutes(last.at, place.lonLat) : 0;
-  const tooFar = need > IMPLICIT_LEG_MAX_MIN;
-  // The way and the buffer, as the validator asks for them; a long drive is
-  // allowed for in full, so the hint is at least not impossible.
-  const gap = need === 0 ? 0 : need + (tooFar ? 0 : LEG_BUFFER_MIN);
-  const startsAt = new Date(roundUp5(last.endsAt + gap * MIN)).toISOString();
 
-  return tooFar
-    ? { startsAt, durationMin, needsTransferMin: need }
-    : { startsAt, durationMin };
+  // Too far to walk or to be just the gap between two stops: a drive of its own,
+  // from the end of the last stop to the door of this one.
+  if (need > IMPLICIT_LEG_MAX_MIN) {
+    const driveStart = roundUp5(last.endsAt);
+    const driveMin = Math.ceil(need / 5) * 5;
+    return {
+      startsAt: new Date(driveStart + driveMin * MIN).toISOString(),
+      durationMin,
+      transfer: {
+        startsAt: new Date(driveStart).toISOString(),
+        durationMin: driveMin,
+      },
+    };
+  }
+
+  // The way and the buffer, as the validator asks for them.
+  const gap = need === 0 ? 0 : need + LEG_BUFFER_MIN;
+  return {
+    startsAt: new Date(roundUp5(last.endsAt + gap * MIN)).toISOString(),
+    durationMin,
+  };
 }
