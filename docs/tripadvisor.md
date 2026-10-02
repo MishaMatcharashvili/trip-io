@@ -33,6 +33,26 @@ from the policy's letter, with a bounded blast radius:
   design to the platform's handler and its fees. A port (`KeptContent`) with a Redis behind it is
   explicit, testable with fakes, and has a TTL we set.
 
+## Photographs come from Wikimedia Commons, not from here
+
+Tripadvisor's own photos are shown if it has them, but the panel's photographs
+are mostly **Wikimedia Commons**: freely licensed, no key, no cost, and (unlike
+Tripadvisor's content) allowed to be kept, so `src/bll/place-photos.ts` holds
+what it finds for 15 minutes. It is a separate request (`GET /api/places/:id/photos`),
+so a review provider that is down, unconfigured or over its limit does not hide
+them. Every photograph carries who took it, its licence and a link to where it
+lives, because the licences ask for the credit.
+
+The one thing that needs care is *relevance*. A search by location returns what is
+near the place, not what is the place — around Narikala it is the mosque beside
+it — so `src/domain/catalogue/photos.ts` keeps only a photograph whose title or
+description names the place: every identifying word of a short name, half of a
+long one, never the city's name or a street's, and never a map or a logo. What no
+photograph names, the place has none of: most hotels and cafés show no photos, which
+is the right answer. The catalogue sometimes holds a landmark under its
+Georgian-romanised name ("Gergetis Samebis Eklesia"), which no English title
+contains; those find nothing. `pnpm smoke:wikimedia` checks the live API.
+
 ## The flow
 
 ```

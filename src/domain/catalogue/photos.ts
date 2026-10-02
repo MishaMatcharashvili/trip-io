@@ -56,12 +56,55 @@ const NOT_A_NAME = new Set([
   "national",
 ]);
 
-/** The parts of a name that identify it: long enough to mean something, and not a place's address. */
+/**
+ * Words that say what a landmark is, not which: "Narikala Fortress" is
+ * identified by "Narikala", and a photograph titled only "Narikala" is of it.
+ * They are left out of what must match, so that the name's own words can be
+ * required — "Gergeti woods" is not "Gergeti Trinity Church" because both say
+ * Gergeti.
+ */
+const KIND_OF_PLACE = new Set([
+  "fortress",
+  "cathedral",
+  "castle",
+  "tower",
+  "basilica",
+  "chapel",
+  "temple",
+  "palace",
+  "bridge",
+  "gate",
+  "wall",
+  "walls",
+  "ruins",
+  "monument",
+  "memorial",
+  "fort",
+  "mosque",
+  "synagogue",
+  "bath",
+  "baths",
+  "lake",
+  "waterfall",
+  "gorge",
+  "pass",
+  "mount",
+  "mountain",
+  "complex",
+]);
+
+/** The parts of a name that identify it: long enough to mean something, not an address, not a kind. */
 function distinctive(name: string): string[] {
   return nameKey(name)
     .split(" ")
-    .filter((word) => word.length >= 4 && !NOT_A_NAME.has(word));
+    .filter(
+      (word) =>
+        word.length >= 4 && !NOT_A_NAME.has(word) && !KIND_OF_PLACE.has(word),
+    );
 }
+
+/** How many of a name's own words a photograph must use: all of a short name, half of a long one. */
+const needed = (words: number) => (words <= 2 ? words : Math.ceil(words / 2));
 
 export function selectPhotos(
   place: PlaceIdentity,
@@ -87,9 +130,9 @@ export function selectPhotos(
     const key = nameKey(text);
 
     // The best of the names: how many of its words the photograph uses, and
-    // whether that is all of them. One shared word is enough for a name of one
-    // or two, but a longer name needs half of it: "Hilton Garden Inn Chavchavadze"
-    // is not a photograph of Chavchavadze Avenue.
+    // whether that is all of them. A short name needs every one of its words
+    // ("Gergeti woods" is not the church at Gergeti) and a longer one half
+    // ("Hilton Garden Inn Chavchavadze" is not Chavchavadze Avenue).
     let matched = 0;
     let whole = false;
     let enough = false;
@@ -97,7 +140,7 @@ export function selectPhotos(
       const hit = tokens.filter((t) => key.includes(t)).length;
       if (hit > matched) matched = hit;
       if (hit === tokens.length) whole = true;
-      if (hit >= Math.ceil(tokens.length / 2)) enough = true;
+      if (hit >= needed(tokens.length)) enough = true;
     }
     if (matched === 0 || !enough) continue;
 
