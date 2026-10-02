@@ -27,11 +27,40 @@ export type PhotoCandidate = {
   lonLat: LonLat | null;
 };
 
-/** The parts of a name that identify it: long enough to mean something. */
+/**
+ * Words that appear in the title of half the photographs taken anywhere in the
+ * country, and so identify nothing: where it is, and what sort of thing a street
+ * or a district is. "Tbilisi" is in "Hilton Garden Inn Tbilisi" and also in every
+ * photograph of a staircase in Tbilisi.
+ */
+const NOT_A_NAME = new Set([
+  "tbilisi",
+  "tiflis",
+  "kutaisi",
+  "batumi",
+  "georgia",
+  "georgian",
+  "sakartvelo",
+  "street",
+  "avenue",
+  "district",
+  "square",
+  "town",
+  "city",
+  "central",
+  "center",
+  "centre",
+  "road",
+  "old",
+  "new",
+  "national",
+]);
+
+/** The parts of a name that identify it: long enough to mean something, and not a place's address. */
 function distinctive(name: string): string[] {
   return nameKey(name)
     .split(" ")
-    .filter((word) => word.length >= 4);
+    .filter((word) => word.length >= 4 && !NOT_A_NAME.has(word));
 }
 
 export function selectPhotos(
@@ -58,15 +87,19 @@ export function selectPhotos(
     const key = nameKey(text);
 
     // The best of the names: how many of its words the photograph uses, and
-    // whether that is all of them.
+    // whether that is all of them. One shared word is enough for a name of one
+    // or two, but a longer name needs half of it: "Hilton Garden Inn Chavchavadze"
+    // is not a photograph of Chavchavadze Avenue.
     let matched = 0;
     let whole = false;
+    let enough = false;
     for (const tokens of names) {
       const hit = tokens.filter((t) => key.includes(t)).length;
       if (hit > matched) matched = hit;
       if (hit === tokens.length) whole = true;
+      if (hit >= Math.ceil(tokens.length / 2)) enough = true;
     }
-    if (matched === 0) continue;
+    if (matched === 0 || !enough) continue;
 
     const metres = c.lonLat ? haversineM(place.lonLat, c.lonLat) : null;
     // Where it was taken, if it says, is near; if it does not say, the whole
