@@ -149,8 +149,18 @@ export const normalizeForQuote = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-export const quoteIsInSource = (quote: string, text: string): boolean =>
-  normalizeForQuote(text).includes(normalizeForQuote(quote));
+/**
+ * A model asked for "the exact sentence" will often mark that it took the
+ * middle of one with an ellipsis. The ellipsis is its punctuation, not the
+ * article's, so it is dropped from the ends before looking.
+ */
+const trimEllipsis = (s: string): string =>
+  s.replace(/^(\.{2,}|…|\s)+|(\.{2,}|…|\s)+$/g, "");
+
+export const quoteIsInSource = (quote: string, text: string): boolean => {
+  const needle = normalizeForQuote(trimEllipsis(quote.normalize("NFKC")));
+  return needle.length > 0 && normalizeForQuote(text).includes(needle);
+};
 
 export type VetContext = {
   /** The English text the extractor was shown. */

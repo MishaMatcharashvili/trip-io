@@ -187,6 +187,11 @@ describe("quoteIsInSource", () => {
     assert.ok(!quoteIsInSource("Rustaveli Avenue will stay open", TEXT));
   });
 
+  test("an ellipsis the model added at either end is not part of the quote", () => {
+    assert.ok(quoteIsInSource("... avenue will be closed to traffic …", TEXT));
+    assert.ok(!quoteIsInSource("...", TEXT));
+  });
+
   test("normalisation is idempotent", () => {
     const once = normalizeForQuote("  A—B   “C” ");
     assert.equal(normalizeForQuote(once), once);

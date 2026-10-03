@@ -16,6 +16,13 @@ const COMMON = `You read one news item about Georgia (the country), already in E
 extract scheduled things that would change a traveller's day. The item may be about
 something else entirely, which is the usual case: return an empty list then.
 
+Only things that are still ahead or under way at the date given as now. Skip anything that
+already happened, however it is worded. Skip private, official or diplomatic functions
+(receptions, press conferences, meetings): a visitor cannot attend them.
+
+If a thing happens in several places, give one item per place; a place field names one
+place only ("Tbilisi", never "Tbilisi and Batumi").
+
 For each thing, give:
 - kind: one of the kinds listed below.
 - place: where, as the item names it — a street, a district, a town. If the item names
