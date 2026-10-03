@@ -4,6 +4,7 @@ export * from "./catalogue.ts";
 export * from "./device.ts";
 export * from "./enrichment.ts";
 export * from "./generation.ts";
+export * from "./hours.ts";
 export * from "./job.ts";
 export * from "./road.ts";
 export * from "./saved.ts";
