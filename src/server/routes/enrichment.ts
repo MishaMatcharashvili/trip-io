@@ -27,8 +27,8 @@ import { requireSession, type SessionEnv } from "../auth.ts";
 //     every browser and CDN between here and the screen. What is kept is kept
 //     on purpose, server-side, in Redis, for a bounded time (see
 //     docs/tripadvisor.md, which says plainly that this goes against the
-//     letter of its caching policy). That is Tripadvisor's, by the owner's
-//     decision; Google's is not kept at all.
+//     letter of its caching policy). Both are the owner's decisions,
+//     Tripadvisor's for 12 hours and Google's for 60 days.
 //   * Reviews must not be in a page's source, so they are fetched from here by
 //     script, and /api is disallowed in robots.txt (src/app/robots.ts).
 //   * It spends money, so it asks for a session. Public search and logos
@@ -48,14 +48,19 @@ const status = {
   malformed: 502,
 } as const satisfies Record<EnrichFailure, number>;
 
-// Without Redis nothing is kept and every visit asks the provider.
-const kept =
+// Without Redis nothing is kept and every visit asks the provider. One store per
+// provider: their answers for a place are separate entries, with separate lifetimes.
+const keptFor = (provider: string) =>
   env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
     ? upstashContent({
         url: env.UPSTASH_REDIS_REST_URL,
         token: env.UPSTASH_REDIS_REST_TOKEN,
+        provider,
       })
     : undefined;
+
+/** How long Google's answer is kept unless told otherwise: 60 days, the owner's decision of 2026-10-03. */
+const GOOGLE_CONTENT_TTL_S = 60 * 86_400;
 
 /** The review sources a place can be asked of, each with its own terms and bill. */
 const sources = ["tripadvisor", "google"] as const;
@@ -63,7 +68,7 @@ type Source = (typeof sources)[number];
 
 type SourceConfig = {
   provider: PlaceEnricher;
-  kept: typeof kept;
+  kept: ReturnType<typeof keptFor>;
   contentTtlSeconds: number;
   limits: typeof defaultLimits;
 };
@@ -71,7 +76,7 @@ type SourceConfig = {
 const config: Record<Source, SourceConfig> = {
   tripadvisor: {
     provider: tripadvisor({ key: env.TRIPADVISOR_API_KEY }),
-    kept,
+    kept: keptFor("tripadvisor"),
     contentTtlSeconds: env.TRIPADVISOR_CONTENT_TTL_S ?? DEFAULT_CONTENT_TTL_S,
     limits: {
       ...defaultLimits,
@@ -82,12 +87,13 @@ const config: Record<Source, SourceConfig> = {
   },
   google: {
     provider: googlePlaces({ key: env.GOOGLE_PLACES_API_KEY }),
-    // Google's terms allow keeping a place's identifier and nothing it says
-    // about it, so there is no store for it, whatever Redis is configured.
-    kept: undefined,
-    contentTtlSeconds: 0,
-    // Tighter than Tripadvisor's, because nothing is kept: every open place is
-    // a Details call and up to six photograph calls, billed.
+    // Kept for 60 days, on the owner's decision. Google's terms allow storing a
+    // place's identifier and, as read, nothing it says about it: like
+    // Tripadvisor's, this departs from the letter (docs/google-places.md).
+    kept: keptFor("google"),
+    contentTtlSeconds: env.GOOGLE_PLACES_CONTENT_TTL_S ?? GOOGLE_CONTENT_TTL_S,
+    // Tighter than Tripadvisor's: a place opened for the first time is a Details
+    // call and up to six photograph calls, billed. One served from Redis is free.
     limits: {
       ...defaultLimits,
       userPerDay: env.GOOGLE_PLACES_USER_PER_DAY ?? 30,

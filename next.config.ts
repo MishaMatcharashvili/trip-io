@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   cacheComponents: true,
   images: {
+    // How long a resized photograph is kept: 60 days, the owner's decision of
+    // 2026-10-03. The default is 4 hours, which would resize the same photo again
+    // every few hours for want of knowing it has not changed.
+    minimumCacheTTL: 60 * 86_400,
     // Hosts a place's photographs come from (src/infra): a host not listed here
     // cannot be optimised, so a new provider adds its CDN here. Tripadvisor
     // serves the photographer's original (up to ~5000px wide, several MB) and

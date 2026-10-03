@@ -61,11 +61,17 @@ export const env = createEnv({
     /**
      * What opening a place may spend on Google (src/bll/place-enrichment.ts).
      * An open place is a Details call and up to six photograph calls, all
-     * billed, and what Google says is never kept, so every open pays. Unset,
-     * the defaults in src/server/routes/enrichment.ts apply.
+     * billed; one served from Redis is free and not counted against the day's
+     * total. Unset, the defaults in src/server/routes/enrichment.ts apply.
      */
     GOOGLE_PLACES_USER_PER_DAY: z.coerce.number().int().positive().optional(),
     GOOGLE_PLACES_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
+    /**
+     * How long what Google said about a place is kept in Redis, in seconds.
+     * Unset, 60 days. 0 keeps nothing: the one switch back to reading Google on
+     * every visit.
+     */
+    GOOGLE_PLACES_CONTENT_TTL_S: z.coerce.number().int().min(0).optional(),
   },
   client: {
     /**

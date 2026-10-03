@@ -33,8 +33,8 @@ import type {
 //
 // Google's terms apply to what this returns: attribution is shown with it (the
 // source is named "Google Maps", every photograph carries its author, every
-// review its author and a link), and the use case is given no store for it. See
-// docs/google-places.md.
+// review its author and a link). What is kept, and for how long, is the use case's
+// business and the owner's decision. See docs/google-places.md.
 //
 // Parsed against the shapes in Google's reference, which has been read but not
 // run against: `pnpm smoke:google-places` is what checks them against the live
@@ -244,8 +244,8 @@ export function googlePlaces(options: {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
-        // Next's fetch cache must not keep it: Google's terms do not allow
-        // keeping what it returns, beyond the place's identifier.
+        // Next's fetch cache must not keep it: what is kept is kept on purpose,
+        // with a lifetime, in the store behind KeptContent.
         cache: "no-store",
       });
     } catch (error) {

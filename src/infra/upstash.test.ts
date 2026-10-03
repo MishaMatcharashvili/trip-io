@@ -38,6 +38,7 @@ const store = (f: ReturnType<typeof fake>, extra = {}) =>
   upstashContent({
     url: "https://redis.example",
     token: "tok",
+    provider: "tripadvisor",
     fetch: f.fetch,
     ...extra,
   });
@@ -50,8 +51,14 @@ describe("upstash content", () => {
     assert.deepEqual(await kept.get(PLACE), outcome);
     const [set] = f.sent;
     assert.equal(set.args[0], "SET");
-    assert.equal(set.args[1], `place-enrichment:v1:${PLACE}`);
+    assert.equal(set.args[1], `place-enrichment:v2:tripadvisor:${PLACE}`);
     assert.deepEqual(set.args.slice(3), ["EX", 3_600]);
+  });
+
+  test("two providers' answers for one place are kept apart", async () => {
+    const f = fake();
+    await store(f).set(PLACE, outcome, 60);
+    assert.equal(await store(f, { provider: "google" }).get(PLACE), null);
   });
 
   test("the token is a bearer header and nothing else", async () => {
@@ -79,15 +86,15 @@ describe("upstash content", () => {
   test("an entry from another version, or not ours, is not read", async () => {
     const f = fake();
     f.data.set(
-      `place-enrichment:v1:${PLACE}`,
+      `place-enrichment:v2:tripadvisor:${PLACE}`,
       JSON.stringify({ v: 0, outcome }),
     );
     assert.equal(await store(f).get(PLACE), null);
-    f.data.set(`place-enrichment:v1:${PLACE}`, "not json");
+    f.data.set(`place-enrichment:v2:tripadvisor:${PLACE}`, "not json");
     assert.equal(await store(f).get(PLACE), null);
     f.data.set(
-      `place-enrichment:v1:${PLACE}`,
-      JSON.stringify({ v: 1, outcome: 5 }),
+      `place-enrichment:v2:tripadvisor:${PLACE}`,
+      JSON.stringify({ v: 2, outcome: 5 }),
     );
     assert.equal(await store(f).get(PLACE), null);
   });
@@ -115,6 +122,7 @@ describe("upstash content", () => {
       upstashContent({
         url: "https://redis.example",
         token: "t",
+        provider: "tripadvisor",
         fetch: slow,
         timeoutMs: 10,
       }).get(PLACE),
