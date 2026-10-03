@@ -25,8 +25,10 @@ import type {
 //     its count, the page to link to, a few reviews, and the photographs' names.
 //   * One Place Photos call per photograph shown, asking for the address rather
 //     than the bytes (`skipHttpRedirect`). The reply is a googleusercontent.com
-//     address that carries no key, which is what lets the browser — and next/image
-//     — fetch it without the key ever leaving this file. A photograph's name is
+//     address that carries no key, which is what lets the browser fetch it
+//     without the key ever leaving this file. The address may be kept; the picture
+//     is not (`unoptimized`): it is not run through next/image, whose cache would
+//     hold a copy. A photograph's name is
 //     not an address and is useless to the client; the address is resolved here.
 //   * Details first, photographs after: a rating with no pictures is worth
 //     showing, so a photograph that cannot be resolved is dropped, not fatal.
@@ -168,6 +170,9 @@ export function toPhoto(
     height: photo.heightPx ?? 3,
     caption: null,
     by: null,
+    // The address is what is kept; the picture is Google's, fetched from Google
+    // by the browser each time and never copied here.
+    unoptimized: true,
     credit: {
       text: author?.displayName ? `${author.displayName} · ${name}` : name,
       url: author?.uri ?? page,

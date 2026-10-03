@@ -14,16 +14,14 @@ const nextConfig: NextConfig = {
     // cannot be optimised, so a new provider adds its CDN here. Tripadvisor
     // serves the photographer's original (up to ~5000px wide, several MB) and
     // the strip draws it 150px wide, so it is the one that needs resizing most.
-    // Google's are the addresses its Place Photos call returns; they carry no key.
+    // Google's photographs are not listed on purpose: they are served as they are
+    // (`unoptimized`), so the optimiser never holds a copy of them.
     remotePatterns: [
       {
         protocol: "https",
         hostname: "dynamic-media.tacdn.com",
         pathname: "/media/**",
       },
-      // Not yet seen live (no key when this was written): `pnpm smoke:google-places`
-      // prints the host a photograph really comes from.
-      { protocol: "https", hostname: "*.googleusercontent.com" },
       {
         protocol: "https",
         hostname: "upload.wikimedia.org",

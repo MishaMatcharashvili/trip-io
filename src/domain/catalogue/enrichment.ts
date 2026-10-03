@@ -41,6 +41,12 @@ export type Photo = {
    * serves one. Absent, the strip uses `url`.
    */
   preview?: string;
+  /**
+   * Serve it as it is, never through the image optimiser: the optimiser keeps
+   * resized copies, and the source's terms allow its links to be kept but not
+   * its pictures.
+   */
+  unoptimized?: true;
   width: number;
   height: number;
   caption: string | null;

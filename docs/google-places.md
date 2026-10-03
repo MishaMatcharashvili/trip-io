@@ -15,8 +15,7 @@ built). `pnpm smoke:google-places` is how to find out.
    calls come from the server.
 3. `GOOGLE_PLACES_API_KEY` in `.env` (and in Vercel). Unset, the panel shows Tripadvisor's alone.
 4. `pnpm smoke:google-places` — four known places, about 32 billed calls. It also prints the host the
-   photographs are served from; that must match `images.remotePatterns` in `next.config.ts`
-   (`*.googleusercontent.com` is a guess from the reference).
+   photographs are served from, and checks that one loads without the key.
 
 ## What is asked for
 
@@ -34,8 +33,8 @@ believed: the search bias is a preference, not a fence.
 
 **Why photographs are resolved on the server.** A photograph is a *name*, not an address, and fetching
 it needs the key. Putting the key in an `<img src>` would publish it. Asking for `skipHttpRedirect`
-returns a `googleusercontent.com` address that carries no key, which the browser and `next/image` can
-fetch freely. Each resolution is a billed call, hence the cap of six; one that fails is dropped.
+returns a `googleusercontent.com` address that carries no key, which the browser can fetch freely. Each
+resolution is a billed call, hence the cap of six; one that fails is dropped.
 
 ## Terms, and what this build does about them
 
@@ -54,16 +53,20 @@ As the terms were read when this was written (re-read them: they change):
 - **How long:** `GOOGLE_PLACES_CONTENT_TTL_S`, 60 days unset. Every `SET` carries an `EX`. A failure is
   kept 30 seconds. Without the `UPSTASH_*` variables nothing is kept.
 - **To stop:** set `GOOGLE_PLACES_CONTENT_TTL_S=0`, or unset the Upstash variables.
-- **Photographs are resized and kept for 60 days too:** `next/image` keeps its resized copies for
-  `images.minimumCacheTTL` (`next.config.ts`), 60 days, again on the owner's decision. Google's photographs
-  go through it like the others. To stop that for Google alone, serve its photographs `unoptimized` in
-  `PhotoTile` (`src/features/place-voices.tsx`), at the price of sending the 1200px image to the strip.
-- **Risk to measure: photograph addresses may expire.** What is kept for a place includes each photograph's
-  `googleusercontent.com` address, and the reference does not say how long one lives. A photograph the
-  optimiser has already fetched is safe for its 60 days; one not yet fetched (scrolled past, or never
-  opened full screen) is not, and a dead address drops out of the strip silently. If, a day or more after
-  opening a place, its Google photographs go missing, shorten `GOOGLE_PLACES_CONTENT_TTL_S` to the
-  addresses' lifetime. (The smoke script checks that an address loads; it cannot say how long.)
+- **The address is kept; the picture is not.** Google's photographs are marked `unoptimized`: they do not
+  go through `next/image`, so the optimiser (which keeps resized copies for 60 days,
+  `images.minimumCacheTTL`) never holds one, and `next.config.ts` does not list Google's host. The browser
+  loads the picture from Google each time and may keep it in its own HTTP cache, which is ordinary
+  browsing. The cost of that choice: the strip draws the 1200px image into a 150px slot, with no
+  resizing, so Google's photographs are heavier than Tripadvisor's. (A second, small Place Photos call per
+  photograph would fix it, at double the billed photo calls; not done.)
+- **Risk to measure: photograph addresses may expire.** What is kept for a place includes each
+  photograph's `googleusercontent.com` address, and the reference does not say how long one lives.
+  Nothing holds the picture now, so an address that has expired is a missing photograph, and it drops out
+  of the strip silently. If, a day or more after opening a place, its Google photographs go missing,
+  shorten `GOOGLE_PLACES_CONTENT_TTL_S` to the addresses' lifetime (the reviews and rating can outlive
+  them, but they share one entry). The smoke script checks that an address loads; it cannot say how long
+  it keeps loading.
 
 ## What it costs
 
