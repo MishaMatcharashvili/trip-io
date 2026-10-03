@@ -20,17 +20,21 @@ const TIMEOUT_MS = 1_500;
 /**
  * The key's version is part of it. A change to what is stored (Enrichment's
  * shape) bumps it, and old entries are never read by new code: they age out.
+ * 2: the provider joined the key, and a photo gained a smaller `preview`.
  */
-const VERSION = 1;
-const keyFor = (placeId: string) => `place-enrichment:v${VERSION}:${placeId}`;
+const VERSION = 2;
+const keyFor = (provider: string, placeId: string) =>
+  `place-enrichment:v${VERSION}:${provider}:${placeId}`;
 
 export function upstashContent(options: {
   url: string;
   token: string;
+  /** Whose content this holds: two providers' answers for one place are two entries. */
+  provider: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
 }): KeptContent {
-  const { url, token, timeoutMs = TIMEOUT_MS } = options;
+  const { url, token, provider, timeoutMs = TIMEOUT_MS } = options;
   const send = options.fetch ?? fetch;
 
   async function command(args: (string | number)[]): Promise<unknown> {
@@ -53,7 +57,7 @@ export function upstashContent(options: {
 
   return {
     async get(placeId) {
-      const raw = await command(["GET", keyFor(placeId)]);
+      const raw = await command(["GET", keyFor(provider, placeId)]);
       if (typeof raw !== "string") return null;
       try {
         const kept = JSON.parse(raw) as {
@@ -73,7 +77,7 @@ export function upstashContent(options: {
       const ttl = Math.max(1, Math.floor(ttlSeconds));
       await command([
         "SET",
-        keyFor(placeId),
+        keyFor(provider, placeId),
         JSON.stringify({ v: VERSION, outcome }),
         "EX",
         ttl,

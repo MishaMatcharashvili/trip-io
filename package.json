@@ -22,6 +22,7 @@
     "smoke:route": "node --env-file=.env scripts/dev/smoke-route.ts",
     "smoke:wikimedia": "node scripts/dev/smoke-wikimedia.ts",
     "smoke:tripadvisor": "node --env-file=.env scripts/dev/smoke-tripadvisor.ts",
+    "smoke:google-places": "node --env-file=.env scripts/dev/smoke-google-places.ts",
     "smoke:telegram": "node --env-file=.env scripts/dev/smoke-telegram.ts",
     "kill:count": "node --env-file=.env scripts/dev/synthetic-count.ts",
     "judge:eval": "node --env-file=.env scripts/dev/judge-eval.ts",

@@ -7,6 +7,7 @@ import {
   googleImagesUrl,
   reviewDate,
   reviewLine,
+  stepIndex,
 } from "./place-voices-model.ts";
 
 describe("excerpt", () => {
@@ -83,5 +84,21 @@ describe("creditHref", () => {
 
   test("a credit that is not a URL is left as it is", () => {
     assert.equal(creditHref({ text: "x", url: "nonsense" }, "A"), "nonsense");
+  });
+});
+
+describe("stepIndex", () => {
+  test("moves along the photographs", () => {
+    assert.equal(stepIndex(1, 1, 4), 2);
+    assert.equal(stepIndex(2, -1, 4), 1);
+  });
+
+  test("wraps round at either end", () => {
+    assert.equal(stepIndex(3, 1, 4), 0);
+    assert.equal(stepIndex(0, -1, 4), 3);
+  });
+
+  test("with no photographs there is nowhere to go", () => {
+    assert.equal(stepIndex(0, 1, 0), 0);
   });
 });

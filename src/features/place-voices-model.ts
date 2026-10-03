@@ -90,3 +90,9 @@ export function creditHref(
   }
   return credit.url;
 }
+
+/** The photograph `delta` places from `index`, wrapping round at either end. */
+export function stepIndex(index: number, delta: number, count: number): number {
+  if (count <= 0) return 0;
+  return (((index + delta) % count) + count) % count;
+}
