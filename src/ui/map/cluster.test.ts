@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clusterIndex } from "./cluster.ts";
+import { clusterIndex, leader } from "./cluster.ts";
 
 const WORLD: [number, number, number, number] = [-180, -90, 180, 90];
 
@@ -29,4 +29,28 @@ test("one stop is one stop", () => {
     6,
   );
   assert.ok(!("cluster" in only.properties));
+});
+
+test("a group is led by its heaviest stop", () => {
+  const group = [
+    { id: "cafe", weight: 24 },
+    { id: "castle", weight: 83 },
+    { id: "bar", weight: 30 },
+  ];
+  assert.equal(leader(group).id, "castle");
+});
+
+test("of equals the earliest leads, so the same group always shows the same pin", () => {
+  assert.equal(
+    leader([
+      { id: "a", weight: 5 },
+      { id: "b", weight: 5 },
+    ]).id,
+    "a",
+  );
+  assert.equal(leader([{ id: "a" }, { id: "b" }]).id, "a");
+});
+
+test("a group of one is its own leader", () => {
+  assert.equal(leader([{ id: "only" }]).id, "only");
 });

@@ -1,6 +1,12 @@
 import type { Map as MapboxMap } from "mapbox-gl";
 import { GEORGIA_BBOX } from "../../domain/geo.ts";
 import { env } from "../../lib/env.ts";
+import {
+  getMapStyle,
+  type MapStyleKind,
+  type Scheme,
+  styleUrl,
+} from "./map-style.ts";
 import { loadMapbox, type Mapbox } from "./mapbox.ts";
 
 // One Mapbox map for the whole visit, not one per page. Every `new Map` is a
@@ -18,7 +24,7 @@ import { loadMapbox, type Mapbox } from "./mapbox.ts";
 // sources and layers the borrower added; the overlays put theirs back when
 // the new style has loaded.
 
-export type Scheme = "light" | "dark";
+export type { Scheme };
 
 export type Lease = {
   readonly map: MapboxMap;
@@ -28,18 +34,27 @@ export type Lease = {
 type Pooled = {
   map: MapboxMap;
   mapbox: Mapbox;
-  /** The style the map is showing, so a borrower in another theme can change it. */
-  scheme: Scheme;
+  /** The style the map is showing, so a borrower that wants another can change it. */
+  url: string;
   container: HTMLDivElement;
 };
 
 const idle: Pooled[] = [];
 const KEEP_IDLE = 1;
 
-const STYLES: Record<Scheme, string> = {
-  light:
-    env.NEXT_PUBLIC_MAPBOX_STYLE_LIGHT ?? "mapbox://styles/mapbox/light-v11",
-  dark: env.NEXT_PUBLIC_MAPBOX_STYLE_DARK ?? "mapbox://styles/mapbox/dark-v11",
+/** The app's own Studio styles, where it has them (docs/mapbox.md). */
+const OVERRIDES = {
+  light: env.NEXT_PUBLIC_MAPBOX_STYLE_LIGHT,
+  dark: env.NEXT_PUBLIC_MAPBOX_STYLE_DARK,
+  terrain: env.NEXT_PUBLIC_MAPBOX_STYLE_TERRAIN,
+};
+
+const urlFor = (kind: MapStyleKind, scheme: Scheme) =>
+  styleUrl(kind, scheme, OVERRIDES);
+
+/** What CSS can key on: imagery needs its labels drawn differently from a street map. */
+const mark = (container: HTMLElement, kind: MapStyleKind) => {
+  container.dataset.mapStyle = kind;
 };
 
 export const currentScheme = (): Scheme =>
@@ -47,17 +62,23 @@ export const currentScheme = (): Scheme =>
     ? "dark"
     : "light";
 
-function build(mapbox: Mapbox, slot: HTMLElement, scheme: Scheme): Pooled {
+function build(
+  mapbox: Mapbox,
+  slot: HTMLElement,
+  kind: MapStyleKind,
+  scheme: Scheme,
+): Pooled {
   const container = document.createElement("div");
   container.style.width = "100%";
   container.style.height = "100%";
   // Measured on construction, so it goes into the page before the map does.
   slot.append(container);
+  mark(container, kind);
 
   const { west, south, east, north } = GEORGIA_BBOX;
   const map = new mapbox.Map({
     container,
-    style: STYLES[scheme],
+    style: urlFor(kind, scheme),
     center: [(west + east) / 2, (south + north) / 2],
     zoom: 6,
     // The app has its own zoom and recentre controls. Mapbox's logo and
@@ -70,7 +91,7 @@ function build(mapbox: Mapbox, slot: HTMLElement, scheme: Scheme): Pooled {
     cooperativeGestures: false,
   });
   map.touchZoomRotate.disableRotation();
-  return { map, mapbox, scheme, container };
+  return { map, mapbox, url: urlFor(kind, scheme), container };
 }
 
 /**
@@ -89,16 +110,19 @@ export function borrow(
   loadMapbox(token).then((mapbox) => {
     if (cancelled) return;
     const scheme = currentScheme();
+    const kind = getMapStyle();
     const reused = idle.pop();
     if (reused) {
       slot.append(reused.container);
       reused.map.resize();
-      if (reused.scheme !== scheme) {
-        reused.map.setStyle(STYLES[scheme]);
-        reused.scheme = scheme;
+      mark(reused.container, kind);
+      const url = urlFor(kind, scheme);
+      if (reused.url !== url) {
+        reused.map.setStyle(url);
+        reused.url = url;
       }
     }
-    ready(reused ?? build(mapbox, slot, scheme));
+    ready(reused ?? build(mapbox, slot, kind, scheme));
   }, failed);
   return () => {
     cancelled = true;
@@ -111,12 +135,19 @@ function dispose(pooled: Pooled) {
   pooled.container.remove();
 }
 
-/** Change the style to the theme's, for a map that is already on a page. */
-export function applyScheme(lease: Lease, scheme: Scheme) {
+/**
+ * Change a map that is already on a page to the traveller's choice, in the
+ * theme's scheme. Mapbox restyles in place: it is not a new map and not a new
+ * billable load, but it drops what the borrower added, which the overlays put
+ * back when the new style has loaded.
+ */
+export function applyStyle(lease: Lease, kind: MapStyleKind, scheme: Scheme) {
   const pooled = lease as Pooled;
-  if (pooled.scheme === scheme) return;
-  pooled.scheme = scheme;
-  pooled.map.setStyle(STYLES[scheme]);
+  mark(pooled.container, kind);
+  const url = urlFor(kind, scheme);
+  if (pooled.url === url) return;
+  pooled.url = url;
+  pooled.map.setStyle(url);
 }
 
 /** Hand a map back. The borrower removes its own markers and layers first. */

@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–6 built; Phase 7 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–7 built; Phase 7 not yet run on a phone. Phase 8 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -90,9 +90,9 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 7 — native shell
 
-- [ ] Expo app against the shared Hono client
-- [ ] Auth, trip list, intervention card (accept/dismiss), push registration, settings
-- [ ] EAS build, TestFlight + Android internal track (beta distribution — store review off critical path)
+- [x] Expo app against the shared Hono client — Expo Router over `hc<AppType>()`, the session kept in the keychain by Better Auth's Expo client and sent as a cookie on every request
+- [~] Auth, trip list, intervention card (accept/dismiss), push registration, settings — all built, type-checked and bundled for both platforms, and the server half exercised over HTTP from a `trip-io://` origin. **Not yet run on a device or simulator.** Email and password only: Google sign-in waits for Google credentials (Phase 0), and planning stays on the web by design
+- [~] EAS build, TestFlight + Android internal track — `mobile/eas.json` has development, preview and production profiles. No build has run: it needs the Apple Developer account, an FCM project and `eas init` (see `context/running-the-pipeline.md` §7)
 
 ## Phase 8 — detector expansion + road-automation spike
 

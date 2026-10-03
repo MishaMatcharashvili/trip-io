@@ -256,3 +256,17 @@
     outline-offset: 2px;
   }
 }
+
+/*
+ * Over satellite imagery the street map's ground-coloured halo is a pale smudge,
+ * and the dark label on it unreadable on dark forest. A map showing imagery is
+ * marked by the pool (src/ui/map/pool.ts), and its stop names are drawn white
+ * with a dark halo instead.
+ */
+[data-map-style="satellite"] [data-stop-label] {
+  color: #fff;
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.95),
+    0 0 4px rgba(0, 0, 0, 0.8),
+    0 1px 6px rgba(0, 0, 0, 0.6);
+}

@@ -6,8 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Toggle } from "@/ui/control";
+import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
-import { Icon } from "@/ui/icon";
+import { Icon, type IconName } from "@/ui/icon";
+import { MapStyleSwitch } from "@/ui/map/map-style-switch";
 import { googleMapsDirectionsUrl } from "@/ui/map/open-in-maps";
 import {
   defaultLayers,
@@ -59,11 +61,14 @@ export function TripMapScreen({
   stops,
   events = [],
   cards,
+  routed = true,
   dimmed = false,
 }: {
   stops: MapStop[];
   events?: MapEvent[];
   cards: StopCard[];
+  /** Draw the road between the stops: only for one day's, never several days'. */
+  routed?: boolean;
   dimmed?: boolean;
 }) {
   const router = useRouter();
@@ -72,6 +77,8 @@ export function TripMapScreen({
   const [layers, setLayers] = useState<MapLayers>(defaultLayers);
   const [selected, setSelected] = useState<string | null>(null);
   const [routeOpen, setRouteOpen] = useState(false);
+  // The desktop route and layers panel: closed until asked for.
+  const [instruments, setInstruments] = useState(false);
 
   // The road: asked for when the stops change or the traveller asks again,
   // never on a pan, a zoom or a panel opening. Between exactly two stops the
@@ -81,8 +88,8 @@ export function TripMapScreen({
     selected: chosen,
     select: pickRoute,
     refresh,
-  } = useTripRoute(stops, {
-    alternatives: stops.length === 2,
+  } = useTripRoute(routed ? stops : [], {
+    alternatives: routed && stops.length === 2,
   });
   const view = describeRoute(route, chosen, stops, new Date());
   const mapsUrl = googleMapsDirectionsUrl(stops.map((s) => s.lonLat));
@@ -112,6 +119,22 @@ export function TripMapScreen({
 
   const layer = (name: keyof MapLayers) => (on: boolean) =>
     setLayers((l) => ({ ...l, [name]: on }));
+
+  const controls: {
+    label: string;
+    icon: IconName;
+    size?: number;
+    act: () => void;
+  }[] = [
+    { label: "Zoom out", icon: "minus", act: () => map.current?.zoomOut() },
+    { label: "Zoom in", icon: "plus", act: () => map.current?.zoomIn() },
+    {
+      label: "Recentre",
+      icon: "locate",
+      size: 15,
+      act: () => map.current?.recentre(),
+    },
+  ];
 
   const hasWeather = events.some((e) => e.kind.startsWith("weather"));
   const hasRoads = events.some((e) => e.kind.startsWith("road"));
@@ -145,9 +168,10 @@ export function TripMapScreen({
         />
       ) : null}
 
-      {layout === "mobile" && stops.length >= 2 ? (
+      {layout === "mobile" ? (
         <div className="absolute bottom-[356px] right-3 z-20 flex max-w-[calc(100%-24px)] flex-col items-end gap-2 lg:hidden">
-          {routeOpen ? (
+          <MapStyleSwitch variant="step" />
+          {stops.length >= 2 && routeOpen ? (
             <Panel className="w-[264px] p-3">
               <RouteSection
                 view={view}
@@ -157,124 +181,155 @@ export function TripMapScreen({
               />
             </Panel>
           ) : null}
-          <button
-            type="button"
-            aria-expanded={routeOpen}
-            onClick={() => setRouteOpen((open) => !open)}
-            className="rounded-full border border-hairline-strong bg-surface px-3 py-1.5 text-mini font-medium shadow-panel"
-          >
-            {view.kind === "ready"
-              ? `${view.time} · ${view.distance}`
-              : view.kind === "loading"
-                ? "Finding the road…"
-                : "Route"}
-          </button>
+          {stops.length >= 2 ? (
+            <button
+              type="button"
+              aria-expanded={routeOpen}
+              onClick={() => setRouteOpen((open) => !open)}
+              className="rounded-full border border-hairline-strong bg-surface px-3 py-1.5 text-mini font-medium shadow-panel"
+            >
+              {view.kind === "ready"
+                ? `${view.time} · ${view.distance}`
+                : view.kind === "loading"
+                  ? "Finding the road…"
+                  : "Route"}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
       <div className="hidden lg:block">
-        <div className="absolute bottom-[30px] right-6 z-20 w-[38px] overflow-hidden rounded-panel border border-hairline-strong bg-surface shadow-panel">
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={() => map.current?.zoomIn()}
-            className="flex h-9 w-full items-center justify-center text-ink-muted hover:bg-canvas"
-          >
-            <Icon name="plus" />
-          </button>
-          <Divider />
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={() => map.current?.zoomOut()}
-            className="flex h-9 w-full items-center justify-center text-ink-muted hover:bg-canvas"
-          >
-            <Icon name="minus" />
-          </button>
-          <Divider />
-          <button
-            type="button"
-            aria-label="Recentre"
-            onClick={() => map.current?.recentre()}
-            className="flex h-9 w-full items-center justify-center text-ink-muted hover:bg-canvas"
-          >
-            <Icon name="locate" size={15} />
-          </button>
-        </div>
-
-        <Panel className="absolute bottom-[30px] right-[74px] z-20 max-h-[calc(100%-140px)] w-[240px] overflow-y-auto">
-          <div className="px-3.5 py-2.5">
-            <Eyebrow>Route</Eyebrow>
-          </div>
-          <Divider />
-          <RouteSection
-            view={view}
-            onRefresh={refresh}
-            onPick={pickRoute}
-            mapsUrl={mapsUrl}
-            className="px-3.5 py-2.5"
-          />
-          <Divider />
-          <div className="px-3.5 py-2.5">
-            <Eyebrow>Layers</Eyebrow>
-          </div>
-          <Divider />
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <span className="flex-1 text-small">Route</span>
-            <Toggle
-              label="Route layer"
-              size="sm"
-              on={layers.route}
-              onChange={layer("route")}
-            />
-          </div>
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <span className="flex-1 text-small">
-              Traffic
-              <span className="block text-mini text-ink-faint">
-                Congestion where Mapbox has data
+        {/* The map's controls: a bar that is always there, with the route and
+            layers on one side and the zoom on the other, and a panel that opens
+            above it on request. Open all the time the panel sat under the cards
+            of the right-hand column and could not be reached; the zoom had its
+            own stack beside it, which ran into those cards. */}
+        <div className="absolute bottom-[30px] right-6 z-30 flex max-h-[calc(100%-120px)] w-[320px] flex-col gap-2">
+          {instruments ? (
+            <Panel className="min-h-0 flex-1 overflow-y-auto">
+              <div className="px-3.5 py-2.5">
+                <Eyebrow>Route</Eyebrow>
+              </div>
+              <Divider />
+              <RouteSection
+                view={view}
+                onRefresh={refresh}
+                onPick={pickRoute}
+                mapsUrl={mapsUrl}
+                className="px-3.5 py-2.5"
+              />
+              <Divider />
+              <div className="px-3.5 py-2.5">
+                <Eyebrow>Base map</Eyebrow>
+              </div>
+              <Divider />
+              <div className="px-3.5 py-2.5">
+                <MapStyleSwitch />
+              </div>
+              <Divider />
+              <div className="px-3.5 py-2.5">
+                <Eyebrow>Layers</Eyebrow>
+              </div>
+              <Divider />
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <span className="flex-1 text-small">Route</span>
+                <Toggle
+                  label="Route layer"
+                  size="sm"
+                  on={layers.route}
+                  onChange={layer("route")}
+                />
+              </div>
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <span className="flex-1 text-small">
+                  Traffic
+                  <span className="block text-mini text-ink-faint">
+                    Congestion where Mapbox has data
+                  </span>
+                </span>
+                <Toggle
+                  label="Traffic layer"
+                  size="sm"
+                  on={layers.traffic}
+                  onChange={layer("traffic")}
+                />
+              </div>
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                <span className="flex-1 text-small">
+                  Weather
+                  {hasWeather ? null : (
+                    <span className="block text-mini text-ink-faint">
+                      Nothing on your stops
+                    </span>
+                  )}
+                </span>
+                <Toggle
+                  label="Weather layer"
+                  size="sm"
+                  on={layers.weather}
+                  onChange={layer("weather")}
+                />
+              </div>
+              <div className="flex items-center gap-2.5 px-3.5 pb-3 pt-2.5">
+                <span className="flex-1 text-small">
+                  Road incidents
+                  {hasRoads ? null : (
+                    <span className="block text-mini text-ink-faint">
+                      None on your route
+                    </span>
+                  )}
+                </span>
+                <Toggle
+                  label="Road incidents layer"
+                  size="sm"
+                  on={layers.roads}
+                  onChange={layer("roads")}
+                />
+              </div>
+            </Panel>
+          ) : null}
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              aria-expanded={instruments}
+              onClick={() => setInstruments((open) => !open)}
+              className="flex h-[38px] min-w-0 flex-1 items-center gap-2 rounded-panel border border-hairline-strong bg-surface px-3.5 text-small font-medium shadow-panel hover:bg-canvas"
+            >
+              <Icon name="route" size={14} className="text-ink-muted" />
+              <span className="flex-1 truncate text-left">
+                {view.kind === "ready"
+                  ? `${view.time} · ${view.distance}`
+                  : view.kind === "loading"
+                    ? "Finding the road…"
+                    : "Route & layers"}
               </span>
-            </span>
-            <Toggle
-              label="Traffic layer"
-              size="sm"
-              on={layers.traffic}
-              onChange={layer("traffic")}
-            />
+              <Icon
+                name="chevronDown"
+                size={14}
+                className={cx(
+                  "text-ink-faint transition-transform",
+                  instruments && "rotate-180",
+                )}
+              />
+            </button>
+            <div className="flex h-[38px] shrink-0 overflow-hidden rounded-panel border border-hairline-strong bg-surface shadow-panel">
+              {controls.map(({ label, icon, size, act }, i) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-label={label}
+                  onClick={act}
+                  className={cx(
+                    "flex w-9 items-center justify-center text-ink-muted hover:bg-canvas",
+                    i > 0 && "border-l border-hairline",
+                  )}
+                >
+                  <Icon name={icon} size={size} />
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <span className="flex-1 text-small">
-              Weather
-              {hasWeather ? null : (
-                <span className="block text-mini text-ink-faint">
-                  Nothing on your stops
-                </span>
-              )}
-            </span>
-            <Toggle
-              label="Weather layer"
-              size="sm"
-              on={layers.weather}
-              onChange={layer("weather")}
-            />
-          </div>
-          <div className="flex items-center gap-2.5 px-3.5 pb-3 pt-2.5">
-            <span className="flex-1 text-small">
-              Road incidents
-              {hasRoads ? null : (
-                <span className="block text-mini text-ink-faint">
-                  None on your route
-                </span>
-              )}
-            </span>
-            <Toggle
-              label="Road incidents layer"
-              size="sm"
-              on={layers.roads}
-              onChange={layer("roads")}
-            />
-          </div>
-        </Panel>
+        </div>
 
         {card ? (
           <Panel className="absolute left-[400px] top-5 z-20 w-[260px] overflow-hidden">
@@ -296,7 +351,7 @@ export function TripMapScreen({
               <Title className="text-[15px]">{card.title}</Title>
               <div className="flex gap-3.5">
                 {[
-                  { label: "Starts", value: card.time },
+                  { label: "Time", value: card.time },
                   { label: "Takes", value: card.duration },
                   { label: "Kind", value: card.kind },
                 ].map((stat) => (

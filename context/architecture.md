@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 0–5 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+Status: Phases 0–7 built (see `context/progress-tracker.md`). Reflects the decisions of record in
 `docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
 update it when an architectural decision changes; don't let it drift from the code.
 
@@ -35,7 +35,7 @@ schema and cron design this section summarizes.
 | Email | Resend | daily briefing |
 | Push | expo-notifications + EAS | APNs + FCM; credential setup starts week 1, latency doesn't compress |
 | Telegram | grammY, webhook | manual road-corridor report form (detector #2) |
-| Native | Expo in `mobile/`, a pnpm workspace package, sharing the Hono client via `hc<AppType>()` | thin shell — trip list, intervention card, push registration, settings; heavy UI (map, editing) stays on web. It reads `AppType` as declarations built by `tsconfig.api.json`, and imports this package's types only (`src/mobile-boundary.test.ts`) |
+| Native | Expo in `mobile/`, a pnpm workspace package, sharing the Hono client via `hc<AppType>()` | thin shell — sign-in, trip list, a trip's days and alerts, intervention card, push registration, watch settings; heavy UI (map, editing) stays on web. Navigation is Expo Router; the session lives in the keychain (Better Auth's Expo client + `@better-auth/expo` on the server, trusting the `trip-io://` origin). It reads `AppType` as declarations built by `tsconfig.api.json`, and imports this package's types only (`src/mobile-boundary.test.ts`) |
 
 ## Layers
 
@@ -53,8 +53,8 @@ is moving the code one layer further left.
 |---|---|---|
 | `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router, the briefing document, the interrupt budget's delivery rules and the road-report vocabulary | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
 | `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts`, `interventions.ts`, `devices.ts`, `road-reports.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
-| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts`, `interrupt.ts`, `interventions.ts`, `watch-settings.ts`, `devices.ts`, `road-report.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`, `interventionCard`, `alertsPage`) |
-| `src/infra` | Outbound adapters: the OpenAI composer, the OpenAI judge, the OpenAI briefer, Open-Meteo, Resend, Expo push, Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts`, `interrupt.ts`, `interventions.ts`, `watch-settings.ts`, `devices.ts`, `road-report.ts`, `place-enrichment.ts`, `suggestions.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`, `interventionCard`, `alertsPage`) |
+| `src/infra` | Outbound adapters: the OpenAI composer, the OpenAI judge, the OpenAI briefer, the OpenAI suggester, Open-Meteo, Resend, Expo push, Tripadvisor (`tripadvisor.ts`), Redis over Upstash (`upstash.ts`), Better Auth | Implements a port the domain declares. The only files that name an external provider |
 | `src/server` | The Hono app, its routers, the session middleware, and the road-report bot behind the Telegram webhook | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 

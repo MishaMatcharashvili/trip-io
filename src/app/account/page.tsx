@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { TopBar } from "@/features/chrome";
 import { SignOutButton } from "@/features/sign-out-button";
+import { SiteFrame } from "@/features/site-frame";
 import { getAuth } from "@/infra/auth.ts";
 import { ButtonLink } from "@/ui/button";
 import { Card, Divider, SectionRule } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
-import { BottomNav, homeTabs } from "@/ui/nav";
-import { Display, Eyebrow, Prose } from "@/ui/text";
+import { Eyebrow, Prose } from "@/ui/text";
 import { ThemeSegmented } from "@/ui/theme";
+import { AccountColumn } from "./column";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -46,12 +46,8 @@ export default async function AccountPage() {
   const guest = Boolean(user?.isAnonymous);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <TopBar watch="none" />
-
-      <main className="mx-auto flex w-full max-w-[640px] flex-1 flex-col gap-5 px-4 pb-28 pt-6 lg:pb-12 lg:pt-10">
-        <Display className="text-[26px]">Account</Display>
-
+    <SiteFrame tab="Profile" watch="none">
+      <AccountColumn>
         {unavailable ? (
           <Card accent="alert" tint className="flex items-start gap-3 p-4">
             <Icon name="warning" size={16} className="mt-0.5 text-alert" />
@@ -145,9 +141,7 @@ export default async function AccountPage() {
             What I watch on your Georgia trip
           </Link>
         </div>
-      </main>
-
-      <BottomNav items={homeTabs} active="Profile" />
-    </div>
+      </AccountColumn>
+    </SiteFrame>
   );
 }

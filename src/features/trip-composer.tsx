@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { focusAreas } from "@/domain/catalogue/focus-areas";
 // Types only: constraints.ts hashes with node:crypto, which has no place in
 // the browser bundle.
@@ -94,6 +94,18 @@ export function TripComposer({
   const [text, setText] = useState("");
   const [overrides, setOverrides] = useState<Partial<Constraints>>({});
   const [editing, setEditing] = useState<Field | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+
+  // "New trip" anywhere in the app is /#plan: arriving on it, or tapping it
+  // here, puts the cursor in the box rather than leaving it to be found.
+  useEffect(() => {
+    const focusIfAsked = () => {
+      if (window.location.hash === "#plan") box.current?.focus();
+    };
+    focusIfAsked();
+    window.addEventListener("hashchange", focusIfAsked);
+    return () => window.removeEventListener("hashchange", focusIfAsked);
+  }, []);
 
   const read = useMemo(() => understand(text, today), [text, today]);
   const c: Constraints = { ...read.constraints, ...overrides };
@@ -145,6 +157,7 @@ export function TripComposer({
     <div className="flex w-full flex-col gap-4">
       <Card className="flex w-full flex-col gap-3 rounded-[16px] p-4 shadow-lifted lg:gap-4 lg:p-5 lg:pb-4">
         <textarea
+          ref={box}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={placeholder}

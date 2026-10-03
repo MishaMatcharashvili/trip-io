@@ -6,6 +6,28 @@ import { ThemeToggle } from "@/ui/theme";
 import { Brand } from "./chrome";
 
 /**
+ * What each auth screen says about itself, in one place so the screen and its
+ * loading state cannot say different things.
+ */
+export const authCopy = {
+  "sign-in": {
+    icon: "user",
+    eyebrow: "Welcome back",
+    title: "Sign in to trip.io",
+    lead: "Your trips, and everything I am watching on them, are waiting where you left them.",
+  },
+  "sign-up": {
+    icon: "userPlus",
+    eyebrow: "Create an account",
+    title: "Keep your trips, and let me watch them",
+    lead: "An account saves what you plan and lets the watch layer follow it while you travel. Planning itself stays free.",
+  },
+} as const satisfies Record<
+  string,
+  { icon: IconName; eyebrow: string; title: string; lead: string }
+>;
+
+/**
  * The frame every auth screen shares. Same washed-out map as trip creation —
  * you are about to go somewhere — with one card in the middle and nothing to
  * navigate away to except the logo.

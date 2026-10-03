@@ -2,6 +2,7 @@ export * from "./auth.ts";
 export * from "./billing.ts";
 export * from "./catalogue.ts";
 export * from "./device.ts";
+export * from "./enrichment.ts";
 export * from "./generation.ts";
 export * from "./job.ts";
 export * from "./road.ts";

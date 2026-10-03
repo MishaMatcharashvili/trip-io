@@ -75,7 +75,7 @@ function ReferenceBuilding() {
       <header className="relative z-10 flex h-[58px] shrink-0 items-center gap-2.5 px-6">
         <Brand />
         <div className="flex-1" />
-        <ButtonLink href="/new" variant="ghost">
+        <ButtonLink href="/#plan" variant="ghost">
           Cancel
         </ButtonLink>
       </header>
@@ -250,7 +250,7 @@ export default async function BuildingPage({
   const { c } = await searchParams;
   if (c === undefined) return <ReferenceBuilding />;
   const wanted = decode(c);
-  if (!wanted) redirect("/new");
+  if (!wanted) redirect("/");
 
   const areas = wanted.areas.map((a) => areaNames[a]).join(" and ");
   const people = wanted.party.adults + wanted.party.children;
@@ -289,7 +289,7 @@ export default async function BuildingPage({
       <header className="relative z-10 flex h-[58px] shrink-0 items-center gap-2.5 px-6">
         <Brand />
         <div className="flex-1" />
-        <ButtonLink href="/new" variant="ghost">
+        <ButtonLink href="/#plan" variant="ghost">
           Cancel
         </ButtonLink>
       </header>

@@ -38,10 +38,17 @@ The app's API client is `hc<AppType>()` in `src/api.ts`, typed by the server's o
 
 ## Navigation & Routing
 
-There is no router yet. `index.ts` registers `App.tsx` with `registerRootComponent`, and that one
-screen is a placeholder proving the typed API client works. Choosing navigation is Phase 7's job; if
-it is Expo Router, install it with `npx expo install expo-router`, move the entry point to it, and
-rewrite this section — until then, a file under `src/app/` is not a screen, because nothing mounts it.
+Expo Router, with files under `src/app/`. `src/app/_layout.tsx` keeps the splash up until the stored
+session is read, then guards two groups with `Stack.Protected`: `(auth)` (sign in, sign up) when
+signed out, `(app)` when signed in. Inside `(app)`: the `(tabs)` group (Trips, Account), a trip
+(`trips/[id]`) and its watch settings (`trips/[id]/watch`), the intervention card (`alerts/[id]`),
+and the `push` prompt, a modal shown once. A tap on a notification opens `alerts/[id]` from
+`data.interventionId`. Typed routes are off on purpose: the generated types live under `.expo/`,
+which is gitignored, so they would make `pnpm typecheck` mean something different in CI.
+
+Read through `client()` and `read()` in `src/api.ts` (`useLoad` in `src/use-load.ts` on a screen);
+`read` throws on anything but a 2xx, and `messageOf`/`bodyOf` turn that into words for the screen.
+Push is `src/push.ts`: register on every launch, unregister before signing out.
 
 ## Colours and dark mode
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AuthForm } from "@/features/auth-form";
-import { AuthShell } from "@/features/auth-shell";
+import { AuthShell, authCopy } from "@/features/auth-shell";
 import { isGoogleConfigured } from "@/infra/auth.ts";
 
 export const metadata: Metadata = { title: "Create an account" };
@@ -11,12 +11,7 @@ export default async function SignUpPage({
   const { next } = await searchParams;
 
   return (
-    <AuthShell
-      icon="userPlus"
-      eyebrow="Create an account"
-      title="Keep your trips, and let me watch them"
-      lead="An account saves what you plan and lets the watch layer follow it while you travel. Planning itself stays free."
-    >
+    <AuthShell {...authCopy["sign-up"]}>
       <AuthForm
         mode="sign-up"
         next={typeof next === "string" ? next : undefined}

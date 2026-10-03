@@ -378,6 +378,10 @@ export type PlaceHit = {
   outdoor: boolean;
   /** From `near`, when one was given. */
   distanceM: number | null;
+  /** How sure the source is that it exists, 0 to 1, when it said. Search only. */
+  confidence?: number | null;
+  /** How many websites of its own are listed. Search only. */
+  websites?: number;
 };
 
 export type PlaceSearch = {
@@ -410,7 +414,10 @@ export async function searchPlaces(search: PlaceSearch): Promise<PlaceHit[]> {
   const rows = await db.execute(sql`
     SELECT p.id, p.name, p.name_ka, p.category, p.tier,
            ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
-           ${near ? sql`ST_Distance(p.geom, ${near})` : sql`NULL`} AS distance_m
+           ${near ? sql`ST_Distance(p.geom, ${near})` : sql`NULL`} AS distance_m,
+           (p.attrs->>'confidence')::float AS confidence,
+           CASE WHEN jsonb_typeof(p.attrs->'websites') = 'array'
+                THEN jsonb_array_length(p.attrs->'websites') ELSE 0 END AS websites
     FROM place p
     WHERE TRUE
       ${q ? sql`AND (p.name ILIKE ${pattern} OR p.name_ka ILIKE ${pattern})` : sql``}
@@ -435,6 +442,8 @@ export async function searchPlaces(search: PlaceSearch): Promise<PlaceHit[]> {
       lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
       outdoor: isOutdoor(category),
       distanceM: r.distance_m === null ? null : Number(r.distance_m),
+      confidence: r.confidence === null ? null : Number(r.confidence),
+      websites: Number(r.websites ?? 0),
     };
   });
 }

@@ -14,6 +14,8 @@ import {
   dateRange,
   mapStops,
   partyLine,
+  stopDetail,
+  stopWeight,
   tripModel,
   weatherView,
 } from "./trip-model.ts";
@@ -198,5 +200,51 @@ describe("weatherView", () => {
     const view = weatherView([hour("09:00", 0), hour("10:00", 0.1)]);
     assert.equal(view?.caption, "Dry · 14–14°C");
     assert.equal(view?.captionTone, "neutral");
+  });
+});
+
+describe("stopDetail", () => {
+  const node = (over: Partial<Parameters<typeof stopDetail>[0]> = {}) => ({
+    kind: "visit" as const,
+    startsAt: at(DAY, "11:00"),
+    durationMin: 90,
+    ...over,
+  });
+
+  test("a visit says how long and until when, so an overlap can be read off the rows", () => {
+    assert.equal(stopDetail(node(), "museum"), "1h 30m · until 12:30 · museum");
+  });
+
+  test("a drive says when it arrives", () => {
+    assert.equal(
+      stopDetail(node({ kind: "transfer", durationMin: 55 }), undefined),
+      "Drive · 55 min · until 11:55",
+    );
+  });
+
+  test("a stay is a base, not an interval", () => {
+    assert.equal(stopDetail(node({ kind: "stay" })), "Your base tonight");
+  });
+
+  test("the end is in Tbilisi's clock, across the hour", () => {
+    assert.equal(
+      stopDetail(node({ startsAt: at(DAY, "23:30"), durationMin: 45 })),
+      "45 min · until 00:15",
+    );
+  });
+});
+
+describe("stopWeight", () => {
+  test("a visit outweighs a meal, which outweighs a check-in, which outweighs a drive", () => {
+    const w = (kind: string) => stopWeight({ kind, durationMin: 60 });
+    assert.ok(w("visit") > w("meal"));
+    assert.ok(w("meal") > w("stay"));
+    assert.ok(w("stay") > w("transfer"));
+  });
+
+  test("a long stop outweighs a short one of its kind, up to a limit", () => {
+    const w = (min: number) => stopWeight({ kind: "visit", durationMin: min });
+    assert.ok(w(180) > w(30));
+    assert.equal(w(600), w(1200));
   });
 });

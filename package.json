@@ -20,6 +20,8 @@
     "smoke:interrupt": "node --env-file=.env scripts/dev/smoke-interrupt.ts",
     "smoke:road": "node --env-file=.env scripts/dev/smoke-road.ts",
     "smoke:route": "node --env-file=.env scripts/dev/smoke-route.ts",
+    "smoke:wikimedia": "node scripts/dev/smoke-wikimedia.ts",
+    "smoke:tripadvisor": "node --env-file=.env scripts/dev/smoke-tripadvisor.ts",
     "smoke:telegram": "node --env-file=.env scripts/dev/smoke-telegram.ts",
     "kill:count": "node --env-file=.env scripts/dev/synthetic-count.ts",
     "judge:eval": "node --env-file=.env scripts/dev/judge-eval.ts",
@@ -33,6 +35,7 @@
     "design:mobile": "tsx scripts/design/mobile/build.ts"
   },
   "dependencies": {
+    "@better-auth/expo": "1.7.4",
     "@hono/zod-validator": "^0.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "@t3-oss/env-nextjs": "^0.13.11",
