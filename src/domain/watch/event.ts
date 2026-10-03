@@ -63,6 +63,7 @@ export const hoursKinds = ["hours.closed"] as const;
 
 /** Detector #6: the railway. */
 export const railKinds = ["rail.cancelled", "rail.delayed"] as const;
+export type RailKind = (typeof railKinds)[number];
 
 export const eventKinds = [
   ...weatherKinds,

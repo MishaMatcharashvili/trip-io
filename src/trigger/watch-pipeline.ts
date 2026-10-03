@@ -139,6 +139,17 @@ export const morningBriefing = schedules.task({
   run: async () => runStages(MORNING),
 });
 
+/**
+ * Detector #6's clock. There is no feed to poll, so what runs weekly is a
+ * message to the operators asking them to look at the railway's notices.
+ */
+export const railReminder = schedules.task({
+  id: "rail-reminder",
+  cron: { pattern: "0 6 * * 1", timezone: "Asia/Tbilisi" },
+  maxDuration: 120,
+  run: async () => runStages(["rail-reminder"]),
+});
+
 /** The same pass on demand, for the mornings you want to read before they happen. */
 export const runMorningBriefing = task({
   id: "run-morning-briefing",

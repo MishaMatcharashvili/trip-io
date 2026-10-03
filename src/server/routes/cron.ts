@@ -6,6 +6,7 @@ import { runMatch } from "@/bll/match.ts";
 import { senseNews } from "@/bll/news.ts";
 import { senseWeather } from "@/bll/sense.ts";
 import { requireCronSecret } from "../cron.ts";
+import { remindOperators } from "../telegram/reminder.ts";
 
 // The pipeline's clock — once there is one. Each handler returns what it did,
 // because in Phase 3 the logs are the product: nothing is delivered, so reading
@@ -40,6 +41,9 @@ export const cron = new Hono()
   // not left to the client: an acceptance rate whose denominator is only the
   // interventions someone answered is the number that flatters us most.
   .get("/outcomes", async (c) => c.json(await sweepOutcomes()))
+
+  // 0 6 * * 1 — Monday 06:00, Tbilisi. Detector #6 is a person; this asks.
+  .get("/rail-reminder", async (c) => c.json(await remindOperators()))
 
   // 30 3 * * * — 07:30 in Tbilisi. One job per live trip-day; the model call
   // itself happens in the drain, like every other one.
