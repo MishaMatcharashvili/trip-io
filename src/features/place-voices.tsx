@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Enrichment, Photo } from "@/domain/catalogue/enrichment";
 import { apiClient } from "@/lib/hono-client";
@@ -224,7 +225,11 @@ function Failed({ reason, onRetry }: { reason: string; onRetry: () => void }) {
 
 /** Photographs, each with who took it: the licence asks for the credit, and so does the review site's. */
 function Photos({ photos, name }: { photos: Photo[]; name: string }) {
-  if (photos.length === 0) return null;
+  // A photograph that will not load (a host that changed, a file taken down)
+  // leaves no hole in the strip.
+  const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
+  const shown = photos.filter((p) => !broken.has(p.id));
+  if (shown.length === 0) return null;
   return (
     <section
       aria-label={`Photos of ${name}`}
@@ -232,17 +237,17 @@ function Photos({ photos, name }: { photos: Photo[]; name: string }) {
     >
       <Eyebrow>Photos</Eyebrow>
       <ul className="-mx-[18px] flex gap-2.5 overflow-x-auto px-[18px] pb-1">
-        {photos.map((photo) => (
+        {shown.map((photo) => (
           <li key={photo.id} className="flex w-[150px] shrink-0 flex-col gap-1">
-            {/* biome-ignore lint/performance/noImgElement: a photograph from its own host, credited to its author; it is not ours to proxy or resize */}
-            <img
+            <Image
               src={photo.url}
               alt={photo.caption ?? `A photo of ${name}`}
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
+              // The optimiser resizes to this slot (and its 2x), as WebP or
+              // AVIF, instead of the browser fetching the original.
               width={150}
               height={112}
+              sizes="150px"
+              onError={() => setBroken((prev) => new Set(prev).add(photo.id))}
               className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
             />
             {photo.credit ? (

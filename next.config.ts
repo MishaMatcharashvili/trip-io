@@ -5,6 +5,24 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   cacheComponents: true,
+  images: {
+    // Hosts a place's photographs come from (src/infra): a host not listed here
+    // cannot be optimised, so a new provider adds its CDN here. Tripadvisor
+    // serves the photographer's original (up to ~5000px wide, several MB) and
+    // the strip draws it 150px wide, so it is the one that needs resizing most.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "dynamic-media.tacdn.com",
+        pathname: "/media/**",
+      },
+      {
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+        pathname: "/wikipedia/commons/**",
+      },
+    ],
+  },
   // A day is a row of the Trip tab, opened in place; it has no screen of its
   // own. The old address stays for the links that already point at it (a push
   // notification, an emailed briefing, a bookmark). Next keeps the query, so
