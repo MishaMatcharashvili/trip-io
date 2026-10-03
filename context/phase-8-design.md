@@ -1,6 +1,7 @@
 # Phase 8 design — detector expansion and the road-automation spike
 
-Status: design, not started. Written 2026-10-03 against `main` at `2a80296`. The checklist is in
+Status: spine built (event kinds, `source_item`, extraction guards — see "Built so far"); detectors
+not started. Written 2026-10-03 against `main` at `2a80296`. The checklist is in
 `context/build-plan.md`; the reasoning behind the detector list is `docs/implementation-plan.md` §8
 and §12. This file says how to build them. Update it when a decision here changes.
 
@@ -23,10 +24,21 @@ order below a question of which detector adds the most trip-relevant events for 
 ## The shape every detector shares
 
 ```
-source adapter  →  source_item  →  extractor  →  guards  →  EventDraft  →  upsertEvent
-(infra)            (dal, new)      (port: domain,   (domain)   (domain)     (existing)
-                                    impl: infra)
+source adapter → translator → source_item → extractor → guards → EventDraft → upsertEvent
+(infra)          (port)        (dal)         (port)      (domain)  (domain)     (existing)
 ```
+
+- **Everything past the translator is English.** Sources are general news plus tourism, weather and
+  roadside coverage, Georgian as often as English. A Georgian item is translated to English by a
+  model before anything reads it; the extractor sees English, the quote guard is checked against the
+  English, and the original is stored beside it (`source_item.original_text`) so a person auditing a
+  claim can check it against what was printed. The traveller only ever reads English.
+- **`Translator` is a port** (`src/domain/watch/extraction.ts`), like `Judge`. The user asked for
+  Google's LLM translation. Cloud Translation v3's LLM model needs a service-account token, not
+  the API key the Places adapter uses, and none is provisioned — so the first implementation, until
+  there is one, is the already-keyed OpenAI model behind the same port, and the Google adapter is a
+  one-file swap in `src/infra` when credentials exist. A translator must not summarise: the quote
+  guard would otherwise pass against words nobody printed.
 
 - **`source_item`** (new table, own migration): `source`, `url`, `content_hash`, `fetched_at`, `text`,
   `extraction jsonb`, `status` (`new | extracted | rejected | published`), `reason`. One row per
@@ -187,9 +199,31 @@ That is a valid outcome and the build-plan item closes on the harness plus that 
 6. Detector 4: gates, corroboration, wording guard, fixtures. Last, so it never exists without them.
 7. `roads:spike` harness and the decision rule.
 
-## Decisions needed from the user before step 3
+## Decided (2026-10-03)
 
-- Which event and news sources, by name. The list is editorial and Georgian-language coverage is the
-  part an engineer cannot judge.
-- Whether to spend on Google Places hours (terms permitting) or ship detector 5 as reports only.
-- The definition of the 4–8 band (above).
+- **Sources:** general news plus tourism, weather and roadside coverage, English or Georgian; Georgian
+  is translated to English by a model first. The named list still has to be written
+  (`data/event-sources.json`) — see "Still needed".
+- **The 4–8 band counts everything the judge found worth telling**, not interrupts only. That is the
+  figure `kill:count -- --judge` already reports (2.2), so briefing-only detectors *do* move it, and
+  the dashboard (Phase 9) shows the interrupt share beside it.
+- **Detector 5 is reports only.** Opening hours are curated by hand and the validator already reads
+  them; there is no second source to poll. Drift is the curator-edit hook above.
+
+## Built so far
+
+| Step | State |
+|---|---|
+| 2. Event kinds, radii, stale windows, labels | Done — `src/domain/watch/event.ts`. A kind that is not weather is observed once and stays matchable 72 h |
+| 1. `source_item` migration | Written (`0016_source_items.sql`), **not applied** to Neon |
+| 1. Translator and extractor ports, extraction guards, `toEventDraft` | Done and tested — `src/domain/watch/extraction.ts` |
+| 1. `source_item` repository, feed adapter, OpenAI translator and extractor, `sense-news` stage | Not started |
+| 3–7 | Not started |
+
+## Still needed from the user
+
+- The named sources: feeds and pages, with the outlet's language. Georgian-language coverage is
+  the part an engineer cannot judge. Until the list exists, nothing can be polled.
+- Google Cloud credentials for Translation v3 (service account), if Google rather than the OpenAI
+  model should do the translating.
+- Applying migration `0016` to Neon, which I have not done.

@@ -96,6 +96,9 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 8 — detector expansion + road-automation spike
 
+Design in `context/phase-8-design.md`. Spine built: event kinds, `source_item` (migration `0016`,
+unapplied), translator/extractor ports and extraction guards. No detector yet.
+
 - [ ] Detector 3 — events & festivals (local pages + extraction)
 - [ ] Detector 4 — protests & safety (news RSS + extraction), **briefing-only, gated**
 - [ ] Detector 5 — opening-hours (user reports + catalogue drift)
