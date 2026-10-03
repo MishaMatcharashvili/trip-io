@@ -118,6 +118,21 @@ for (const place of places) {
     "no photo address carries the key",
   );
   for (const p of e.photos) hosts.add(new URL(p.url).host);
+
+  // The place's content is kept in Redis for 60 days, photograph addresses
+  // included. Whether such an address outlives a day is not in the reference;
+  // this at least shows that one loads, with the key absent. To learn how long
+  // one lives, open a kept place the next day: a broken photo means they expire,
+  // and GOOGLE_PLACES_CONTENT_TTL_S should shrink to match.
+  const [first] = e.photos;
+  if (first) {
+    const image = await fetch(first.url, { method: "HEAD" });
+    expect(
+      image.ok &&
+        (image.headers.get("content-type") ?? "").startsWith("image/"),
+      `a photo address loads as an image without the key (${image.status})`,
+    );
+  }
 }
 
 console.log(`\nPhoto hosts seen: ${[...hosts].join(", ") || "none"}`);
