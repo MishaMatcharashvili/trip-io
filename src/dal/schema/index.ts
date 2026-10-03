@@ -7,6 +7,7 @@ export * from "./generation.ts";
 export * from "./job.ts";
 export * from "./road.ts";
 export * from "./saved.ts";
+export * from "./source.ts";
 export * from "./trip.ts";
 export * from "./usage.ts";
 export * from "./watch.ts";
