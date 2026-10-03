@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { WeatherRibbon } from "@/ui/bars";
+import { WeatherRibbon, type WeatherSummary } from "@/ui/bars";
 import { ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Icon } from "@/ui/icon";
@@ -8,6 +8,7 @@ type Weather = {
   hours: Parameters<typeof WeatherRibbon>[0]["hours"];
   caption: string;
   captionTone?: "alert" | "neutral";
+  summary?: WeatherSummary;
 } | null;
 
 /**
@@ -37,6 +38,7 @@ export function DayPanel({
             hours={weather.hours}
             caption={weather.caption}
             captionTone={weather.captionTone}
+            summary={weather.summary}
           />
         </Card>
       ) : null}
