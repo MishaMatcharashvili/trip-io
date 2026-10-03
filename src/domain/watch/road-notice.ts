@@ -96,6 +96,7 @@ export const claimConditions = [
   "closed",
   "restricted",
   "delays",
+  "reopened",
   "none",
 ] as const;
 
@@ -105,7 +106,9 @@ export const roadClaim = z.object({
   /** `none` when the notice is not about the road at all (a water-supply notice). */
   condition: z.enum(claimConditions),
   /** The sentence the claim rests on, copied exactly. */
-  quote: z.string().max(400),
+  // A sentence in Georgian is long; the cap is only against a model pasting the
+  // whole notice back.
+  quote: z.string().max(1000),
 });
 export type RoadClaim = z.infer<typeof roadClaim>;
 
@@ -122,10 +125,12 @@ export type VettedClaim = {
 };
 
 /**
- * The status is the department's and the model cannot overrule it: "restored"
- * is a reopening and nothing the model says changes that; a restriction cannot
- * be read as one; a partial notice may be a restriction or a delay but not a
- * full closure or a reopening.
+ * Two readings of the same notice must agree: the department's status code and
+ * the model's reading of the prose. Where they do not, the claim is refused and
+ * the notice goes to a person, because one of them is wrong and a wrong
+ * "reopened" ends real events. The first run of this spike found the department
+ * itself coding a notice "restored" whose text says trailers *will be*
+ * restricted (notice 5244), so neither signal is trusted over the other.
  */
 export function vetRoadClaim(
   raw: unknown,
@@ -144,9 +149,8 @@ export function vetRoadClaim(
   if (c.condition === "none") {
     return { ok: true, claim: { corridor: c.corridor, condition: "none" } };
   }
-  if (ctx.status === "restored") {
-    // A reopening cannot be a closure, and the model is not asked to say more.
-    return { ok: true, claim: { corridor: c.corridor, condition: "reopened" } };
+  if ((ctx.status === "restored") !== (c.condition === "reopened")) {
+    return { ok: false, reason: "contradicts-status" };
   }
   if (ctx.status === "restriction" && c.condition === "delays") {
     return { ok: false, reason: "contradicts-status" };
@@ -178,6 +182,8 @@ export type Prediction = {
 export type SpikeScore = {
   total: number;
   corridorCorrect: number;
+  /** Notices whose condition is graded: the ones on a corridor. */
+  conditionScored: number;
   conditionCorrect: number;
   /** Notices that reach one of the twelve roads, by the gold set. */
   onCorridor: number;
@@ -198,6 +204,7 @@ export function scoreSpike(
   const score: SpikeScore = {
     total: gold.length,
     corridorCorrect: 0,
+    conditionScored: 0,
     conditionCorrect: 0,
     onCorridor: 0,
     recalled: 0,
@@ -226,9 +233,14 @@ export function scoreSpike(
     }
     if (wantsRoad && corridorOk) score.recalled++;
     if (corridorOk) score.corridorCorrect++;
-    if (conditionOk) score.conditionCorrect++;
-    if (!corridorOk || !conditionOk)
+    // The condition only matters where an event would be written, on a corridor.
+    // A wrong condition on a road we do not watch changes nothing, so counting
+    // it would grade the model on something that can never reach a traveller.
+    if (wantsRoad) score.conditionScored++;
+    if (wantsRoad && conditionOk) score.conditionCorrect++;
+    if (!corridorOk || (wantsRoad && !conditionOk)) {
       score.misses.push({ id: want.id, want, got });
+    }
   }
   return score;
 }
@@ -262,7 +274,9 @@ export function decide(score: SpikeScore): Verdict {
   const precision = score.claimedOnCorridor
     ? score.claimedCorrectly / score.claimedOnCorridor
     : 1;
-  const condition = score.conditionCorrect / score.total;
+  const condition = score.conditionScored
+    ? score.conditionCorrect / score.conditionScored
+    : 1;
   const failing: string[] = [];
   if (recall < DECISION.minRecall)
     failing.push(`recall ${pct(recall)} < ${pct(DECISION.minRecall)}`);

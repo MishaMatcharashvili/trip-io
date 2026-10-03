@@ -71,15 +71,34 @@ describe("vetRoadClaim", () => {
     });
   });
 
-  test("a restored notice is a reopening whatever the model said", () => {
+  test("a restored notice read as a reopening passes", () => {
     const r = vetRoadClaim(
-      { corridor: "military-road", condition: "closed", quote: QUOTE },
+      { corridor: "military-road", condition: "reopened", quote: QUOTE },
       { text, status: "restored" },
     );
     assert.deepEqual(r, {
       ok: true,
       claim: { corridor: "military-road", condition: "reopened" },
     });
+  });
+
+  test("status and text disagreeing either way is refused, not resolved", () => {
+    // The department coded notice 5244 "restored" for a text that says trailers
+    // will be restricted; a "reopened" there would end real events.
+    for (const [status, condition] of [
+      ["restored", "restricted"],
+      ["restriction", "reopened"],
+      ["partial", "reopened"],
+    ] as const) {
+      assert.deepEqual(
+        vetRoadClaim(
+          { corridor: "military-road", condition, quote: QUOTE },
+          { text, status },
+        ),
+        { ok: false, reason: "contradicts-status" },
+        `${status} / ${condition}`,
+      );
+    }
   });
 
   test("a restriction read as a delay contradicts the department", () => {
@@ -173,7 +192,8 @@ describe("scoreSpike and decide", () => {
     assert.equal(score.recalled, 1);
     assert.equal(score.claimedOnCorridor, 2);
     assert.equal(score.claimedCorrectly, 1);
-    assert.equal(score.conditionCorrect, 3);
+    assert.equal(score.conditionScored, 3);
+    assert.equal(score.conditionCorrect, 2);
     assert.equal(score.rejected, 1);
     assert.deepEqual(
       score.misses.map((m) => m.id),
