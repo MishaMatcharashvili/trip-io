@@ -24,7 +24,7 @@ function ports(
   const calls = over.calls ?? [];
   const translate: Translator = async (text) => {
     calls.push("translate");
-    return { language: "ka", english: `${ENGLISH}` + (text ? "" : "") };
+    return { language: "ka", english: `${ENGLISH}${text ? "" : ""}` };
   };
   const extract: Extractor = async () => {
     calls.push("extract");

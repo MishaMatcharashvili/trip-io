@@ -62,7 +62,7 @@ export function parseNotices(json: unknown): RoadNotice[] {
       noticeStatuses[n.restriction_status as keyof typeof noticeStatuses];
     const text =
       n.translates.find((t) => t.language === "ka") ?? n.translates[0];
-    const published = Date.parse(n.publish_date.replace(" ", "T") + "+04:00");
+    const published = Date.parse(`${n.publish_date.replace(" ", "T")}+04:00`);
     if (!status || Number.isNaN(published)) return [];
     return [
       {

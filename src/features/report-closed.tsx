@@ -79,9 +79,9 @@ export function ReportClosed({
     <div className="flex flex-col gap-2 border-b border-hairline px-[18px] py-3.5">
       <Eyebrow>Is it shut?</Eyebrow>
       {answer ? (
-        <p role="status" className="text-small text-ink-muted">
+        <output className="block text-small text-ink-muted">
           {answer.kind === "error" ? answer.message : SAYS[answer.kind]}
-        </p>
+        </output>
       ) : (
         <button
           type="button"

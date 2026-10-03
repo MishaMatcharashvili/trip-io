@@ -22,9 +22,17 @@ const text = (v: unknown): string => {
   if (typeof v === "number") return String(v);
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
-    return text(o["#text"] ?? o["__cdata"] ?? "");
+    return text(o["#text"] ?? o.__cdata ?? "");
   }
   return "";
+};
+
+/** A parsed element: its children and attributes, by name. */
+type XmlNode = { [name: string]: unknown };
+
+type Parsed = {
+  rss?: { channel?: { item?: XmlNode | XmlNode[] } };
+  feed?: { entry?: XmlNode | XmlNode[] };
 };
 
 const asArray = <T>(v: T | T[] | undefined): T[] =>
@@ -38,8 +46,8 @@ const instant = (v: unknown): string | null => {
 
 /** Pure: the XML text of a feed to its items. Items with no link are dropped. */
 export function parseFeed(xml: string): FeedItem[] {
-  const doc = parser.parse(xml) as Record<string, any>;
-  const rssItems = asArray<any>(doc.rss?.channel?.item);
+  const doc = parser.parse(xml) as Parsed;
+  const rssItems = asArray<XmlNode>(doc.rss?.channel?.item);
   if (rssItems.length > 0) {
     return rssItems.flatMap((i) => {
       const url = text(i.link).trim() || text(i.guid).trim();
@@ -55,8 +63,10 @@ export function parseFeed(xml: string): FeedItem[] {
       ];
     });
   }
-  return asArray<any>(doc.feed?.entry).flatMap((e) => {
-    const link = asArray<any>(e.link).find((l) => l["@_rel"] !== "self");
+  return asArray<XmlNode>(doc.feed?.entry).flatMap((e) => {
+    const link = asArray(e.link as XmlNode | XmlNode[] | undefined).find(
+      (l) => l["@_rel"] !== "self",
+    );
     const url = text(link?.["@_href"]).trim();
     if (!url.startsWith("http")) return [];
     return [
