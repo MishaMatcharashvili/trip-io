@@ -1,9 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { submitHoursReport } from "@/bll/hours-report";
 import { placeLogo, searchCatalogue } from "@/bll/places";
 import { categoryGroups } from "@/domain/catalogue/categories";
 import { focusAreaSlugs } from "@/domain/catalogue/focus-areas";
+import { getAuth } from "@/infra/auth";
+import { isCurator } from "@/lib/curator";
 
 // The catalogue, read-only and public: adding a stop searches it, Explore
 // browses it. Nothing here is anyone's own data.
@@ -39,6 +42,33 @@ export const places = new Hono()
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'",
       });
+    },
+  )
+  // Detector #5: "this place is shut on this day". A signed-in account is
+  // required and an anonymous session is not enough — two reports from two
+  // throwaway sessions would publish a closure, which is what the quorum
+  // exists to prevent. A curator's report publishes alone.
+  .post(
+    "/:id/closed",
+    zValidator("param", z.object({ id: z.uuid() })),
+    zValidator("json", z.object({ date: z.string() })),
+    async (c) => {
+      const session = await getAuth().api.getSession({
+        headers: c.req.raw.headers,
+      });
+      if (!session) return c.json({ error: "unauthenticated" }, 401);
+      if (session.user.isAnonymous) {
+        return c.json({ error: "sign-in-required" }, 403);
+      }
+      const result = await submitHoursReport(
+        { placeId: c.req.valid("param").id, date: c.req.valid("json").date },
+        {
+          id: session.user.id,
+          trust: isCurator(session.user) ? "curator" : "community",
+        },
+      );
+      if (result.ok) return c.json(result);
+      return c.json(result, result.reason === "unknown-place" ? 404 : 400);
     },
   )
   .get(
