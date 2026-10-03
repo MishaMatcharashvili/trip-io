@@ -20,7 +20,16 @@ import { logger, schedules, task } from "@trigger.dev/sdk";
  * which reads nothing the others write and goes last only so an hour's
  * deliveries have had their chance to be answered before it looks.
  */
-const STAGES = ["sense-weather", "match", "drain", "outcomes"] as const;
+const STAGES = [
+  "sense-weather",
+  "sense-news",
+  // Reads what sense-news stored, so the events it writes are there for the
+  // match that follows. Judge jobs ride along; the second drain finishes them.
+  "drain",
+  "match",
+  "drain",
+  "outcomes",
+] as const;
 
 /**
  * The morning pass. `briefing` finds the trip-days that have one and posts a

@@ -3,6 +3,7 @@ import { scheduleBriefings } from "@/bll/briefing.ts";
 import { drain } from "@/bll/drain.ts";
 import { sweepOutcomes } from "@/bll/interventions.ts";
 import { runMatch } from "@/bll/match.ts";
+import { senseNews } from "@/bll/news.ts";
 import { senseWeather } from "@/bll/sense.ts";
 import { requireCronSecret } from "../cron.ts";
 
@@ -24,6 +25,10 @@ export const cron = new Hono()
 
   // 0 * * * * — hourly, one forecast per region with a live trip.
   .get("/sense-weather", async (c) => c.json(await senseWeather()))
+
+  // Detector #3: fetch the feeds, store what is new, queue a read of each. The
+  // reading is a model call and happens in the drain.
+  .get("/sense-news", async (c) => c.json(await senseNews()))
 
   // */5 * * * * — the spatiotemporal join, then the judge queue.
   .get("/match", async (c) => c.json(await runMatch()))

@@ -4,6 +4,7 @@ import { BRIEFING_JOB, writeBriefing } from "./briefing.ts";
 import { deliverInterrupt, INTERRUPT_JOB } from "./interrupt.ts";
 import { judgeMatch } from "./judge.ts";
 import { JUDGE_JOB } from "./match.ts";
+import { EXTRACT_JOB, extractItem } from "./news.ts";
 
 // The twenty lines that make the system survive a spike.
 //
@@ -67,6 +68,16 @@ export const handlers: Record<string, Handler> = {
     return writeBriefing(tripId, date, {
       lastChance: job.attempts >= MAX_ATTEMPTS,
     });
+  },
+
+  // Posted by the news sense loop, one per new article. Translating and
+  // extracting are model calls, so they live behind the queue like every other.
+  [EXTRACT_JOB]: async (payload) => {
+    const { itemId } = payload as { itemId?: string };
+    if (typeof itemId !== "string") {
+      throw new Error("extract job has no itemId");
+    }
+    return extractItem(itemId);
   },
 };
 
