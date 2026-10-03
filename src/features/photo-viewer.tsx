@@ -100,7 +100,6 @@ export function PhotoViewer({
             key={photo.id}
             src={photo.url}
             alt={photo.caption ?? `A photo of ${name}`}
-            unoptimized={photo.unoptimized}
             fill
             sizes="100vw"
             className="pointer-events-none object-contain"
@@ -135,7 +134,6 @@ export function PhotoViewer({
         <Image
           src={next.url}
           alt=""
-          unoptimized={next.unoptimized}
           fill
           sizes="100vw"
           loading="eager"

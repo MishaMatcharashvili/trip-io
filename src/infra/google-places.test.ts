@@ -225,8 +225,6 @@ describe("the calls", () => {
       url: "https://maps.google.com/?cid=1",
     });
     assert.notEqual(first.id, second.id);
-    // Its address may be kept; its picture is never copied by the optimiser.
-    assert.ok(result.enrichment.photos.every((p) => p.unoptimized === true));
   });
 
   test("a photograph that cannot be resolved is dropped, not the place", async () => {

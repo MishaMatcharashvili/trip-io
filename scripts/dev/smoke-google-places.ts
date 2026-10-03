@@ -15,9 +15,9 @@
 // does not fit shows as `malformed`; the first thing to do then is read the raw
 // reply and fix the adapter's parser, not loosen it.
 //
-// It also prints the host each photograph is served from, for the record:
-// Google's photographs are served as they are, not through next/image, so no
-// allowlist depends on it.
+// It also prints the host each photograph is served from, which is what
+// `images.remotePatterns` in next.config.ts must allow: a host that is not there
+// shows as a broken picture in the app.
 //
 // Review text is counted, never printed: it is somebody's writing and is not to
 // land in a terminal log or a CI artifact.
@@ -136,6 +136,9 @@ for (const place of places) {
 }
 
 console.log(`\nPhoto hosts seen: ${[...hosts].join(", ") || "none"}`);
+console.log(
+  "(each must match images.remotePatterns in next.config.ts: *.googleusercontent.com)",
+);
 console.log(
   failures ? `\n${failures} check(s) failed.` : "\nAll checks passed.",
 );

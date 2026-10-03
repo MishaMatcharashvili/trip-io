@@ -283,7 +283,6 @@ function PhotoTile({
       <Image
         src={full ? photo.url : (photo.preview ?? photo.url)}
         alt={alt}
-        unoptimized={photo.unoptimized}
         // The optimiser resizes to this slot (and its 2x), as WebP or AVIF,
         // from the smaller version where there is one: it is the original it
         // would otherwise have to download.
