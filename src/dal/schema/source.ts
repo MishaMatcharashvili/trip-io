@@ -36,17 +36,19 @@ export const sourceItem = pgTable(
     // The feed or site, by the name `data/` calls it. Not a provider name.
     source: text("source").notNull(),
     url: text("url").notNull(),
-    // SHA-256 of the English text the extractor reads.
+    // SHA-256 of the original text, as fetched: the page that has not changed
+    // since the last poll hashes the same.
     contentHash: text("content_hash").notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     fetchedAt: tstz("fetched_at"),
-    // The language it arrived in ("ka", "en"), as the translator reported it.
+    // The language the outlet publishes in ("ka", "en"), from the source list.
     language: text("language").notNull(),
-    // What was fetched, kept only when it was not English: the quote guard is
-    // checked against the English, but a person auditing a claim reads this.
-    originalText: text("original_text"),
-    // English, translated if it had to be. What the extractor was shown.
-    text: text("text").notNull(),
+    // What was fetched, always kept: the quote guard is checked against the
+    // English, but a person auditing a claim reads what was printed.
+    originalText: text("original_text").notNull(),
+    // English, translated if it had to be, and what the extractor was shown.
+    // Null until the extract job has run: the sense loop only fetches.
+    text: text("text"),
     status: sourceItemStatus("status").notNull().default("new"),
     // Why it was rejected or empty; a domain rejection reason.
     reason: text("reason"),
