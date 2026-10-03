@@ -34,7 +34,13 @@ export type Review = {
 
 export type Photo = {
   id: string;
+  /** The full photograph: what is shown when it is opened full screen. */
   url: string;
+  /**
+   * A smaller version of the same photograph for the strip, when the source
+   * serves one. Absent, the strip uses `url`.
+   */
+  preview?: string;
   width: number;
   height: number;
   caption: string | null;

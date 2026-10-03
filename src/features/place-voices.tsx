@@ -254,6 +254,48 @@ function Failed({ reason, onRetry }: { reason: string; onRetry: () => void }) {
   );
 }
 
+/**
+ * One photograph in the strip: the source's smaller version, which is what a
+ * 150px slot wants, falling back to the full one if the smaller will not load,
+ * and giving up (so the strip closes the gap) only when neither does.
+ */
+function PhotoTile({
+  photo,
+  alt,
+  label,
+  onOpen,
+  onBroken,
+}: {
+  photo: Photo;
+  alt: string;
+  label: string;
+  onOpen: () => void;
+  onBroken: () => void;
+}) {
+  const [full, setFull] = useState(!photo.preview);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      className="cursor-zoom-in rounded-[9px]"
+    >
+      <Image
+        src={full ? photo.url : (photo.preview ?? photo.url)}
+        alt={alt}
+        // The optimiser resizes to this slot (and its 2x), as WebP or AVIF,
+        // from the smaller version where there is one: it is the original it
+        // would otherwise have to download.
+        width={150}
+        height={112}
+        sizes="150px"
+        onError={() => (full ? onBroken() : setFull(true))}
+        className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
+      />
+    </button>
+  );
+}
+
 /** Photographs, each with who took it: the licence asks for the credit, and so does the review site's. */
 function Photos({ photos, name }: { photos: Photo[]; name: string }) {
   // A photograph that will not load (a host that changed, a file taken down)
@@ -272,24 +314,13 @@ function Photos({ photos, name }: { photos: Photo[]; name: string }) {
       <ul className="-mx-[18px] flex gap-2.5 overflow-x-auto px-[18px] pb-1">
         {shown.map((photo, i) => (
           <li key={photo.id} className="flex w-[150px] shrink-0 flex-col gap-1">
-            <button
-              type="button"
-              onClick={() => setOpen(i)}
-              aria-label={`Open photo ${i + 1} of ${shown.length} full screen`}
-              className="cursor-zoom-in rounded-[9px]"
-            >
-              <Image
-                src={photo.url}
-                alt={photo.caption ?? `A photo of ${name}`}
-                // The optimiser resizes to this slot (and its 2x), as WebP or
-                // AVIF, instead of the browser fetching the original.
-                width={150}
-                height={112}
-                sizes="150px"
-                onError={() => setBroken((prev) => new Set(prev).add(photo.id))}
-                className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
-              />
-            </button>
+            <PhotoTile
+              photo={photo}
+              alt={photo.caption ?? `A photo of ${name}`}
+              label={`Open photo ${i + 1} of ${shown.length} full screen`}
+              onOpen={() => setOpen(i)}
+              onBroken={() => setBroken((prev) => new Set(prev).add(photo.id))}
+            />
             {photo.credit ? (
               <a
                 href={creditHref(photo.credit, name)}

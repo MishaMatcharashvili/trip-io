@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   classify,
+  previewOf,
   toCandidates,
   toEnrichment,
   toPhotos,
@@ -143,6 +144,16 @@ describe("parsing", () => {
     assert.equal(a.caption, "The yard");
     assert.equal(b.by, "venue");
     assert.equal(b.width, 4);
+  });
+
+  test("a photo's preview is the CDN's smaller size of the same picture", () => {
+    const original = "https://dynamic-media.example/media/photo-o/14/0b/x.jpg";
+    assert.equal(
+      previewOf(original),
+      "https://dynamic-media.example/media/photo-w/14/0b/x.jpg",
+    );
+    // An address that is not shaped like the original's has no preview.
+    assert.equal(previewOf("https://media.example/p/77.jpg"), undefined);
   });
 
   test("an address that is not https is a malformed reply", () => {

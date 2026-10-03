@@ -183,10 +183,28 @@ export function toReviews(body: unknown): Review[] {
   });
 }
 
+// Tripadvisor's CDN serves each photograph at several sizes under one path
+// segment: `photo-o` is the original (checked live: 3.6 MB for one) and `photo-w`
+// the same picture at about a tenth of that (252 KB). The reference documents
+// only the original's address, so the smaller one is a convention of the CDN's,
+// used for the strip and never trusted: an address that does not have the
+// original's shape gets no preview, and one that does not load falls back to
+// the original (src/features/place-voices.tsx).
+const ORIGINAL = "/media/photo-o/";
+const PREVIEW = "/media/photo-w/";
+
+export function previewOf(original: string): string | undefined {
+  const url = new URL(original);
+  if (!url.pathname.startsWith(ORIGINAL)) return undefined;
+  url.pathname = PREVIEW + url.pathname.slice(ORIGINAL.length);
+  return url.href;
+}
+
 export function toPhotos(body: unknown): Photo[] {
   return photosResponse.parse(body).data.map((p) => ({
     id: p.id,
     url: p.photo.original_size_url,
+    preview: previewOf(p.photo.original_size_url),
     width: p.photo.original_width ?? 4,
     height: p.photo.original_height ?? 3,
     caption: p.caption?.trim() || null,
