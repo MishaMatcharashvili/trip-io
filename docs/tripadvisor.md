@@ -53,6 +53,21 @@ is the right answer. The catalogue sometimes holds a landmark under its
 Georgian-romanised name ("Gergetis Samebis Eklesia"), which no English title
 contains; those find nothing. `pnpm smoke:wikimedia` checks the live API.
 
+## How photographs are drawn
+
+Tripadvisor's `original_size_url` is the photographer's original: checked live on 2026-10-03, a
+Narikala photo was 5106×3426 and the strip draws it 150px wide. The strip and the full-screen viewer
+(`src/features/photo-viewer.tsx`) therefore go through `next/image`, which resizes to the slot as
+WebP/AVIF; `images.remotePatterns` in `next.config.ts` lists the hosts allowed (Tripadvisor's is
+`dynamic-media.tacdn.com`). The optimiser keeps its resized copies on the server for Next's default
+4 hours: a cache of Tripadvisor's pixels, shorter than the 12-hour content cache above and under the same
+decision. Setting `unoptimized` on the images turns it off.
+
+The viewer is the tap on any photo in the strip: arrow keys, buttons or a swipe page through them, and
+the credit link stays with the picture.
+
+Google Maps now sits beside this in the same panel: `docs/google-places.md`.
+
 ## The flow
 
 ```
