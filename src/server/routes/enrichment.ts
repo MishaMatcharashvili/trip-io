@@ -7,7 +7,11 @@ import {
   enrichPlace,
 } from "@/bll/place-enrichment.ts";
 import { photosForPlace } from "@/bll/place-photos.ts";
-import type { EnrichFailure } from "@/domain/catalogue/enrichment.ts";
+import type {
+  EnrichFailure,
+  PlaceEnricher,
+} from "@/domain/catalogue/enrichment.ts";
+import { googlePlaces } from "@/infra/google-places.ts";
 import { tripadvisor } from "@/infra/tripadvisor.ts";
 import { upstashContent } from "@/infra/upstash.ts";
 import { wikimediaPhotos } from "@/infra/wikimedia.ts";
@@ -17,12 +21,14 @@ import { requireSession, type SessionEnv } from "../auth.ts";
 // A place's rating, reviews and photos. Validation, status codes and nothing
 // else; the rules on spending are in src/bll/place-enrichment.ts.
 //
-// Three things here come from the provider's terms, not from taste:
-//   * It forbids keeping what it returns, so the response says `no-store` to
+// Two sources are asked of, Tripadvisor and Google (`?source=`), under their own
+// terms, limits and bills. Three things here come from those terms, not from taste:
+//   * Both forbid keeping what they return, so the response says `no-store` to
 //     every browser and CDN between here and the screen. What is kept is kept
 //     on purpose, server-side, in Redis, for a bounded time (see
 //     docs/tripadvisor.md, which says plainly that this goes against the
-//     letter of its caching policy).
+//     letter of its caching policy). That is Tripadvisor's, by the owner's
+//     decision; Google's is not kept at all.
 //   * Reviews must not be in a page's source, so they are fetched from here by
 //     script, and /api is disallowed in robots.txt (src/app/robots.ts).
 //   * It spends money, so it asks for a session. Public search and logos
@@ -42,8 +48,6 @@ const status = {
   malformed: 502,
 } as const satisfies Record<EnrichFailure, number>;
 
-const provider = tripadvisor({ key: env.TRIPADVISOR_API_KEY });
-
 // Without Redis nothing is kept and every visit asks the provider.
 const kept =
   env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
@@ -52,6 +56,45 @@ const kept =
         token: env.UPSTASH_REDIS_REST_TOKEN,
       })
     : undefined;
+
+/** The review sources a place can be asked of, each with its own terms and bill. */
+const sources = ["tripadvisor", "google"] as const;
+type Source = (typeof sources)[number];
+
+type SourceConfig = {
+  provider: PlaceEnricher;
+  kept: typeof kept;
+  contentTtlSeconds: number;
+  limits: typeof defaultLimits;
+};
+
+const config: Record<Source, SourceConfig> = {
+  tripadvisor: {
+    provider: tripadvisor({ key: env.TRIPADVISOR_API_KEY }),
+    kept,
+    contentTtlSeconds: env.TRIPADVISOR_CONTENT_TTL_S ?? DEFAULT_CONTENT_TTL_S,
+    limits: {
+      ...defaultLimits,
+      userPerDay: env.TRIPADVISOR_USER_PER_DAY ?? defaultLimits.userPerDay,
+      globalPerDay:
+        env.TRIPADVISOR_GLOBAL_PER_DAY ?? defaultLimits.globalPerDay,
+    },
+  },
+  google: {
+    provider: googlePlaces({ key: env.GOOGLE_PLACES_API_KEY }),
+    // Google's terms allow keeping a place's identifier and nothing it says
+    // about it, so there is no store for it, whatever Redis is configured.
+    kept: undefined,
+    contentTtlSeconds: 0,
+    // Tighter than Tripadvisor's, because nothing is kept: every open place is
+    // a Details call and up to six photograph calls, billed.
+    limits: {
+      ...defaultLimits,
+      userPerDay: env.GOOGLE_PLACES_USER_PER_DAY ?? 30,
+      globalPerDay: env.GOOGLE_PLACES_GLOBAL_PER_DAY ?? 200,
+    },
+  },
+};
 
 /**
  * A failure inside the use case (a database that is missing a table, a provider
@@ -103,22 +146,20 @@ export const enrichment = new Hono<SessionEnv>()
     "/:id/enrichment",
     requireSession,
     zValidator("param", z.object({ id: z.uuid() })),
+    // Which source to ask. Tripadvisor when it is not said, as before there
+    // was a second.
+    zValidator(
+      "query",
+      z.object({ source: z.enum(sources).default("tripadvisor") }),
+    ),
     async (c) => {
       let outcome: Awaited<ReturnType<typeof enrichPlace>>;
       try {
-        outcome = await enrichPlace(c.req.valid("param").id, c.get("userId"), {
-          provider,
-          kept,
-          contentTtlSeconds:
-            env.TRIPADVISOR_CONTENT_TTL_S ?? DEFAULT_CONTENT_TTL_S,
-          limits: {
-            ...defaultLimits,
-            userPerDay:
-              env.TRIPADVISOR_USER_PER_DAY ?? defaultLimits.userPerDay,
-            globalPerDay:
-              env.TRIPADVISOR_GLOBAL_PER_DAY ?? defaultLimits.globalPerDay,
-          },
-        });
+        outcome = await enrichPlace(
+          c.req.valid("param").id,
+          c.get("userId"),
+          config[c.req.valid("query").source],
+        );
       } catch (error) {
         outcome = failed(error, "enrich");
       }

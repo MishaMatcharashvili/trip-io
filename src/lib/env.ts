@@ -50,6 +50,22 @@ export const env = createEnv({
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
     TRIPADVISOR_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
+    /**
+     * Google's Places API (New) key (src/infra/google-places.ts), for the same
+     * panel as Tripadvisor's. Server-only: it rides in a header to Google and
+     * goes nowhere else (the photographs' addresses it resolves carry no key).
+     * Restrict it in Google Cloud to the Places API (New). Unset, the panel shows
+     * Tripadvisor's alone.
+     */
+    GOOGLE_PLACES_API_KEY: z.string().min(1).optional(),
+    /**
+     * What opening a place may spend on Google (src/bll/place-enrichment.ts).
+     * An open place is a Details call and up to six photograph calls, all
+     * billed, and what Google says is never kept, so every open pays. Unset,
+     * the defaults in src/server/routes/enrichment.ts apply.
+     */
+    GOOGLE_PLACES_USER_PER_DAY: z.coerce.number().int().positive().optional(),
+    GOOGLE_PLACES_GLOBAL_PER_DAY: z.coerce.number().int().positive().optional(),
   },
   client: {
     /**
