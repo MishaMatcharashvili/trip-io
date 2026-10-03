@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Checkpoint, Day, Trip } from "@/data/trip";
+import { StopWeatherTag } from "@/ui/bars";
 import { Divider } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
@@ -23,13 +24,23 @@ export function CheckpointRow({
   const { state, conflict } = checkpoint;
   const body = (
     <>
-      <div
-        className={cx(
-          "w-[38px] shrink-0 pt-0.5 text-mini tracking-[0.01em]",
-          state === "now" ? "font-semibold text-agent" : "text-ink-faint",
-        )}
-      >
-        {checkpoint.time}
+      <div className="w-[38px] shrink-0 pt-0.5">
+        <div
+          className={cx(
+            "text-mini tracking-[0.01em]",
+            state === "now" ? "font-semibold text-agent" : "text-ink-faint",
+          )}
+        >
+          {checkpoint.time}
+        </div>
+        {checkpoint.weather ? (
+          <StopWeatherTag
+            sky={checkpoint.weather.sky}
+            label={checkpoint.weather.label}
+            temperature={checkpoint.weather.temperature}
+            alert={checkpoint.weather.wet && !checkpoint.indoor}
+          />
+        ) : null}
       </div>
       <Dot
         tone={state === "now" ? "agent" : conflict ? "alert" : "idle"}
