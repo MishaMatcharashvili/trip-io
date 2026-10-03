@@ -77,6 +77,8 @@ export type EnrichDeps = {
   log: (entry: EnrichLog) => void;
 };
 
+// In flight, by provider and place: two providers asked about one place are two
+// calls, not one shared answer.
 const inflight = new Map<string, Promise<EnrichOutcome>>();
 
 const defaults = (): Omit<EnrichDeps, "provider"> => ({
@@ -128,24 +130,28 @@ export async function enrichPlace(
     return finish({ ok: false, reason: "not-configured" });
   }
 
+  // Counted per provider: each is paid for, and limited, on its own.
+  const scope = `enrich:${deps.provider.provider}`;
   const { limits } = deps;
   if (
-    (await deps.count(`enrich:user:${userId}:m`, MINUTE, now)) >
+    (await deps.count(`${scope}:user:${userId}:m`, MINUTE, now)) >
       limits.userPerMinute ||
-    (await deps.count(`enrich:user:${userId}:d`, DAY, now)) > limits.userPerDay
+    (await deps.count(`${scope}:user:${userId}:d`, DAY, now)) >
+      limits.userPerDay
   ) {
     return finish({ ok: false, reason: "rate-limited" });
   }
 
-  const shared = inflight.get(placeId);
+  const flight = `${deps.provider.provider}:${placeId}`;
+  const shared = inflight.get(flight);
   if (shared) return finish(await shared, "shared");
 
   const call = loadThrough(placeId, deps, now);
-  inflight.set(placeId, call);
+  inflight.set(flight, call);
   try {
     return finish(await call);
   } finally {
-    inflight.delete(placeId);
+    inflight.delete(flight);
   }
 }
 
@@ -210,7 +216,7 @@ async function resolveAndRead(
 
     // Looking a place up is the provider's most tightly limited call.
     if (
-      (await deps.count("enrich:search:m", MINUTE, now)) >
+      (await deps.count(`enrich:${provider.provider}:search:m`, MINUTE, now)) >
       limits.searchPerMinute
     ) {
       return { ok: false, reason: "rate-limited" };
@@ -233,7 +239,10 @@ async function resolveAndRead(
 
   // Counted when the provider is actually about to be asked, so a shared
   // answer, a remembered absence and a refusal cost nothing.
-  if ((await deps.count("enrich:all:d", DAY, now)) > limits.globalPerDay) {
+  if (
+    (await deps.count(`enrich:${provider.provider}:all:d`, DAY, now)) >
+    limits.globalPerDay
+  ) {
     return { ok: false, reason: "quota" };
   }
   return provider.read(externalId);

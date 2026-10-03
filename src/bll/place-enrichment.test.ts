@@ -204,7 +204,7 @@ describe("spending", () => {
     w.provider.answers.search = { ok: true, candidates: [] };
     await run(w);
     await run(w);
-    assert.equal(w.counts.get("enrich:all:d") ?? 0, 0);
+    assert.equal(w.counts.get("enrich:fake:all:d") ?? 0, 0);
   });
 
   test("two travellers opening one place at once share one read", async () => {
@@ -228,6 +228,31 @@ describe("spending", () => {
     // Gone once answered: the next visit asks again.
     await run(w, "c");
     assert.equal(w.asked.read, 2);
+  });
+
+  test("two providers asked about one place are two calls, counted apart", async () => {
+    const a = world();
+    const b = world();
+    b.deps.provider = { ...b.provider, provider: "other" };
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    for (const w of [a, b]) {
+      w.provider.answers.read = async () => {
+        await gate;
+        return { ok: true, enrichment };
+      };
+    }
+    const both = [run(a), run(b)];
+    await new Promise((r) => setTimeout(r, 10));
+    release();
+    await Promise.all(both);
+    assert.equal(a.asked.read, 1);
+    // `b.deps.provider` is a copy that reads through the original's counters.
+    assert.equal(b.asked.read, 1);
+    assert.ok(a.counts.has("enrich:fake:all:d"));
+    assert.ok(b.counts.has("enrich:other:all:d"));
   });
 });
 
@@ -269,7 +294,7 @@ describe("keeping what was said", () => {
     await run(w);
     await run(w, "someone else");
     assert.equal(w.asked.read, 1);
-    assert.equal(w.counts.get("enrich:all:d"), 1);
+    assert.equal(w.counts.get("enrich:fake:all:d"), 1);
   });
 
   test("it is kept for the lifetime given, and the traveller is still counted", async () => {
