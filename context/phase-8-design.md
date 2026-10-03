@@ -65,11 +65,13 @@ Two inputs, both deterministic:
 - **A report.** A "this was closed" / "different hours" button on a place, one tap, no free text
   (the road form's lesson). Stored like a road report and moderated the same way: an operator's
   publishes at once, a stranger's waits. Writes `hours.closed` for the date, geometry = the place.
-- **Drift.** At match time, a node whose `startsAt` falls outside the place's recorded opening hours
-  is a pair with a deterministic reason — no source to poll. **Check before building:** whether the
-  catalogue holds hours at all. I have not checked what Overture carries for hours here; Google Places (added in
-  #32 for photos) returns them, but its terms limit how long a response may be stored. If the answer is
-  "no usable hours", drift is cut and detector 5 is the report path only. Do not scrape.
+- **Drift.** `place.opening_hours` is captured by hand during curation (no source provides it for
+  Georgia) and the coherent-day validator already reads it through `isOpenThroughout`. So a node
+  scheduled outside a place's hours is caught when the day is written, not by a detector. What
+  drift adds is the other direction: a *curator correcting* a place's hours after trips are
+  planned. On that edit, write an `hours.closed` event for the affected dates so live trips that
+  now conflict are matched and judged. It is only as good as the curated set (0 of 600 today),
+  so it is a hook to build with the curation UI, not a source to poll. Do not scrape.
 
 Confidence: 0.8 operator, 0.6 community. Cheapest detector; ships first so the matcher sees a
 second `kind` family end to end.
