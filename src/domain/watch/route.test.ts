@@ -130,6 +130,22 @@ describe("routing", () => {
     );
   });
 
+  test("safety never interrupts, even if someone lists it as graduated", () => {
+    for (const kind of ["safety.demonstration", "safety.advisory"] as const) {
+      assert.deepEqual(
+        route(
+          input({
+            kind,
+            interruptEligible: new Set([kind, RAIN]),
+            eventConfidence: 1,
+            verdict: verdict({ confidence: 1, horizonHrs: 0 }),
+          }),
+        ),
+        { route: "briefing", reason: "briefing-only-detector" },
+      );
+    }
+  });
+
   test("never interrupts below the confidence floor, whatever else is true", () => {
     // The fourth validator from the implementation plan, as an invariant over
     // the whole input space rather than one case.

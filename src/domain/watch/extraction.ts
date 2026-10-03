@@ -54,6 +54,12 @@ export type Extractor = (input: ExtractionInput) => Promise<unknown>;
 
 const isoInstant = z.iso.datetime({ offset: true });
 
+/** Where safety events live, whichever outlet said them. */
+export const SAFETY_SOURCE = "news-safety";
+
+/** Outlets that must agree before a safety claim can reach the matcher. */
+export const SAFETY_QUORUM = 2;
+
 export const extractableKinds = [...eventListingKinds, ...safetyKinds] as const;
 export type ExtractableKind = (typeof extractableKinds)[number];
 
@@ -82,6 +88,7 @@ export const extractionRejections = [
   "window-too-far-ahead",
   "window-too-long",
   "wrong-detector",
+  "characterises",
 ] as const;
 export type ExtractionRejection = (typeof extractionRejections)[number];
 
@@ -162,6 +169,16 @@ export const quoteIsInSource = (quote: string, text: string): boolean => {
   return needle.length > 0 && normalizeForQuote(text).includes(needle);
 };
 
+/**
+ * Words that judge a place or a people rather than describe a schedule. A claim
+ * that a demonstration is planned outside parliament at 18:00 is news; a claim
+ * that the area is dangerous is an opinion, and an opinion from a model reading
+ * a headline is the confident, wrong, alarming sentence this detector is gated
+ * to keep from a traveller.
+ */
+const CHARACTERISING =
+  /\b(unsafe|dangerous|danger|deadly|violent|violence|terror\w*|threat\w*|chaos|chaotic|lawless|hostile|avoid|do not travel|stay away)\b/i;
+
 export type VetContext = {
   /** The English text the extractor was shown. */
   text: string;
@@ -212,6 +229,13 @@ export function vetExtraction(raw: unknown, ctx: VetContext): VetResult {
       refuse("quote-not-in-source");
       continue;
     }
+    if (
+      item.kind.startsWith("safety.") &&
+      CHARACTERISING.test(`${item.summary} ${item.place}`)
+    ) {
+      refuse("characterises");
+      continue;
+    }
     const regionSlug = ctx.resolveRegion(item.place);
     if (!regionSlug) {
       refuse("unknown-place");
@@ -256,8 +280,12 @@ export function toEventDraft(
   from: { source: string; url: string; language: string; observedAt: string },
 ): EventDraft {
   const { item } = vetted;
+  // A safety claim is published only once two outlets have made it, so the
+  // outlets must meet on one row: the source is the detector's, and each
+  // outlet that reported it is a member of the payload.
+  const corroborated = item.kind.startsWith("safety.");
   return {
-    source: from.source,
+    source: corroborated ? SAFETY_SOURCE : from.source,
     kind: item.kind,
     severity: vetted.severity,
     confidence: vetted.confidence,
@@ -271,6 +299,11 @@ export function toEventDraft(
       url: from.url,
       language: from.language,
       reportedAt: from.observedAt,
+      ...(corroborated
+        ? {
+            outlets: [{ id: from.source, url: from.url, quote: item.quote }],
+          }
+        : {}),
     },
   };
 }

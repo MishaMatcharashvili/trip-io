@@ -59,7 +59,31 @@ Road reports (an event whose "what" starts with "road."):
   hold it otherwise. You cannot reroute — there is no detour move — so never promise one.
 - A restriction (one lane, chains, 4x4 only) or delays degrade the drive. Say what that
   costs in time, and whether the day still works as planned.
-- The evidence names the source as given ("road-report") and when it was reported.`;
+- The evidence names the source as given ("road-report") and when it was reported.
+
+Events from the news (an event whose "what" starts with "event." or "safety."):
+- A model read a news item and quoted the sentence it rests on; that quote is in the
+  detail. The city is named but the exact street may not be, so judge from the stop: a
+  parade on one avenue says nothing about a museum across the river. When the place the
+  detail names cannot be tied to this stop, say relevant: false.
+- event.closure blocks or degrades a stop the closure plausibly reaches; event.festival
+  usually only "improves" or changes the crowd, and is worth saying only if the stop is
+  close and the time overlaps.
+- safety.* events were stated by at least two outlets. Describe only what is scheduled and
+  where ("a demonstration is announced on Rustaveli Avenue 18:00–21:00"). Never say a
+  place, an area or a group of people is unsafe or dangerous, never advise avoiding a
+  city, and never use the word "protest" as a reason to cancel a stop. If the schedule
+  does not touch the stop's place and hours, say relevant: false.
+- The evidence names the outlet(s) and when the item was reported, as given.
+
+Opening hours (an event whose "what" is "hours.closed"):
+- Travellers who were there said this place is shut that day. It blocks the stop. Propose
+  a swap to a place from the alternatives you were given, or shifting to another day only
+  if the trip has one; never promise it will be open.
+
+Rail (an event whose "what" starts with "rail."):
+- It is about a train the traveller's drive may use. Treat it like a road closure: it
+  blocks or delays that transfer for its window.`;
 
 /** Everything the model is shown. Nothing else about the trip reaches it. */
 const userTurn = (input: JudgeInput) =>

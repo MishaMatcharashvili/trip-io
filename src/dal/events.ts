@@ -119,6 +119,47 @@ export async function upsertEvent(
 }
 
 /**
+ * Write a claim that more than one outlet can make. The first outlet inserts
+ * the row; each later one joins `payload.outlets`, one entry per outlet, and
+ * the matcher holds the event back until there are enough of them
+ * (src/dal/matches.ts). Confidence and severity are the first writer's: a
+ * second outlet repeating a claim does not make it more certain than a
+ * detector is allowed to be.
+ */
+export async function upsertCorroborated(
+  draft: EventDraft,
+  event: Pick<WorldEvent, "regionSlug" | "observedAt" | "dedupeKey">,
+): Promise<{ id: string; outlets: number } | null> {
+  const rows = await db.execute(sql`
+    INSERT INTO world_event
+      (source, kind, severity, confidence, geom, valid_from, valid_to,
+       observed_at, dedupe_key, payload)
+    SELECT ${draft.source}, ${draft.kind}, ${draft.severity}, ${draft.confidence},
+           ST_SimplifyPreserveTopology(r.geom::geometry, 0.01)::geography,
+           ${draft.validFrom}::timestamptz, ${draft.validTo}::timestamptz,
+           ${event.observedAt}::timestamptz, ${event.dedupeKey},
+           ${JSON.stringify(draft.payload)}::jsonb
+    FROM region r WHERE r.slug = ${event.regionSlug}
+    ON CONFLICT (dedupe_key) DO UPDATE SET
+      observed_at = EXCLUDED.observed_at,
+      payload = world_event.payload || jsonb_build_object('outlets', (
+        SELECT jsonb_agg(x) FROM (
+          SELECT DISTINCT ON (o->>'id') o AS x
+          FROM jsonb_array_elements(
+            COALESCE(world_event.payload->'outlets', '[]'::jsonb)
+            || COALESCE(EXCLUDED.payload->'outlets', '[]'::jsonb)
+          ) o
+          ORDER BY o->>'id'
+        ) s
+      ))
+    RETURNING id, jsonb_array_length(payload->'outlets') AS outlets
+  `);
+  const row = rows.rows[0];
+  if (!row) return null;
+  return { id: row.id as string, outlets: Number(row.outlets) };
+}
+
+/**
  * Let an escalated event be judged again. The dedupe key deliberately collapses
  * a re-forecast onto one row, which means a spell that turns from `minor` into
  * `severe` would otherwise keep the verdict formed when it was drizzle.

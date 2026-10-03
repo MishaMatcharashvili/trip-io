@@ -5,6 +5,7 @@ import {
   CAPS,
   normalizeForQuote,
   quoteIsInSource,
+  SAFETY_SOURCE,
   toEventDraft,
   vetExtraction,
 } from "./extraction.ts";
@@ -212,5 +213,90 @@ describe("eventDraft", () => {
     assert.equal(draft.payload.quote, QUOTE);
     assert.equal(draft.payload.language, "ka");
     assert.equal(draft.validFrom, "2030-05-04T10:00:00.000Z");
+  });
+});
+
+describe("safety claims", () => {
+  const SAFE_TEXT =
+    "A demonstration is planned outside parliament on Rustaveli Avenue tomorrow at 18:00 and the area is dangerous.";
+  const safety = (over: Record<string, unknown> = {}) => ({
+    kind: "safety.demonstration",
+    place: "Tbilisi",
+    startsAt: "2030-05-02T14:00:00Z",
+    endsAt: "2030-05-02T18:00:00Z",
+    summary:
+      "A demonstration is planned outside parliament on Rustaveli Avenue.",
+    quote: "A demonstration is planned outside parliament on Rustaveli Avenue",
+    confidence: 0.9,
+    ...over,
+  });
+  const c = ctx({ text: SAFE_TEXT, detector: "safety" as const });
+
+  test("a scheduled demonstration is described, not characterised", () => {
+    assert.equal(vetExtraction({ items: [safety()] }, c).accepted.length, 1);
+  });
+
+  test("a summary that judges the place is refused", () => {
+    assert.deepEqual(
+      reasons(
+        {
+          items: [
+            safety({ summary: "The area around parliament is dangerous." }),
+          ],
+        },
+        c,
+      ),
+      ["characterises"],
+    );
+    assert.deepEqual(
+      reasons(
+        {
+          items: [
+            safety({ summary: "Tourists should avoid Rustaveli Avenue." }),
+          ],
+        },
+        c,
+      ),
+      ["characterises"],
+    );
+  });
+
+  test("the same wording is fine for an event, which is not judged", () => {
+    const festival = item({ summary: "Roads are chaotic during the parade." });
+    assert.equal(
+      vetExtraction({ items: [festival] }, ctx()).accepted.length,
+      1,
+    );
+  });
+
+  test("a safety draft names its outlet in a list other outlets can join", () => {
+    const [vetted] = vetExtraction({ items: [safety()] }, c).accepted;
+    const draft = toEventDraft(vetted, {
+      source: "civil-ge",
+      url: "https://civil.ge/x",
+      language: "en",
+      observedAt: NOW.toISOString(),
+    });
+    assert.equal(draft.source, SAFETY_SOURCE);
+    assert.deepEqual(draft.payload.outlets, [
+      {
+        id: "civil-ge",
+        url: "https://civil.ge/x",
+        quote:
+          "A demonstration is planned outside parliament on Rustaveli Avenue",
+      },
+    ]);
+  });
+
+  test("an event draft keeps its outlet as its source and has no outlet list", () => {
+    const [vetted] = vetExtraction({ items: [item()] }, ctx()).accepted;
+    const draft = toEventDraft(vetted, {
+      source: "civil-ge",
+      url: "u",
+      language: "en",
+      observedAt: NOW.toISOString(),
+    });
+    assert.equal(draft.source, "civil-ge");
+    assert.equal(draft.payload.outlets, undefined);
   });
 });

@@ -105,8 +105,8 @@ describe("the source list", () => {
     for (const s of NEWS_SOURCES) assert.ok(s.url.startsWith("https://"), s.id);
   });
 
-  test("nothing reads for safety until safety has its gate", () => {
-    assert.equal(enabledSources("safety").length, 0);
+  test("the English-or-Georgian outlets are read for both detectors", () => {
+    assert.ok(enabledSources("safety").length >= 4);
     assert.ok(enabledSources("events").length >= 4);
   });
 });

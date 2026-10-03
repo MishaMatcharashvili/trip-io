@@ -1,4 +1,4 @@
-import { upsertEvent } from "../dal/events.ts";
+import { upsertCorroborated, upsertEvent } from "../dal/events.ts";
 import { enqueue } from "../dal/jobs.ts";
 import {
   loadItem,
@@ -13,7 +13,7 @@ import { type FeedItem, itemText } from "../domain/watch/feed.ts";
 import { resolveRegion } from "../domain/watch/gazetteer.ts";
 import { readItem } from "../domain/watch/read-item.ts";
 import {
-  enabledSources,
+  enabledNewsSources,
   NEWS_SOURCES,
   type NewsSource,
 } from "../domain/watch/sources.ts";
@@ -56,7 +56,7 @@ export type SenseNewsDeps = {
 export async function senseNews(deps: SenseNewsDeps = {}): Promise<NewsReport> {
   const started = Date.now();
   const fetchItems = deps.fetch ?? fetchFeed;
-  const sources = deps.sources ?? enabledSources("events");
+  const sources = deps.sources ?? enabledNewsSources();
 
   const bySource: SourceReport[] = [];
   let queued = 0;
@@ -131,7 +131,11 @@ export async function extractItem(
   let written = 0;
   for (const { draft, regionSlug } of outcome.events) {
     const event = toWorldEvent(draft, regionSlug, observedAt);
-    if (await upsertEvent(draft, event)) written++;
+    // Safety claims join the row other outlets wrote; the matcher waits for two.
+    const row = draft.kind.startsWith("safety.")
+      ? await upsertCorroborated(draft, event)
+      : await upsertEvent(draft, event);
+    if (row) written++;
   }
 
   await markItem(itemId, {

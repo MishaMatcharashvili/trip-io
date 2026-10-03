@@ -13,7 +13,7 @@ export type NewsSource = {
   kind: "rss";
   url: string;
   language: SourceLanguage;
-  /** Which detectors may read it. Safety waits for its own gate (step 6). */
+  /** Which detectors may read it. */
   detectors: readonly ("events" | "safety")[];
   enabled: boolean;
   note: string;
@@ -26,7 +26,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "rss",
     url: "https://civil.ge/feed",
     language: "en",
-    detectors: ["events"],
+    detectors: ["events", "safety"],
     enabled: true,
     note: "English. 10 items, full text in content:encoded. Politics-heavy: most items are not events, which the gate absorbs.",
   },
@@ -36,7 +36,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "rss",
     url: "https://jam-news.net/feed/",
     language: "en",
-    detectors: ["events"],
+    detectors: ["events", "safety"],
     enabled: true,
     note: "English, South Caucasus. 10 items, full text.",
   },
@@ -46,7 +46,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "rss",
     url: "https://oc-media.org/feed/",
     language: "en",
-    detectors: ["events"],
+    detectors: ["events", "safety"],
     enabled: true,
     note: "English, Caucasus. 16 items, full text. Titles arrive wrapped in CDATA inside CDATA.",
   },
@@ -56,7 +56,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "rss",
     url: "https://netgazeti.ge/feed/",
     language: "ka",
-    detectors: ["events"],
+    detectors: ["events", "safety"],
     enabled: true,
     note: "Georgian. 32 items, summary only. The feed's declared language is wrong (en-US).",
   },
@@ -66,7 +66,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "rss",
     url: "https://on.ge/rss",
     language: "ka",
-    detectors: ["events"],
+    detectors: ["events", "safety"],
     enabled: true,
     note: "Georgian. 50 items, summary only.",
   },
@@ -76,7 +76,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "rss",
     url: "https://newsgeorgia.ge/feed/",
     language: "ru",
-    detectors: ["events"],
+    detectors: ["events", "safety"],
     enabled: false,
     note: "Russian. 100 items, summary only. Off: Russian-language coverage was not asked for; turn on if the others prove thin.",
   },
@@ -97,6 +97,9 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
  *    Georgian, server-rendered HTML. The road-automation spike's source, not a
  *    news feed (context/phase-8-design.md).
  */
+export const enabledNewsSources = (): readonly NewsSource[] =>
+  NEWS_SOURCES.filter((s) => s.enabled);
+
 export const enabledSources = (
   detector: "events" | "safety",
 ): readonly NewsSource[] =>
