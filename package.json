@@ -43,6 +43,7 @@
     "@trigger.dev/sdk": "^4.6.3",
     "better-auth": "^1.7.4",
     "drizzle-orm": "^0.45.2",
+    "fast-xml-parser": "^5.11.2",
     "grammy": "^1.46.0",
     "hono": "catalog:",
     "lucide-react": "^1.48.0",
