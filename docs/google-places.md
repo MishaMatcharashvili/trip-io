@@ -43,25 +43,38 @@ As the terms were read when this was written (re-read them: they change):
 
 | Term | Where it bites |
 |---|---|
-| **Only a place's identifier may be stored.** Other content — reviews, photographs, ratings — may not be cached or stored beyond what serving a request needs. | Google is **never kept**: no Redis, no Postgres, `Cache-Control: no-store`. `place_external` keeps the place id and nothing else. *Unlike Tripadvisor, there is no owner decision to depart from this.* Every open place is billed. |
+| **Only a place's identifier may be stored.** Other content — reviews, photographs, ratings — may not be cached or stored beyond what serving a request needs. | **This build keeps the content anyway**, in Redis, for **60 days**, on the owner's decision of 2026-10-03. The id is kept in Postgres as before. It is a known departure from the letter, as Tripadvisor's 12-hour cache is (`docs/tripadvisor.md`), and a longer one. |
 | **Attribution.** Google-sourced content must show "Google Maps", and reviews and photographs credit their authors. | The source is named "Google Maps" in the section heading and the "See all" link; each review shows its author and links to Google Maps; each photograph is credited `Author · Google Maps` and links to the author's profile. |
 | **Place ids can go stale.** | A `404` on a stored id reads as "nothing to show". It is not yet re-resolved; if it starts to show in `places.enrich` logs, clear the `place_external` row for `provider = 'google'` or add a re-search on `no-match` from `read`. |
 
-One residue worth knowing: the `next/image` optimiser keeps resized copies on the server for its
-`minimumCacheTTL` (Next's default, 4 hours). That is a cache of Google's pixels. It is shorter than the
-12 hours Tripadvisor's content is kept for, but it is not nothing; if Google's terms are read strictly,
-serve its photographs with `unoptimized` in `Photos` (`src/features/place-voices.tsx`) at the price of
-sending the 1200px original to the strip.
+### The caching decision
+
+- **Where:** Redis (Upstash), keyed by provider and place id, never by traveller. Not in Postgres, not in
+  the browser (`Cache-Control: no-store`), not in Next's data cache (`cache: "no-store"` on the fetch).
+- **How long:** `GOOGLE_PLACES_CONTENT_TTL_S`, 60 days unset. Every `SET` carries an `EX`. A failure is
+  kept 30 seconds. Without the `UPSTASH_*` variables nothing is kept.
+- **To stop:** set `GOOGLE_PLACES_CONTENT_TTL_S=0`, or unset the Upstash variables.
+- **Photographs are resized and kept for 60 days too:** `next/image` keeps its resized copies for
+  `images.minimumCacheTTL` (`next.config.ts`), 60 days, again on the owner's decision. Google's photographs
+  go through it like the others. To stop that for Google alone, serve its photographs `unoptimized` in
+  `PhotoTile` (`src/features/place-voices.tsx`), at the price of sending the 1200px image to the strip.
+- **Risk to measure: photograph addresses may expire.** What is kept for a place includes each photograph's
+  `googleusercontent.com` address, and the reference does not say how long one lives. A photograph the
+  optimiser has already fetched is safe for its 60 days; one not yet fetched (scrolled past, or never
+  opened full screen) is not, and a dead address drops out of the strip silently. If, a day or more after
+  opening a place, its Google photographs go missing, shorten `GOOGLE_PLACES_CONTENT_TTL_S` to the
+  addresses' lifetime. (The smoke script checks that an address loads; it cannot say how long.)
 
 ## What it costs
 
-Every open place is one Details call and up to six Photos calls, and nothing is cached, so
-**opening a place twice costs twice.** Limits (`src/server/routes/enrichment.ts`), overridable by
-`GOOGLE_PLACES_USER_PER_DAY` and `GOOGLE_PLACES_GLOBAL_PER_DAY`: **30 places a day per traveller and
-200 a day in all**, deliberately tighter than Tripadvisor's 60 and 500. The per-minute and search
-limits are the same as Tripadvisor's, counted separately per provider. Check the current per-SKU
-prices and free monthly allowances for the account before raising them; set a budget alert in Google
-Cloud as well, because an alert only emails — the limits above are what actually stop spending.
+A place opened for the first time is one Details call and up to six Photos calls. **One served from
+Redis costs nothing and is not counted against the day's total**; the traveller's own limit still
+counts it. Limits (`src/server/routes/enrichment.ts`), overridable by `GOOGLE_PLACES_USER_PER_DAY` and
+`GOOGLE_PLACES_GLOBAL_PER_DAY`: **30 places a day per traveller and 200 a day in all** (misses only),
+deliberately tighter than Tripadvisor's 60 and 500 because a miss is dearer. The per-minute and search
+limits are the same as Tripadvisor's, counted separately per provider. Check the current per-SKU prices
+and free monthly allowances for the account before raising them; set a budget alert in Google Cloud as
+well, because an alert only emails — the limits above are what actually stop spending.
 
 ## Not known yet
 

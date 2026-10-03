@@ -56,12 +56,23 @@ contains; those find nothing. `pnpm smoke:wikimedia` checks the live API.
 ## How photographs are drawn
 
 Tripadvisor's `original_size_url` is the photographer's original: checked live on 2026-10-03, a
-Narikala photo was 5106×3426 and the strip draws it 150px wide. The strip and the full-screen viewer
-(`src/features/photo-viewer.tsx`) therefore go through `next/image`, which resizes to the slot as
-WebP/AVIF; `images.remotePatterns` in `next.config.ts` lists the hosts allowed (Tripadvisor's is
-`dynamic-media.tacdn.com`). The optimiser keeps its resized copies on the server for Next's default
-4 hours: a cache of Tripadvisor's pixels, shorter than the 12-hour content cache above and under the same
-decision. Setting `unoptimized` on the images turns it off.
+Narikala photo was 5106×3426 and 3.6 MB. Its CDN serves the same picture at several sizes under one
+path segment, and `photo-w` was 252 KB, so:
+
+- **The strip** loads the `photo-w` address (`previewOf` in `src/infra/tripadvisor.ts`), through
+  `next/image`, which makes a 150px WebP of it (about 28 KB measured for the original; less from the
+  smaller source). If the `photo-w` address does not load, the tile falls back to the original.
+- **The full-screen viewer** (`src/features/photo-viewer.tsx`) opens the original, through `next/image`
+  sized to the viewport (489 KB at 1920px measured).
+
+`photo-w` is a convention of the CDN's, not in Terra's reference: an address not shaped like
+`/media/photo-o/…` gets no preview, and if Tripadvisor changes the scheme the fallback means a slower
+strip, not a broken one. `images.remotePatterns` in `next.config.ts` lists the hosts allowed
+(Tripadvisor's is `dynamic-media.tacdn.com`).
+
+The optimiser keeps its resized copies for 60 days (`images.minimumCacheTTL`), on the owner's decision
+of 2026-10-03: a cache of Tripadvisor's pixels, longer than the 12-hour content cache above and under the
+same kind of decision. Setting `unoptimized` on the images turns it off.
 
 The viewer is the tap on any photo in the strip: arrow keys, buttons or a swipe page through them, and
 the credit link stays with the picture.
