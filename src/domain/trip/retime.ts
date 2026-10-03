@@ -23,6 +23,12 @@ import {
 // itself, and each later stop pushed — never pulled — just far enough to clear
 // the one before it and the way between them.
 //
+// A traveller who changes how long a stop takes expects the day after it to
+// follow, not only to be crowded: a longer lunch moves the afternoon, a shorter
+// one gives it back. `follow` asks for that — every later stop keeps the gap it
+// had — and is what the editor uses. The default is the minimum, which is what
+// a suggestion made on the traveller's behalf should be: the least that holds.
+//
 // Pure: a document and an edit in, ops out. The caller shows the pushes before
 // they are made and applies them as one patch, so a change that moves three
 // stops is one change and one undo.
@@ -54,6 +60,12 @@ export type Retimed = {
 export type RetimeContext = {
   places: ReadonlyMap<string, PlaceInfo>;
   travel: TravelEstimator;
+  /**
+   * A change of length carries the later stops with it, earlier as well as
+   * later, each keeping its gap. A booked stop does not move for it (and what
+   * follows a stop that stayed stays too): it is pushed only if crowded.
+   */
+  follow?: boolean;
 };
 
 /**
@@ -115,6 +127,11 @@ export function retime(
   const pushOps: PatchOp[] = [];
   let prevEnd = nodeEnd(edited);
   let prevAt = locate(edited, ctx.places);
+  // How far the stop before has moved, which the next keeps to when following.
+  let carried =
+    ctx.follow && edit.durationMin !== undefined
+      ? (edit.durationMin - original.durationMin) * MIN
+      : 0;
 
   for (const { id: nodeId, node } of after) {
     const here = locate(node, ctx.places);
@@ -124,10 +141,15 @@ export function retime(
         ? 0
         : gapMinutes(ctx.travel, prevAt, here);
     const earliest = prevEnd + gap * MIN;
-    // Room already: it, and so everything after it, was right and stays right.
-    if (Date.parse(node.startsAt) >= earliest) break;
+    const was = Date.parse(node.startsAt);
+    // Room already and nothing carried: it, and so everything after it, was
+    // right and stays right.
+    if (carried === 0 && was >= earliest) break;
 
-    const start = roundUp5(earliest);
+    const following = node.meta.booked ? 0 : carried;
+    const start =
+      was + following >= earliest ? was + following : roundUp5(earliest);
+    if (start === was) break;
     const moved: TripNode = {
       ...node,
       startsAt: new Date(start).toISOString(),
@@ -151,6 +173,9 @@ export function retime(
     });
     prevEnd = end;
     prevAt = here;
+    // Only a traveller's own change of length is carried on; a minimal push
+    // is recomputed from each stop's own neighbour.
+    carried = ctx.follow ? start - was : 0;
   }
 
   return { ops: [...ops, ...pushOps], pushed, overflow: false };

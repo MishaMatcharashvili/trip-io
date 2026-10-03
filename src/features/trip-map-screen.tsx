@@ -8,7 +8,7 @@ import { Divider, Panel } from "@/ui/card";
 import { Toggle } from "@/ui/control";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
-import { Icon } from "@/ui/icon";
+import { Icon, type IconName } from "@/ui/icon";
 import { MapStyleSwitch } from "@/ui/map/map-style-switch";
 import { googleMapsDirectionsUrl } from "@/ui/map/open-in-maps";
 import {
@@ -120,6 +120,22 @@ export function TripMapScreen({
   const layer = (name: keyof MapLayers) => (on: boolean) =>
     setLayers((l) => ({ ...l, [name]: on }));
 
+  const controls: {
+    label: string;
+    icon: IconName;
+    size?: number;
+    act: () => void;
+  }[] = [
+    { label: "Zoom out", icon: "minus", act: () => map.current?.zoomOut() },
+    { label: "Zoom in", icon: "plus", act: () => map.current?.zoomIn() },
+    {
+      label: "Recentre",
+      icon: "locate",
+      size: 15,
+      act: () => map.current?.recentre(),
+    },
+  ];
+
   const hasWeather = events.some((e) => e.kind.startsWith("weather"));
   const hasRoads = events.some((e) => e.kind.startsWith("road"));
 
@@ -183,39 +199,12 @@ export function TripMapScreen({
       ) : null}
 
       <div className="hidden lg:block">
-        <div className="absolute bottom-[30px] right-6 z-20 w-[38px] overflow-hidden rounded-panel border border-hairline-strong bg-surface shadow-panel">
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={() => map.current?.zoomIn()}
-            className="flex h-9 w-full items-center justify-center text-ink-muted hover:bg-canvas"
-          >
-            <Icon name="plus" />
-          </button>
-          <Divider />
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={() => map.current?.zoomOut()}
-            className="flex h-9 w-full items-center justify-center text-ink-muted hover:bg-canvas"
-          >
-            <Icon name="minus" />
-          </button>
-          <Divider />
-          <button
-            type="button"
-            aria-label="Recentre"
-            onClick={() => map.current?.recentre()}
-            className="flex h-9 w-full items-center justify-center text-ink-muted hover:bg-canvas"
-          >
-            <Icon name="locate" size={15} />
-          </button>
-        </div>
-
-        {/* The route and the layers: a bar that is always there, and a panel that
-            opens above it on request. Open all the time it sat under the cards
-            of the right-hand column and could not be reached. */}
-        <div className="absolute bottom-[30px] right-[74px] z-30 flex max-h-[calc(100%-120px)] w-[240px] flex-col gap-2">
+        {/* The map's controls: a bar that is always there, with the route and
+            layers on one side and the zoom on the other, and a panel that opens
+            above it on request. Open all the time the panel sat under the cards
+            of the right-hand column and could not be reached; the zoom had its
+            own stack beside it, which ran into those cards. */}
+        <div className="absolute bottom-[30px] right-6 z-30 flex max-h-[calc(100%-120px)] w-[320px] flex-col gap-2">
           {instruments ? (
             <Panel className="min-h-0 flex-1 overflow-y-auto">
               <div className="px-3.5 py-2.5">
@@ -299,29 +288,47 @@ export function TripMapScreen({
               </div>
             </Panel>
           ) : null}
-          <button
-            type="button"
-            aria-expanded={instruments}
-            onClick={() => setInstruments((open) => !open)}
-            className="flex h-[38px] shrink-0 items-center gap-2 rounded-panel border border-hairline-strong bg-surface px-3.5 text-small font-medium shadow-panel hover:bg-canvas"
-          >
-            <Icon name="route" size={14} className="text-ink-muted" />
-            <span className="flex-1 text-left">
-              {view.kind === "ready"
-                ? `${view.time} · ${view.distance}`
-                : view.kind === "loading"
-                  ? "Finding the road…"
-                  : "Route & layers"}
-            </span>
-            <Icon
-              name="chevronDown"
-              size={14}
-              className={cx(
-                "text-ink-faint transition-transform",
-                instruments && "rotate-180",
-              )}
-            />
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              aria-expanded={instruments}
+              onClick={() => setInstruments((open) => !open)}
+              className="flex h-[38px] min-w-0 flex-1 items-center gap-2 rounded-panel border border-hairline-strong bg-surface px-3.5 text-small font-medium shadow-panel hover:bg-canvas"
+            >
+              <Icon name="route" size={14} className="text-ink-muted" />
+              <span className="flex-1 truncate text-left">
+                {view.kind === "ready"
+                  ? `${view.time} · ${view.distance}`
+                  : view.kind === "loading"
+                    ? "Finding the road…"
+                    : "Route & layers"}
+              </span>
+              <Icon
+                name="chevronDown"
+                size={14}
+                className={cx(
+                  "text-ink-faint transition-transform",
+                  instruments && "rotate-180",
+                )}
+              />
+            </button>
+            <div className="flex h-[38px] shrink-0 overflow-hidden rounded-panel border border-hairline-strong bg-surface shadow-panel">
+              {controls.map(({ label, icon, size, act }, i) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-label={label}
+                  onClick={act}
+                  className={cx(
+                    "flex w-9 items-center justify-center text-ink-muted hover:bg-canvas",
+                    i > 0 && "border-l border-hairline",
+                  )}
+                >
+                  <Icon name={icon} size={size} />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {card ? (

@@ -3,6 +3,8 @@ import { georgiaMapStops, getTrip, type Trip, todayWeather } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { DayAccordion, type DayRow } from "@/features/day-accordion";
 import { DayEditor } from "@/features/day-editor";
+import { DayStrip } from "@/features/day-strip";
+import { chipsFor } from "@/features/day-strip-model";
 import { dayTiming } from "@/features/day-timing";
 import { CheckpointList } from "@/features/itinerary";
 import { RoutedTripMap } from "@/features/routed-trip-map";
@@ -37,6 +39,7 @@ function WholeTrip({
   stats,
   totals,
   stops,
+  switcher,
   days,
   actions,
 }: {
@@ -44,6 +47,7 @@ function WholeTrip({
   stats: Figure[];
   totals: Figure[];
   stops: MapStop[];
+  switcher?: React.ReactNode;
   /** The days, each opening in place. */
   days: React.ReactNode;
   actions: React.ReactNode;
@@ -56,6 +60,7 @@ function WholeTrip({
       map={
         <RoutedTripMap stops={stops} className="absolute inset-0 size-full" />
       }
+      switcher={switcher}
       days={days}
       actions={actions}
     />
@@ -145,7 +150,6 @@ export default async function FullTripPage({
   }
 
   const { screen, trip } = await loadTrip(tripId);
-  const stops = tripStops(trip);
   const nodes = Object.values(screen.doc.nodes);
   const driving = nodes
     .filter((n) => n.kind === "transfer")
@@ -163,7 +167,16 @@ export default async function FullTripPage({
     .size;
   const { told, applied } = screen.alerts;
 
-  const openDay = pickDay(trip, wanted) ?? trip.days[trip.currentDay - 1];
+  // The switcher's choice. A day named in the URL is the one the map shows and
+  // the list opens; "all" is every stop and no day open; with nothing asked for,
+  // the map has every stop and today's row is the one that is open.
+  const everyDay = wanted === "all";
+  const chosen = everyDay ? undefined : pickDay(trip, wanted);
+  const focused = wanted ? chosen : undefined;
+  const openDay = everyDay
+    ? undefined
+    : (chosen ?? trip.days[trip.currentDay - 1]);
+  const stops = focused ? mapStops(focused) : tripStops(trip);
   const today = dayKey(new Date());
   // An open recommendation touches the days its matched stops are on.
   const recommendation = screen.alerts.alerts.find((a) => a.outcome === null);
@@ -238,6 +251,16 @@ export default async function FullTripPage({
         told ? `${told} · ${applied} applied` : "None yet",
       ])}
       stops={stops}
+      switcher={
+        trip.days.length > 1 ? (
+          <DayStrip
+            tripId={trip.id}
+            chips={chipsFor(trip.days)}
+            selected={focused?.id ?? "all"}
+            page="plan"
+          />
+        ) : null
+      }
       days={<DayAccordion tripId={trip.id} rows={rows} />}
       actions={
         <>

@@ -107,7 +107,9 @@ export function OpportunityCard({
 /**
  * The calm state — what most days look like. It has to read as deliberate
  * rather than broken, so it states what was checked, when, and promises to
- * interrupt if that stops being true.
+ * interrupt if that stops being true. That is one line until asked for: a
+ * day with nothing to decide should not take the room of one with something
+ * to decide, so the detail opens, and the advisory beside it never needs to.
  */
 export function AllClearCard({
   sources,
@@ -126,40 +128,50 @@ export function AllClearCard({
 }) {
   return (
     <Panel className={`overflow-hidden ${className ?? ""}`}>
-      <div className="flex flex-col gap-3 px-[18px] pb-4 pt-5">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-[26px] items-center justify-center rounded-full bg-ok-tint text-ok">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-3 marker:hidden hover:bg-canvas [&::-webkit-details-marker]:hidden">
+          <span className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-ok-tint text-ok">
             <Icon name="check" size={14} strokeWidth={2.2} />
           </span>
-          <Eyebrow tone="ok">Nothing needs your attention</Eyebrow>
-        </div>
-        <Display className="text-[25px]">{headline}</Display>
-        <Prose>{note}</Prose>
-      </div>
-
-      <Divider />
-
-      <div className="flex flex-col px-[18px] pb-3.5 pt-3">
-        {sources.map((source, i) => (
-          <div
-            key={source.name}
-            className={`flex items-center gap-2.5 py-2 ${i > 0 ? "border-t border-track" : ""}`}
-          >
-            <Dot tone={source.tone} />
-            <span className="flex-1 text-small">{source.name}</span>
-            <span className="text-mini text-ink-faint">{source.status}</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <Eyebrow tone="ok">Nothing needs your attention</Eyebrow>
+            <Title className="truncate text-[15px]">{headline}</Title>
           </div>
-        ))}
-      </div>
+          <Icon
+            name="chevronDown"
+            size={14}
+            className="shrink-0 text-ink-faint transition-transform group-open:rotate-180"
+          />
+        </summary>
 
-      <Divider />
+        <div className="px-4 pb-3.5">
+          <Prose>{note}</Prose>
+        </div>
 
-      <div className="flex items-center gap-2.5 px-[18px] py-3">
-        <span className="flex-1 text-mini text-ink-faint">{nextSweep}</span>
-        <ButtonLink href={watchHref} size="sm">
-          What I watch
-        </ButtonLink>
-      </div>
+        <Divider />
+
+        <div className="flex flex-col px-[18px] pb-3.5 pt-3">
+          {sources.map((source, i) => (
+            <div
+              key={source.name}
+              className={`flex items-center gap-2.5 py-2 ${i > 0 ? "border-t border-track" : ""}`}
+            >
+              <Dot tone={source.tone} />
+              <span className="flex-1 text-small">{source.name}</span>
+              <span className="text-mini text-ink-faint">{source.status}</span>
+            </div>
+          ))}
+        </div>
+
+        <Divider />
+
+        <div className="flex items-center gap-2.5 px-[18px] py-3">
+          <span className="flex-1 text-mini text-ink-faint">{nextSweep}</span>
+          <ButtonLink href={watchHref} size="sm">
+            What I watch
+          </ButtonLink>
+        </div>
+      </details>
     </Panel>
   );
 }

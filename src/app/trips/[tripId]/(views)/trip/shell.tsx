@@ -30,6 +30,7 @@ export function WholeTripShell({
   stats,
   totals,
   map,
+  switcher,
   days,
   actions,
 }: {
@@ -38,6 +39,8 @@ export function WholeTripShell({
   totals: Figure[];
   /** The whole trip's map, filling its box. */
   map: React.ReactNode;
+  /** Which day the map and the list are on, when there is more than one. */
+  switcher?: React.ReactNode;
   /** The days, each opening in place. */
   days: React.ReactNode;
   actions: React.ReactNode;
@@ -65,6 +68,8 @@ export function WholeTripShell({
               ))}
             </div>
           </div>
+
+          {switcher}
 
           {/*
             Every day, with a watch status each. This is the table where the

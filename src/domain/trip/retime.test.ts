@@ -155,3 +155,79 @@ describe("the edit itself", () => {
     assert.equal(order.length, Object.keys(doc.nodes).length);
   });
 });
+
+describe("following a change of length", () => {
+  const follow = { ...ctx, follow: true };
+  const moves = (out: ReturnType<typeof retime>) =>
+    out.pushed.map((p) => [p.id, clock(p.from), clock(p.to)]);
+
+  test("a longer stop carries every later stop with it, though they had room", () => {
+    const doc = kazbegiDoc();
+    // The minimum is to clear the viewpoint, ten minutes, and the day after it
+    // is left as it was.
+    assert.deepEqual(
+      retime(doc, N.breakfast, { durationMin: 60 }, ctx).pushed.map(
+        (p) => p.id,
+      ),
+      [N.friendship],
+    );
+    const out = retime(doc, N.breakfast, { durationMin: 60 }, follow);
+    assert.deepEqual(moves(out), [
+      [N.friendship, "10:15", "10:30"],
+      [N.drive, "11:05", "11:20"],
+      [N.lunch, "12:30", "12:45"],
+      [N.stayKazbegi, "14:15", "14:30"],
+      [N.hike, "16:00", "16:15"],
+      [N.dinner, "19:30", "19:45"],
+    ]);
+    assert.deepEqual(errors(apply(doc, out.ops).doc), []);
+  });
+
+  test("a shorter stop gives the time back: later stops come forward, gaps kept", () => {
+    const doc = kazbegiDoc();
+    const out = retime(doc, N.lunch, { durationMin: 15 }, follow);
+    assert.deepEqual(moves(out), [
+      [N.stayKazbegi, "14:15", "13:15"],
+      [N.hike, "16:00", "15:00"],
+      [N.dinner, "19:30", "18:30"],
+    ]);
+    assert.deepEqual(errors(apply(doc, out.ops).doc), []);
+  });
+
+  test("a booked stop does not move for it, and neither does what follows", () => {
+    const doc = kazbegiDoc();
+    doc.nodes[N.lunch] = {
+      ...doc.nodes[N.lunch],
+      meta: { ...doc.nodes[N.lunch].meta, booked: true },
+    };
+    const out = retime(doc, N.breakfast, { durationMin: 60 }, follow);
+    assert.deepEqual(
+      out.pushed.map((p) => p.id),
+      [N.friendship, N.drive],
+    );
+  });
+
+  test("a booked stop is still pushed when it is crowded", () => {
+    const doc = kazbegiDoc();
+    doc.nodes[N.lunch] = {
+      ...doc.nodes[N.lunch],
+      meta: { ...doc.nodes[N.lunch].meta, booked: true },
+    };
+    const out = retime(doc, N.friendship, { durationMin: 150 }, follow);
+    assert.ok(out.pushed.some((p) => p.id === N.lunch));
+    assert.deepEqual(errors(apply(doc, out.ops).doc), []);
+  });
+
+  test("moving a stop without changing its length carries nothing", () => {
+    const doc = kazbegiDoc();
+    const out = retime(doc, N.hike, { startsAt: at(DAY, "15:30") }, follow);
+    assert.deepEqual(out.pushed, []);
+  });
+
+  test("it still stops at the end of the day", () => {
+    const doc = kazbegiDoc();
+    const out = retime(doc, N.hike, { durationMin: 480 }, follow);
+    assert.equal(out.overflow, true);
+    assert.deepEqual(out.pushed, []);
+  });
+});

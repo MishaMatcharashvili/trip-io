@@ -8,6 +8,7 @@ import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Eyebrow } from "@/ui/text";
 import {
+  creditHref,
   EXCERPT_CHARS,
   excerpt,
   failureNote,
@@ -246,7 +247,7 @@ function Photos({ photos, name }: { photos: Photo[]; name: string }) {
             />
             {photo.credit ? (
               <a
-                href={photo.credit.url}
+                href={creditHref(photo.credit, name)}
                 target="_blank"
                 rel="noreferrer noopener"
                 title={photo.credit.text}
