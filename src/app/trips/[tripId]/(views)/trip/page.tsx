@@ -9,6 +9,7 @@ import { dayTiming } from "@/features/day-timing";
 import { CheckpointList } from "@/features/itinerary";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { forecastRibbon } from "@/features/shared-reads";
+import { withStopWeather } from "@/features/stop-weather";
 import { AddDayButton } from "@/features/trip-actions";
 import { firstParam, worthForecasting } from "@/features/trip-links";
 import {
@@ -186,7 +187,8 @@ export default async function FullTripPage({
   const timing = dayTiming(screen.doc, screen.places);
 
   const rows = await Promise.all(
-    trip.days.map(async (day): Promise<DayRow> => {
+    trip.days.map(async (plain): Promise<DayRow> => {
+      const day = await withStopWeather(plain, today);
       const near = centroid(mapStops(day));
       const forecast =
         near && day.date && worthForecasting(day.date, today)

@@ -13,8 +13,10 @@ import {
   watchStrip,
 } from "@/data/trip";
 import type { LonLat } from "@/domain/geo";
+import { dayKey } from "@/domain/trip/document";
 import { chipsFor } from "@/features/day-strip-model";
 import { forecastRibbon } from "@/features/shared-reads";
+import { withStopWeather } from "@/features/stop-weather";
 import { dayHref } from "@/features/trip-links";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
 import {
@@ -138,9 +140,11 @@ async function realView(
   // day for what is about today (the next stop, the calm note), so the trip's
   // current one stands in for them.
   const all = wantedDay === "all";
-  const day = all
+  const chosen = all
     ? trip.days[trip.currentDay - 1]
     : (pickDay(trip, wantedDay) ?? trip.days[trip.currentDay - 1]);
+  // The weather under each stop's time, where the forecast reaches.
+  const day = await withStopWeather(chosen, dayKey(now));
   const stops = all ? tripStops(trip) : mapStops(day);
 
   // The newest thing still waiting for an answer, if any: the advisory card.
