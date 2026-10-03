@@ -8,6 +8,7 @@ import { SkeletonLine } from "@/ui/bars";
 import { Button } from "@/ui/button";
 import { cx } from "@/ui/cx";
 import { Eyebrow } from "@/ui/text";
+import { PhotoViewer } from "./photo-viewer";
 import {
   creditHref,
   EXCERPT_CHARS,
@@ -228,6 +229,8 @@ function Photos({ photos, name }: { photos: Photo[]; name: string }) {
   // A photograph that will not load (a host that changed, a file taken down)
   // leaves no hole in the strip.
   const [broken, setBroken] = useState<ReadonlySet<string>>(new Set());
+  // Which photograph is open full screen, if any.
+  const [open, setOpen] = useState<number | null>(null);
   const shown = photos.filter((p) => !broken.has(p.id));
   if (shown.length === 0) return null;
   return (
@@ -237,19 +240,26 @@ function Photos({ photos, name }: { photos: Photo[]; name: string }) {
     >
       <Eyebrow>Photos</Eyebrow>
       <ul className="-mx-[18px] flex gap-2.5 overflow-x-auto px-[18px] pb-1">
-        {shown.map((photo) => (
+        {shown.map((photo, i) => (
           <li key={photo.id} className="flex w-[150px] shrink-0 flex-col gap-1">
-            <Image
-              src={photo.url}
-              alt={photo.caption ?? `A photo of ${name}`}
-              // The optimiser resizes to this slot (and its 2x), as WebP or
-              // AVIF, instead of the browser fetching the original.
-              width={150}
-              height={112}
-              sizes="150px"
-              onError={() => setBroken((prev) => new Set(prev).add(photo.id))}
-              className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
-            />
+            <button
+              type="button"
+              onClick={() => setOpen(i)}
+              aria-label={`Open photo ${i + 1} of ${shown.length} full screen`}
+              className="cursor-zoom-in rounded-[9px]"
+            >
+              <Image
+                src={photo.url}
+                alt={photo.caption ?? `A photo of ${name}`}
+                // The optimiser resizes to this slot (and its 2x), as WebP or
+                // AVIF, instead of the browser fetching the original.
+                width={150}
+                height={112}
+                sizes="150px"
+                onError={() => setBroken((prev) => new Set(prev).add(photo.id))}
+                className="h-[112px] w-[150px] rounded-[9px] bg-track object-cover"
+              />
+            </button>
             {photo.credit ? (
               <a
                 href={creditHref(photo.credit, name)}
@@ -264,6 +274,15 @@ function Photos({ photos, name }: { photos: Photo[]; name: string }) {
           </li>
         ))}
       </ul>
+      {open !== null ? (
+        <PhotoViewer
+          photos={shown}
+          index={Math.min(open, shown.length - 1)}
+          name={name}
+          onIndex={setOpen}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
     </section>
   );
 }
