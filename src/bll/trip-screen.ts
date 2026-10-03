@@ -8,6 +8,7 @@ import {
 import { type PlaceCard, placeCards } from "../dal/places.ts";
 import { type PatchRecord, type TripListRow, tripsFor } from "../dal/trips.ts";
 import { loadWatch, type Watch } from "../dal/watches.ts";
+import type { ForecastHour } from "../domain/forecast.ts";
 import type { LonLat } from "../domain/geo.ts";
 import {
   placeIdsOf,
@@ -91,12 +92,7 @@ export function myTrips(userId: string): Promise<TripListRow[]> {
   return tripsFor(userId);
 }
 
-export type ForecastHour = {
-  at: string;
-  /** mm in the hour. */
-  precipitation: number;
-  apparentTemperature: number | null;
-};
+export type { ForecastHour };
 
 /** Open-Meteo forecasts this far ahead and no further. */
 const FORECAST_HORIZON_H = 16 * 24;
@@ -127,6 +123,10 @@ export async function dayForecast(
           at,
           precipitation: series.precipitation?.[i] ?? 0,
           apparentTemperature: series.apparentTemperature?.[i] ?? null,
+          temperature: series.temperature?.[i] ?? null,
+          snowfall: series.snowfall?.[i] ?? 0,
+          windGusts: series.windGusts?.[i] ?? null,
+          weatherCode: series.weatherCode?.[i] ?? null,
         },
       ];
     });
