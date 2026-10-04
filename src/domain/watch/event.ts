@@ -143,11 +143,14 @@ export const radiusFor = (kind: EventKind): number => {
     case "road.hazard":
       return 5_000;
     // A city event: a parade shuts a few streets, a festival fills a district.
+    // The event's own area is the street's footprint, or the municipality when
+    // the street could not be found (src/domain/watch/footprint.ts), so this is
+    // only the entrance round the corner, not a district's worth of slop.
     case "event.festival":
     case "event.closure":
     case "safety.demonstration":
     case "safety.advisory":
-      return 3_000;
+      return 500;
     // Matched to the place itself. The slop is a pavement's width, for the
     // entrance round the corner from the point the catalogue holds.
     case "hours.closed":

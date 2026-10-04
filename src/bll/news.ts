@@ -1,4 +1,4 @@
-import { upsertCorroborated } from "../dal/events.ts";
+import { streetCluster, upsertCorroborated } from "../dal/events.ts";
 import { enqueue } from "../dal/jobs.ts";
 import {
   loadItem,
@@ -10,6 +10,7 @@ import {
 import { toWorldEvent } from "../domain/watch/event.ts";
 import type { Extractor, Translator } from "../domain/watch/extraction.ts";
 import { type FeedItem, itemText } from "../domain/watch/feed.ts";
+import { streetName, toFootprint } from "../domain/watch/footprint.ts";
 import { resolveRegion } from "../domain/watch/gazetteer.ts";
 import { readItem } from "../domain/watch/read-item.ts";
 import {
@@ -131,9 +132,25 @@ export async function extractItem(
   let written = 0;
   for (const { draft, regionSlug } of outcome.events) {
     const event = toWorldEvent(draft, regionSlug, observedAt);
+    // Where in the municipality, if the article names a street the catalogue
+    // can place; otherwise the whole municipality, as before.
+    const street = streetName(
+      String(draft.payload.place ?? ""),
+      [...slugs].map((s) => s.replace(/-/g, " ")),
+    );
+    const footprint = street
+      ? toFootprint(street, await streetCluster(regionSlug, street))
+      : null;
+    if (footprint) {
+      draft.payload.area = {
+        street: footprint.street,
+        radiusM: footprint.radiusM,
+        places: footprint.places,
+      };
+    }
     // Every outlet that reports the same thing joins one row; for safety the
     // matcher then waits for two of them.
-    if (await upsertCorroborated(draft, event)) written++;
+    if (await upsertCorroborated(draft, event, footprint)) written++;
   }
 
   await markItem(itemId, {

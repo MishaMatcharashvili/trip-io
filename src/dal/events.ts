@@ -119,6 +119,47 @@ export async function upsertEvent(
 }
 
 /**
+ * Where a street's places cluster inside one municipality: the geometric median
+ * of the catalogue places whose address mentions it (robust to the odd place
+ * that merely contains the name), and the distance within which 90% of them
+ * lie. Null when none match. Judging whether that is enough to believe is the
+ * domain's (`toFootprint`).
+ */
+export async function streetCluster(
+  regionSlug: string,
+  street: string,
+): Promise<{
+  lon: number;
+  lat: number;
+  spreadM: number;
+  places: number;
+} | null> {
+  const rows = await db.execute(sql`
+    WITH pts AS (
+      SELECT p.geom::geometry AS g
+      FROM place p
+      JOIN region r ON r.slug = ${regionSlug}
+                   AND ST_Within(p.geom::geometry, r.geom::geometry)
+      WHERE p.attrs->>'address' ILIKE ${`%${street}%`}
+    ),
+    c AS (SELECT ST_GeometricMedian(ST_Collect(g)) AS m, count(*)::int AS n FROM pts)
+    SELECT c.n AS places, ST_X(c.m) AS lon, ST_Y(c.m) AS lat,
+           percentile_cont(0.9) WITHIN GROUP (
+             ORDER BY ST_Distance(pts.g::geography, c.m::geography)
+           ) AS spread
+    FROM pts, c GROUP BY c.n, c.m
+  `);
+  const r = rows.rows[0];
+  if (!r || r.lon === null) return null;
+  return {
+    places: Number(r.places),
+    lon: Number(r.lon),
+    lat: Number(r.lat),
+    spreadM: Number(r.spread),
+  };
+}
+
+/**
  * Write a claim that more than one outlet can make. The first outlet inserts
  * the row; each later one joins `payload.outlets`, one entry per outlet, and
  * the matcher holds the event back until there are enough of them
@@ -129,13 +170,18 @@ export async function upsertEvent(
 export async function upsertCorroborated(
   draft: EventDraft,
   event: Pick<WorldEvent, "regionSlug" | "observedAt" | "dedupeKey">,
+  /** Where in the municipality it is, if the street could be found. */
+  footprint?: { lon: number; lat: number; radiusM: number } | null,
 ): Promise<{ id: string; outlets: number } | null> {
+  const area = footprint
+    ? sql`ST_Buffer(ST_SetSRID(ST_MakePoint(${footprint.lon}, ${footprint.lat}), 4326)::geography, ${footprint.radiusM})`
+    : sql`ST_SimplifyPreserveTopology(r.geom::geometry, 0.01)::geography`;
   const rows = await db.execute(sql`
     INSERT INTO world_event
       (source, kind, severity, confidence, geom, valid_from, valid_to,
        observed_at, dedupe_key, payload)
     SELECT ${draft.source}, ${draft.kind}, ${draft.severity}, ${draft.confidence},
-           ST_SimplifyPreserveTopology(r.geom::geometry, 0.01)::geography,
+           ${area},
            ${draft.validFrom}::timestamptz, ${draft.validTo}::timestamptz,
            ${event.observedAt}::timestamptz, ${event.dedupeKey},
            ${JSON.stringify(draft.payload)}::jsonb

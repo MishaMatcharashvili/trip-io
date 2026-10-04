@@ -66,6 +66,10 @@ Events from the news (an event whose "what" starts with "event." or "safety."):
   detail. The city is named but the exact street may not be, so judge from the stop: a
   parade on one avenue says nothing about a museum across the river. When the place the
   detail names cannot be tied to this stop, say relevant: false.
+- When the detail has an "area", the event is drawn as a circle of that radius around the
+  street named there, found from other places on it; it is approximate. A stop well inside
+  it is plausibly affected; one near its edge may not be. With no "area" the event covers
+  the whole municipality and the place named is all you have to go on.
 - event.closure blocks or degrades a stop the closure plausibly reaches; event.festival
   usually only "improves" or changes the crowd, and is worth saying only if the stop is
   close and the time overlaps.
