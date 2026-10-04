@@ -3,9 +3,13 @@ import { describe, test } from "node:test";
 import {
   decide,
   type GoldLabel,
+  isNoticeReporter,
+  noticeReporterId,
   noticeText,
+  PROPOSAL_HOURS,
   type Prediction,
   parseNotices,
+  proposalFor,
   scoreSpike,
   vetRoadClaim,
 } from "./road-notice.ts";
@@ -244,5 +248,50 @@ describe("scoreSpike and decide", () => {
     const verdict = decide(bad);
     assert.equal(verdict.decision, "stay-manual");
     assert.match(verdict.why, /recall/);
+  });
+});
+
+describe("proposalFor", () => {
+  const published = { publishedAt: "2026-10-03T12:12:00.000Z" };
+
+  test("a claim on a corridor becomes a proposal that lasts three days from the notice", () => {
+    const p = proposalFor(
+      { corridor: "tusheti", condition: "restricted" },
+      published,
+    );
+    assert.deepEqual(p, {
+      corridorSlug: "tusheti",
+      condition: "restricted",
+      validFrom: "2026-10-03T12:12:00.000Z",
+      validTo: "2026-10-06T12:12:00.000Z",
+    });
+    assert.equal(PROPOSAL_HOURS, 72);
+  });
+
+  test("a reopening is proposed too, to end what was approved before it", () => {
+    assert.equal(
+      proposalFor(
+        { corridor: "military-road", condition: "reopened" },
+        published,
+      )?.condition,
+      "reopened",
+    );
+  });
+
+  test("a road we do not watch, and a notice that is not about a road, are not", () => {
+    assert.equal(
+      proposalFor({ corridor: null, condition: "closed" }, published),
+      null,
+    );
+    assert.equal(
+      proposalFor({ corridor: "tusheti", condition: "none" }, published),
+      null,
+    );
+  });
+
+  test("a notice's reporter id says where it came from", () => {
+    assert.equal(noticeReporterId({ id: 5282 }), "georoad:5282");
+    assert.ok(isNoticeReporter("georoad:5282"));
+    assert.ok(!isNoticeReporter("123456789"));
   });
 });

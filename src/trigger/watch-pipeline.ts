@@ -23,9 +23,11 @@ import { logger, schedules, task } from "@trigger.dev/sdk";
 const STAGES = [
   "sense-weather",
   "sense-news",
+  "sense-roads",
   // Reads what sense-news stored, so the events it writes are there for the
   // match that follows. Judge jobs ride along; the second drain finishes them.
   "drain",
+  "road-proposals",
   "match",
   "drain",
   "outcomes",

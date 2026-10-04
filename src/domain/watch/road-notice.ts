@@ -295,3 +295,47 @@ export function decide(score: SpikeScore): Verdict {
 }
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+
+// ---------------------------------------------------------------------------
+// From a vetted claim to something an operator can approve
+
+/** Who a proposal is "from" in the queue, and in the ids that keep it unique. */
+export const NOTICE_REPORTER_NAME = "Roads Department notice";
+export const noticeReporterId = (n: Pick<RoadNotice, "id">): string =>
+  `georoad:${n.id}`;
+export const isNoticeReporter = (reporterId: string): boolean =>
+  reporterId.startsWith("georoad:");
+
+/**
+ * How long a proposal stays worth approving, and so how long the event lives if
+ * it is. The longest window the manual form offers: the notice rarely says
+ * when a restriction ends, and a later "restored" notice, once approved, ends
+ * it sooner. A reopening needs no window — it ends events, it does not start one.
+ */
+export const PROPOSAL_HOURS = 72;
+
+export type Proposal = {
+  corridorSlug: string;
+  condition: RoadCondition;
+  validFrom: string;
+  validTo: string;
+};
+
+/**
+ * Only a claim that lands on a corridor and says something about traffic is
+ * worth an operator's tap; everything else (a road we do not watch, a water
+ * supply notice) is stored and left alone.
+ */
+export function proposalFor(
+  claim: VettedClaim,
+  notice: Pick<RoadNotice, "publishedAt">,
+): Proposal | null {
+  if (claim.corridor === null || claim.condition === "none") return null;
+  const from = Date.parse(notice.publishedAt);
+  return {
+    corridorSlug: claim.corridor,
+    condition: claim.condition,
+    validFrom: new Date(from).toISOString(),
+    validTo: new Date(from + PROPOSAL_HOURS * 3_600_000).toISOString(),
+  };
+}
