@@ -156,9 +156,11 @@ From `docs/implementation-plan.md` §13:
   read the Roads Department's own notice feed and decided **stay manual** — and found the
   department coding a notice "restored" for a text that says restricted. Weather also gained a
   temperature, a sky and a day summary on every stop. Later the same day: mute list for the new families, outlets merged into one event, eleven judge
-  eval fixtures (11/11 on the real judge), and the assisted road flow. **Still not done:** an events
-  calendar, a narrower geometry than a municipality for news events, `kill:count` over the new
-  kinds, and any of it on a phone, in a browser or on Telegram.
+  eval fixtures (11/11 on the real judge), and the assisted road flow. Then checked in a browser (a place-page
+  crash on Wikimedia thumbnails, found and fixed) and narrowed news events to a street where the
+  catalogue can place it. **Still not done:** an events calendar (both candidate sites' terms forbid
+  scraping — needs their permission), `kill:count` over the new kinds, and anything on Telegram
+  or a phone.
 
 - **2026-10-01** — Phase 7 built, not yet run on a phone. The Expo app is a thin shell on Expo Router:
   sign-in and sign-up, the trips list, a trip's days and alerts, the intervention card (apply, keep, mute),

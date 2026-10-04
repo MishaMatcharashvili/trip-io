@@ -98,7 +98,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 Design, research and results in `context/phase-8-design.md`.
 
-- [~] Detector 3 — events & festivals: five news feeds, Georgian translated to English, extracted and guarded. Run live once; **no tourism feed exists**, so a real events calendar is still an HTML adapter away
+- [~] Detector 3 — events & festivals: five news feeds, Georgian translated to English, extracted and guarded. Run live once; **no tourism feed exists**, and the two sites with an events listing forbid scraping in their terms, so a real events calendar needs their permission
 - [x] Detector 4 — protests & safety: two outlets must agree, a wording guard, and the router can never interrupt on it, whatever the eligible set says. **Briefing-only, gated.** No real safety event has been seen
 - [x] Detector 5 — opening-hours: a one-tap report on the place page; a curator publishes alone, two signed-in travellers publish together. Drift from the catalogue is the validator's job, not a detector's
 - [x] Detector 6 — rail: operators report through the Telegram bot, a Monday reminder asks. Not connected to Telegram yet

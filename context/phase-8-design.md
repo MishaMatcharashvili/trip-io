@@ -312,19 +312,48 @@ to know, and re-run on labels written *before* the list. `GOLD` in `scripts/dev/
   no bot token and no operator id.** The Tusheti proposal, which is still live, will be announced
   the first time there is.
 
+### Checked in a browser (2026-10-04)
+
+Chrome would not start for want of system libraries; `apt-get download` of `libnspr4`, `libnss3` and
+`libasound2t64`, unpacked into a scratch directory and put on `LD_LIBRARY_PATH`, fixed it without
+`sudo`. Then, against a throwaway account and a seeded trip (both deleted afterwards):
+
+- **Weather under each stop's time** renders: icon and temperature below the clock time, coral only
+  for a wet outdoor stop (the Gergeti hike), grey for an indoor one.
+- **The watch screen** lists the six live families; switching off "Announced demonstrations" saved
+  `muted_sources = ['safety']` to the database. It exposed a stale "On · 2 sources" badge, now fixed.
+- **The "Is it shut?" button** on a place page sends the report and shows "Thank you. I'll tell
+  other trips once a second traveller says the same."
+- **A bug the browser found:** every place page with a Wikimedia photograph crashed
+  (`next/image` threw on `thumb.wikimedia.org`, which the allow-list lacked). Fixed; the allow-list
+  now lives in `src/lib/image-hosts.ts` with a test against a real URL.
+
+Not seen: the Telegram bot (no token), the Monday reminder, or anything on a phone.
+
+### Narrower location for news events (2026-10-04)
+
+A street named in an article ("Rustaveli Avenue, Tbilisi") is looked up in the catalogue's place
+addresses inside that municipality. Five or more places that agree give a circle of their spread
+(800 m to 4 km) around their geometric median; anything else keeps the whole municipality. On the
+real data: Rustaveli → 800 m at (44.7954, 41.7006), where the avenue is; Freedom Square and
+Marjanishvili → 800 m; Agmashenebeli → refused (8 km of spread, it is a long avenue) and falls
+back to the city. The event's own 3 km slop, meant for weather, is now 500 m. The judge is told
+that an `area` is approximate.
+
 ### Not done, and why
 
+- **An events calendar: not built, because the terms forbid it.** Read 2026-10-04.
+  georgia.travel's terms prohibit "systematically downloading and storing" its content and any
+  commercial use; yolo.ge's prohibit reproducing "information, text, photos and graphics" without
+  written permission. Both robots.txt files allow it, which is not a licence. A legitimate route is
+  a feed or written permission from one of them — georgia.travel is a state tourism agency and the
+  more likely to say yes. That is a conversation, not code, and it is yours to have.
 - **`kill:count` over the new kinds.** News has no archive to replay, so the synthetic count cannot
-  include it. The pairs-per-trip-day figure for the new kinds is unmeasured; watch it on real trips.
-- **An events calendar** (HTML adapter for georgia.travel or yolo.ge). Their terms have not been
-  read, and a scraper written before reading them is a decision made for the site.
-- **A city event is a whole municipality.** News events are stored with the region's polygon, so a
-  closure on one Tbilisi avenue matches every Tbilisi stop and the judge decides (it did, correctly,
-  in the eval: a closure on one avenue does not touch dinner across the river). A narrower
-  geometry needs a geocoder, which costs money per call and has not been chosen.
+  include it. The pairs-per-trip-day figure for the new kinds is unmeasured until real trips have
+  run; it belongs on the Phase 9 dashboard.
 - **Rail station coordinates were written from memory** and checked only for plausibility (Kutaisi
   falls inside the Tbilisi–Batumi buffer, Mestia outside it).
-- **Anything in a browser or on Telegram.** Chrome cannot start in this environment (missing system
-  libraries, `sudo agent-browser install --with-deps`), and there is no bot token.
+- **Telegram.** No bot token or operator id, so the rail form, the Monday reminder and the road
+  proposals have only been run against fakes.
 - **A larger spike.** If the assisted flow is to be trusted to propose without a model-reading
   check, the labelled set needs 50+ notices and a second reader.
