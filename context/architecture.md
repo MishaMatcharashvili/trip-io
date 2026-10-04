@@ -83,6 +83,8 @@ entry file changes.
 0 * * * *    /api/cron/sense-news      fetch feeds, store new items, queue reads    built (hourly, in the pipeline task)
 POST         /api/telegram/webhook     road reports → world_event                  built
 0 6 * * 1    /api/cron/rail-reminder   Monday message to operators                  built
+0 * * * *    /api/cron/sense-roads     Roads Department notices → queued reads      built (hourly, in the pipeline task)
+0 * * * *    /api/cron/road-proposals  tell operators what the model proposed       built (hourly, in the pipeline task)
 0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     built
 ```
 

@@ -134,7 +134,7 @@ From `docs/implementation-plan.md` §13:
 
 1. **Domain** — parked. `roamline.io` is the best free option found; `wandr.ai` is brokered. Confirm
    at a registrar + trademark search before any design spend.
-2. ~~**Road automation**~~ — **decided 2026-10-04: stay manual.** Evidence: the Roads Department's own notice feed (api.georoad.gov.ge) read by a model, 20 hand-labelled notices, recall 33–50%, precision 100%. Recommended next: model-proposed, operator-approved. Re-run on a larger, independently labelled set before reopening.
+2. ~~**Road automation**~~ — **decided 2026-10-04: stay manual.** Evidence: the Roads Department's own notice feed (api.georoad.gov.ge) read by a model, 20 hand-labelled notices, recall 33–50%, precision 100%. Built the assisted form instead: the model proposes, an operator approves. Re-run on a larger, independently labelled set before reopening full automation.
 3. ~~**Who may submit road reports**~~ — **decided 2026-09-25: anyone, moderated.** Operators publish
    at once at confidence 0.9; everyone else's reports wait for an operator's approval and publish at
    0.8.
@@ -155,9 +155,10 @@ From `docs/implementation-plan.md` §13:
   four it extracted, correctly), then one genuine upcoming fair became two events. The road spike
   read the Roads Department's own notice feed and decided **stay manual** — and found the
   department coding a notice "restored" for a text that says restricted. Weather also gained a
-  temperature, a sky and a day summary on every stop. **Not done:** judge eval fixtures for the new
-  kinds, the settings screen's mute list, an events calendar, deduplication of one event across
-  outlets, and any of it on a phone or in a browser.
+  temperature, a sky and a day summary on every stop. Later the same day: mute list for the new families, outlets merged into one event, eleven judge
+  eval fixtures (11/11 on the real judge), and the assisted road flow. **Still not done:** an events
+  calendar, a narrower geometry than a municipality for news events, `kill:count` over the new
+  kinds, and any of it on a phone, in a browser or on Telegram.
 
 - **2026-10-01** — Phase 7 built, not yet run on a phone. The Expo app is a thin shell on Expo Router:
   sign-in and sign-up, the trips list, a trip's days and alerts, the intervention card (apply, keep, mute),

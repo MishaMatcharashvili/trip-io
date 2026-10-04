@@ -291,21 +291,40 @@ To get a decisive answer: grow the labelled set to 50+ with a second reviewer, a
 place list per corridor (villages, passes, junctions) so the model is not relying on what it happens
 to know, and re-run on labels written *before* the list. `GOLD` in `scripts/dev/roads-spike.ts`.
 
+### Done after the first pass (2026-10-04)
+
+- **Mute list.** The watch screen and API now offer events, safety, opening hours and rail;
+  `muteFamilies` is derived from the kind namespaces and a test keeps them equal.
+- **One event, many outlets.** Event listings merge across outlets the way safety does (source
+  `news-events` / `news-safety`, outlets in the payload), so a parade three outlets cover is one row.
+- **Judge eval for the new kinds.** Eleven fixtures (`eval/fixtures-news.ts`), built from the keys the
+  detectors really write. Real judge, 41 fixtures: **11/11 on the news set, no alarm wording, safety
+  fixtures quiet or neutral.** The only failures were the two quiet-urban-stop false positives that
+  were already known (a Rustaveli stroll, a taxi across Tbilisi), 13% against a 15% line. The first
+  run also missed one "fire" fixture that the second did not, so the model is not deterministic here
+  and one run is not a verdict.
+- **Assisted road automation** (the spike's recommendation). `sense-roads` reads the Roads
+  Department's newest notices; the drain has the model place each on a corridor; a claim that lands
+  on one becomes a pending road report, 72 hours long; the operators are sent it once with the
+  usual Approve / Reject buttons. A person still decides. Migration 0019 (`notified_at`). Run live
+  on the real feed: 9 notices, 3 landed on a corridor (Military Road closed and reopened, Tusheti
+  restricted), 6 were left alone; a second pass queued nothing. **Nobody has been sent one: there is
+  no bot token and no operator id.** The Tusheti proposal, which is still live, will be announced
+  the first time there is.
+
 ### Not done, and why
 
-- **Judge eval fixtures for the new kinds.** The 30-fixture eval has no event, safety, hours or rail
-  case, and the judge prompt gained sections for all four. Hand-written fixtures need a person who
-  knows what the right answer is; `npm run judge:eval` should be re-run after they exist. Until then
-  the judge's behaviour on these kinds is unmeasured.
 - **`kill:count` over the new kinds.** News has no archive to replay, so the synthetic count cannot
   include it. The pairs-per-trip-day figure for the new kinds is unmeasured; watch it on real trips.
-- **The settings screen** still lists only weather and roads as families a traveller can mute; the
-  matcher honours `events`, `safety`, `hours` and `rail` already.
-- **Duplicate events across outlets.** Three outlets reporting one parade write three events
-  (safety is the exception — it merges). The judge sees the same stop three times.
-- **An events calendar** (HTML adapter for georgia.travel or yolo.ge).
+- **An events calendar** (HTML adapter for georgia.travel or yolo.ge). Their terms have not been
+  read, and a scraper written before reading them is a decision made for the site.
 - **A city event is a whole municipality.** News events are stored with the region's polygon, so a
-  closure on one Tbilisi avenue matches every Tbilisi stop and the judge decides. A narrower
-  geometry needs a geocoder.
+  closure on one Tbilisi avenue matches every Tbilisi stop and the judge decides (it did, correctly,
+  in the eval: a closure on one avenue does not touch dinner across the river). A narrower
+  geometry needs a geocoder, which costs money per call and has not been chosen.
 - **Rail station coordinates were written from memory** and checked only for plausibility (Kutaisi
   falls inside the Tbilisi–Batumi buffer, Mestia outside it).
+- **Anything in a browser or on Telegram.** Chrome cannot start in this environment (missing system
+  libraries, `sudo agent-browser install --with-deps`), and there is no bot token.
+- **A larger spike.** If the assisted flow is to be trusted to propose without a model-reading
+  check, the labelled set needs 50+ notices and a second reader.

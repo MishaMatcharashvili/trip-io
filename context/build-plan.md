@@ -102,7 +102,7 @@ Design, research and results in `context/phase-8-design.md`.
 - [x] Detector 4 — protests & safety: two outlets must agree, a wording guard, and the router can never interrupt on it, whatever the eligible set says. **Briefing-only, gated.** No real safety event has been seen
 - [x] Detector 5 — opening-hours: a one-tap report on the place page; a curator publishes alone, two signed-in travellers publish together. Drift from the catalogue is the validator's job, not a detector's
 - [x] Detector 6 — rail: operators report through the Telegram bot, a Monday reminder asks. Not connected to Telegram yet
-- [x] Road-automation spike: **decided — stay manual** (recall 33–50%, precision 100% on 20 hand-labelled notices from the Roads Department's own feed). Recommended next: model-proposed, operator-approved. Facebook was not evaluated; the department's JSON feed made it unnecessary
+- [x] Road-automation spike: **decided — stay manual** (recall 33–50%, precision 100% on 20 hand-labelled notices from the Roads Department's own feed). **Built, assisted**: the model proposes each notice that lands on a corridor and an operator approves it in the Telegram queue (not yet connected). Facebook was not evaluated; the department's JSON feed made it unnecessary
 
 ## Phase 9 — instrumentation and kill-criteria dashboard
 
