@@ -1,6 +1,6 @@
-// Runs the real judge over the thirty fixtures and scores it.
+// Runs the real judge over the fixtures and scores it.
 //
-//   npm run judge:eval            all thirty
+//   npm run judge:eval            all of them (thirty weather and road, eleven news)
 //   npm run judge:eval -- fire    one band only
 //   npm run judge:eval -- -v      print every verdict, not just the failures
 //
@@ -18,6 +18,7 @@ import {
   type EvalFixture,
   fixtures,
 } from "../../src/domain/watch/eval/fixtures.ts";
+import { newsFixtures } from "../../src/domain/watch/eval/fixtures-news.ts";
 import {
   type FixtureResult,
   scoreFixture,
@@ -32,7 +33,9 @@ const band = args.find((a): a is Band =>
   ["fire", "quiet", "ambiguous"].includes(a),
 );
 
-const corpus = band ? byBand(band) : fixtures;
+// The first thirty are weather and roads; the news set is Phase 8's detectors.
+const all = [...fixtures, ...newsFixtures];
+const corpus = band ? all.filter((f) => f.expect.band === band) : all;
 
 /**
  * The alternatives a fixture offers are treated as `verified`, which is the

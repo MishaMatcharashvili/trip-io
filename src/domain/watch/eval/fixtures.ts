@@ -48,8 +48,12 @@ const uid = (n: number) =>
 let seq = 0;
 const nextId = () => uid(++seq);
 
-type EventSpec = {
+export type EventSpec = {
   kind: EventKind;
+  /** Defaults to the weather detector's. */
+  source?: string;
+  /** What a detector other than the weather's put in the payload. */
+  payload?: Record<string, unknown>;
   severity: Severity;
   /** Hours from the fixture's `now`. */
   from: number;
@@ -59,7 +63,7 @@ type EventSpec = {
   observedHoursAgo?: number;
 };
 
-type NodeSpec = {
+export type NodeSpec = {
   what: string;
   kind?: JudgeInput["node"]["kind"];
   /** Hours from the fixture's `now`. */
@@ -69,7 +73,7 @@ type NodeSpec = {
   corridorSlug?: string;
 };
 
-type Alternative = {
+export type Alternative = {
   name: string;
   category: string;
   indoor: boolean;
@@ -89,7 +93,7 @@ const METRICS: Record<string, { metric: string; unit: string }> = {
   "weather.thunderstorm": { metric: "WMO weather code", unit: "" },
 };
 
-function fixture(
+export function fixture(
   now: string,
   event: EventSpec,
   node: NodeSpec,
@@ -122,9 +126,9 @@ function fixture(
         confidence: event.confidence ?? 0.9,
         validFrom: hoursFrom(now, event.from),
         validTo: hoursFrom(now, event.to),
-        source: "open-meteo",
+        source: event.source ?? "open-meteo",
         observedAt,
-        payload: {
+        payload: event.payload ?? {
           ...METRICS[event.kind],
           peak: event.peak,
           peakAt: hoursFrom(now, event.from),
@@ -161,9 +165,9 @@ function fixture(
   };
 }
 
-const couple = { adults: 2 };
-const family = { adults: 2, children: 2 };
-const solo = { adults: 1 };
+export const couple = { adults: 2 };
+export const family = { adults: 2, children: 2 };
+export const solo = { adults: 1 };
 
 const blocksOrDegrades: readonly Impact[] = ["blocks", "degrades"];
 

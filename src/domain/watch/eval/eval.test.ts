@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import type { PlaceTier } from "../../catalogue/tier.ts";
 import type { Verdict } from "../judge.ts";
 import { byBand, type EvalFixture, fixtures } from "./fixtures.ts";
+import { newsFixtures } from "./fixtures-news.ts";
 import { alarmWordsIn, scoreFixture, summarise } from "./score.ts";
 
 // The corpus, and the scorer that reads it. The scorer is tested against
@@ -223,5 +224,86 @@ describe("framing", () => {
       alarmWordsIn("Rain until two — the cellar tasting runs all afternoon."),
       [],
     );
+  });
+});
+
+describe("the news corpus", () => {
+  test("is eleven fixtures, named once and distinct from the first thirty", () => {
+    assert.equal(newsFixtures.length, 11);
+    const ids = [...fixtures, ...newsFixtures].map((f) => f.id);
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  test("covers every kind Phase 8 added, at least once", () => {
+    const kinds = new Set(newsFixtures.map((f) => f.input.event.kind));
+    for (const kind of [
+      "event.closure",
+      "event.festival",
+      "safety.demonstration",
+      "hours.closed",
+      "rail.cancelled",
+      "rail.delayed",
+    ] as const) {
+      assert.ok(kinds.has(kind), kind);
+    }
+  });
+
+  test("the same invariants as the first thirty", () => {
+    for (const f of newsFixtures) {
+      assert.ok(f.expect.why.length > 40, `${f.id} has no reasoning recorded`);
+      assert.equal(
+        f.expect.relevant,
+        f.expect.band === "fire"
+          ? true
+          : f.expect.band === "quiet"
+            ? false
+            : undefined,
+        f.id,
+      );
+      const nodeFrom = Date.parse(f.input.node.startsAt);
+      const nodeTo = nodeFrom + f.input.node.durationMin * 60_000;
+      assert.ok(
+        Date.parse(f.input.event.validFrom) < nodeTo &&
+          Date.parse(f.input.event.validTo) > nodeFrom,
+        `${f.id}: event and stop do not overlap`,
+      );
+    }
+  });
+
+  test("a news event carries the keys the detector actually writes", () => {
+    for (const f of newsFixtures) {
+      const p = f.input.event.payload;
+      assert.ok(typeof p.summary === "string" && p.summary.length > 0, f.id);
+      if (f.input.event.source.startsWith("news-")) {
+        assert.ok(Array.isArray(p.outlets) && p.outlets.length >= 1, f.id);
+      }
+    }
+  });
+
+  test("a safety fixture has two outlets, as the matcher would insist", () => {
+    for (const f of newsFixtures.filter((x) =>
+      x.input.event.kind.startsWith("safety."),
+    )) {
+      assert.ok((f.input.event.payload.outlets as unknown[]).length >= 2, f.id);
+    }
+  });
+
+  test("no safety fixture can interrupt, whatever the verdict", () => {
+    for (const f of newsFixtures.filter((x) =>
+      x.input.event.kind.startsWith("safety."),
+    )) {
+      const result = scoreFixture(
+        f,
+        answer(f, { confidence: 1, horizonHrs: 0 }),
+        {
+          tiers: tiers(f),
+        },
+      );
+      assert.notEqual(result.routing?.route, "interrupt", f.id);
+    }
+  });
+
+  test("calling a place unsafe counts as an alarm", () => {
+    assert.deepEqual(alarmWordsIn("Rustaveli is unsafe tonight."), ["unsafe"]);
   });
 });
