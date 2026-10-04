@@ -1,4 +1,4 @@
-import { upsertCorroborated, upsertEvent } from "../dal/events.ts";
+import { upsertCorroborated } from "../dal/events.ts";
 import { enqueue } from "../dal/jobs.ts";
 import {
   loadItem,
@@ -131,11 +131,9 @@ export async function extractItem(
   let written = 0;
   for (const { draft, regionSlug } of outcome.events) {
     const event = toWorldEvent(draft, regionSlug, observedAt);
-    // Safety claims join the row other outlets wrote; the matcher waits for two.
-    const row = draft.kind.startsWith("safety.")
-      ? await upsertCorroborated(draft, event)
-      : await upsertEvent(draft, event);
-    if (row) written++;
+    // Every outlet that reports the same thing joins one row; for safety the
+    // matcher then waits for two of them.
+    if (await upsertCorroborated(draft, event)) written++;
   }
 
   await markItem(itemId, {

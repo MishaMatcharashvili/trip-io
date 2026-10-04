@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import { eventDraft as eventDraftSchema } from "./event.ts";
 import {
   CAPS,
+  EVENTS_SOURCE,
   normalizeForQuote,
   quoteIsInSource,
   SAFETY_SOURCE,
@@ -288,7 +289,7 @@ describe("safety claims", () => {
     ]);
   });
 
-  test("an event draft keeps its outlet as its source and has no outlet list", () => {
+  test("an event draft is merged by detector too, so three outlets are one row", () => {
     const [vetted] = vetExtraction({ items: [item()] }, ctx()).accepted;
     const draft = toEventDraft(vetted, {
       source: "civil-ge",
@@ -296,7 +297,7 @@ describe("safety claims", () => {
       language: "en",
       observedAt: NOW.toISOString(),
     });
-    assert.equal(draft.source, "civil-ge");
-    assert.equal(draft.payload.outlets, undefined);
+    assert.equal(draft.source, EVENTS_SOURCE);
+    assert.equal((draft.payload.outlets as unknown[]).length, 1);
   });
 });

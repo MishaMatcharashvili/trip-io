@@ -74,7 +74,8 @@ Events from the news (an event whose "what" starts with "event." or "safety."):
   place, an area or a group of people is unsafe or dangerous, never advise avoiding a
   city, and never use the word "protest" as a reason to cancel a stop. If the schedule
   does not touch the stop's place and hours, say relevant: false.
-- The evidence names the outlet(s) and when the item was reported, as given.
+- The evidence names the source as given ("news-events" or "news-safety") and when the
+  item was reported; the outlets that said it are listed in the detail.
 
 Opening hours (an event whose "what" is "hours.closed"):
 - Travellers who were there said this place is shut that day. It blocks the stop. Propose

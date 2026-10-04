@@ -57,6 +57,9 @@ const isoInstant = z.iso.datetime({ offset: true });
 /** Where safety events live, whichever outlet said them. */
 export const SAFETY_SOURCE = "news-safety";
 
+/** Where event listings and closures live, whichever outlet said them. */
+export const EVENTS_SOURCE = "news-events";
+
 /** Outlets that must agree before a safety claim can reach the matcher. */
 export const SAFETY_QUORUM = 2;
 
@@ -280,12 +283,13 @@ export function toEventDraft(
   from: { source: string; url: string; language: string; observedAt: string },
 ): EventDraft {
   const { item } = vetted;
-  // A safety claim is published only once two outlets have made it, so the
-  // outlets must meet on one row: the source is the detector's, and each
-  // outlet that reported it is a member of the payload.
-  const corroborated = item.kind.startsWith("safety.");
+  // Outlets meet on one row. A safety claim needs two of them before it is
+  // published, and an event listing is better for one row than three: a parade
+  // three outlets cover is one thing for the judge to weigh against a stop, not
+  // three. So the source is the detector's, and each outlet that reported it is
+  // a member of the payload.
   return {
-    source: corroborated ? SAFETY_SOURCE : from.source,
+    source: item.kind.startsWith("safety.") ? SAFETY_SOURCE : EVENTS_SOURCE,
     kind: item.kind,
     severity: vetted.severity,
     confidence: vetted.confidence,
@@ -299,11 +303,7 @@ export function toEventDraft(
       url: from.url,
       language: from.language,
       reportedAt: from.observedAt,
-      ...(corroborated
-        ? {
-            outlets: [{ id: from.source, url: from.url, quote: item.quote }],
-          }
-        : {}),
+      outlets: [{ id: from.source, url: from.url, quote: item.quote }],
     },
   };
 }
