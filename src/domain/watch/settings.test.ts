@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { CLOCK_TIME, capForDays, tripDays } from "./settings.ts";
+import { eventKinds } from "./event.ts";
+import { CLOCK_TIME, capForDays, muteFamilies, tripDays } from "./settings.ts";
 
 describe("the interrupt budget", () => {
   test("is 3-5 for a week, as planned", () => {
@@ -37,5 +38,12 @@ describe("clock times", () => {
     for (const bad of ["24:00", "7:30", "07:60", "07:30:00", "noon"]) {
       assert.ok(!CLOCK_TIME.test(bad), bad);
     }
+  });
+});
+
+describe("the families a traveller can mute", () => {
+  test("every one is the namespace of some event kind, and every kind has one", () => {
+    const used = new Set(eventKinds.map((k) => k.split(".")[0]));
+    assert.deepEqual([...used].sort(), [...muteFamilies].sort());
   });
 });

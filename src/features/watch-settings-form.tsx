@@ -32,13 +32,31 @@ const LIVE_SOURCES = [
     name: "Roads and closures",
     note: "Only on roads you will actually drive",
   },
+  {
+    key: "rail",
+    name: "Trains",
+    note: "Checked by hand once a week, so never up to the hour",
+  },
+  {
+    key: "event",
+    name: "Events and street closures",
+    note: "Read from the news; festivals nearby and streets shut for them",
+  },
+  {
+    key: "hours",
+    name: "Places reported shut",
+    note: "When other travellers find a place closed on your day",
+  },
+  {
+    key: "safety",
+    name: "Announced demonstrations",
+    note: "Only what is scheduled and reported by two outlets. Briefing only, never a push",
+  },
 ] as const;
 
 /** Detectors the plan has not built yet: shown, and honestly off. */
 const PLANNED_SOURCES = [
-  { name: "Transport", note: "Marshrutkas, trains, strikes — coming later" },
-  { name: "Opening hours", note: "Re-checked the day before — coming later" },
-  { name: "Safety advisories", note: "Briefing-only when it arrives" },
+  { name: "Marshrutkas and strikes", note: "Local transport — coming later" },
 ];
 
 export function WatchSettingsForm({

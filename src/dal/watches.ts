@@ -64,7 +64,7 @@ export type Watch = WatchSettings & {
   cap: number;
   activeFrom: string;
   activeTo: string;
-  /** Detector families muted for this trip: "weather", "road". */
+  /** Detector families muted for this trip (`muteFamilies`). */
   mutedSources: string[];
   verbosity: "affecting" | "nearby";
 };
