@@ -118,12 +118,12 @@ function conflictLine(match: LiveMatch): string {
 const LIVE_DETECTORS = [
   { prefix: "weather", name: "Weather" },
   { prefix: "road", name: "Roads on your route" },
+  { prefix: "rail", name: "Trains" },
+  { prefix: "event", name: "Events and street closures" },
+  { prefix: "hours", name: "Places reported shut" },
+  { prefix: "safety", name: "Announced demonstrations" },
 ] as const;
-const PLANNED_DETECTORS = [
-  "Transport",
-  "Opening hours",
-  "Local events & safety",
-];
+const PLANNED_DETECTORS = ["Marshrutkas and strikes"];
 
 function sources(screen: TripScreen, now: Date): Source[] {
   const checked = screen.lastCheck ? ` · ${ago(screen.lastCheck, now)}` : "";
