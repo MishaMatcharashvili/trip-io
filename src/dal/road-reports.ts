@@ -83,6 +83,13 @@ export async function insertReport(
   return (rows.rows[0]?.id as string | undefined) ?? null;
 }
 
+/** A proposal read from a notice, inserted on the default connection. */
+export function insertProposal(
+  row: Parameters<typeof insertReport>[1],
+): Promise<string | null> {
+  return insertReport(db, row);
+}
+
 /** Reports this person has waiting for review that are still worth reviewing. */
 export async function pendingCount(reporterId: string): Promise<number> {
   const rows = await db.execute(sql`

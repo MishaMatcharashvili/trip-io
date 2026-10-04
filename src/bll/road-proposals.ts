@@ -1,6 +1,9 @@
-import { db } from "../dal/client.ts";
 import { enqueue } from "../dal/jobs.ts";
-import { insertReport, unnotifiedProposals } from "../dal/road-reports.ts";
+import {
+  insertProposal,
+  markNotified,
+  unnotifiedProposals,
+} from "../dal/road-reports.ts";
 import { loadItem, markItem, storeItems } from "../dal/source-items.ts";
 import { describeStored } from "../domain/watch/road.ts";
 import {
@@ -112,7 +115,7 @@ export async function proposeFromNotice(
     return { proposed: false, reason: "not-on-a-corridor" };
   }
 
-  const reportId = await insertReport(db, {
+  const reportId = await insertProposal({
     corridorSlug: proposal.corridorSlug,
     condition:
       proposal.condition === "reopened" ? "reopened" : proposal.condition,
@@ -132,6 +135,10 @@ export async function proposeFromNotice(
   await record("published", null);
   return { proposed: true, reportId };
 }
+
+/** Record that the operators have been sent these. */
+export const announced = (ids: readonly string[]): Promise<void> =>
+  markNotified(ids);
 
 export type Waiting = { id: string; description: string };
 

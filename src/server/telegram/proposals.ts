@@ -1,6 +1,5 @@
 import { Bot, InlineKeyboard } from "grammy";
-import { proposalsToAnnounce } from "../../bll/road-proposals.ts";
-import { markNotified } from "../../dal/road-reports.ts";
+import { announced, proposalsToAnnounce } from "../../bll/road-proposals.ts";
 import { operatorIds } from "./bot.ts";
 import { moderationButtons } from "./form.ts";
 
@@ -67,7 +66,7 @@ export async function announceProposals(send?: Send): Promise<AnnounceReport> {
     }
     // Marked once anyone has it: the others find it in /queue.
     if (reached > 0) {
-      await markNotified([proposal.id]);
+      await announced([proposal.id]);
       sent++;
     }
   }

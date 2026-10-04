@@ -14,7 +14,6 @@
 import type { PlaceTier } from "../../src/domain/catalogue/tier.ts";
 import {
   type Band,
-  byBand,
   type EvalFixture,
   fixtures,
 } from "../../src/domain/watch/eval/fixtures.ts";
