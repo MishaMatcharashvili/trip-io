@@ -8,11 +8,15 @@ type SessionUser = {
   isAnonymous?: boolean | null;
 };
 
-export function isCurator(user: SessionUser): boolean {
-  if (user.isAnonymous || !user.emailVerified) return false;
-  const allowed = (process.env.CURATOR_EMAILS ?? "")
+/** The allowlist, lower-cased. Also who the dashboard leaves out of its cohort. */
+export function curatorEmails(): string[] {
+  return (process.env.CURATOR_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return allowed.includes(user.email.toLowerCase());
+}
+
+export function isCurator(user: SessionUser): boolean {
+  if (user.isAnonymous || !user.emailVerified) return false;
+  return curatorEmails().includes(user.email.toLowerCase());
 }

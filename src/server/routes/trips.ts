@@ -4,6 +4,7 @@ import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
+import { submitSurvey } from "@/bll/survey.ts";
 import {
   type AppendFailure,
   type AppendSuccess,
@@ -158,6 +159,32 @@ export const trips = new Hono<SessionEnv>()
     const view = await tripView(id);
     return view ? c.json(view) : c.json({ error: "not found" }, 404);
   })
+
+  // The one question after a trip: would you pay for it to be watched
+  // (src/bll/survey.ts). Asked once, of the owner, once the trip is over.
+  .post(
+    "/:id/survey",
+    zValidator("param", params),
+    zValidator(
+      "json",
+      z.object({
+        wouldPay: z.boolean(),
+        note: z.string().max(500).optional(),
+      }),
+    ),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const result = await submitSurvey({ tripId: id, ...c.req.valid("json") });
+      return result === "recorded"
+        ? c.json({ ok: true as const }, 201)
+        : result === "already-answered"
+          ? c.json({ error: "already answered" }, 409)
+          : c.json({ error: "not askable yet" }, 409);
+    },
+  )
 
   .post(
     "/:id/patches",

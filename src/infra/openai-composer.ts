@@ -79,6 +79,7 @@ export const composeWithOpenAI: Composer = async (input, feedback) => {
   );
 
   const raw = await generateJson({
+    purpose: "compose",
     instructions: SYSTEM,
     input: [
       { role: "user", content: userTurn(input) },

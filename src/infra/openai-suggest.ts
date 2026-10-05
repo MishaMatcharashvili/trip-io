@@ -29,6 +29,7 @@ const format = zodTextFormat(picksSchema, "picks");
 
 export const suggestWithOpenAI: Suggester = (input) =>
   generateJson({
+    purpose: "suggest",
     instructions: SYSTEM,
     input: [
       {

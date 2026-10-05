@@ -89,6 +89,7 @@ const userTurn = (input: ExtractionInput) =>
 
 export const extractWithOpenAI: Extractor = (input) =>
   generateJson({
+    purpose: "extract",
     instructions: INSTRUCTIONS[input.detector],
     input: [{ role: "user", content: userTurn(input) }],
     format: FORMAT,

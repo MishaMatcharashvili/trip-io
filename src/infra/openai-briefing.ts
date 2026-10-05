@@ -67,6 +67,7 @@ const FORMAT = zodTextFormat(briefingDraft, "briefing");
 
 export const briefWithOpenAI: Briefer = (input) =>
   generateJson({
+    purpose: "briefing",
     instructions: SYSTEM,
     input: [{ role: "user", content: userTurn(input) }],
     format: FORMAT,

@@ -260,8 +260,13 @@ about delivery.
   being purged.
 - Failed jobs keep their row after `MAX_ATTEMPTS` — the error is the only record of what the
   pipeline could not do. A judge job that gives up leaves its pair queued and unjudged; the quiet
-  briefing counts it as unresolved rather than calling the day clear. `queueDepth()` counts them; nothing surfaces them yet. That is Phase 9's
-  dashboard.
+  briefing counts it as unresolved rather than calling the day clear. `queueDepth()` counts them; `/ops` does not show
+  them yet — it shows when sensing and judging last ran, which catches a stopped pipeline but not a
+  stuck queue.
+- **`/ops` and the price of a model call.** `/ops` needs `CURATOR_EMAILS` (the same allowlist as
+  `/curate`) and a verified, non-anonymous sign-in. Model spend is recorded from migration 0020 on, in
+  tokens; dollars appear once `gpt-5.4-mini` has an entry in `PRICES` (`src/domain/watch/kill-criteria.ts`),
+  read off OpenAI's pricing page. Until then the page says "price not set".
 - `event_match` rows accumulate for the life of the trip. Fine at this scale; revisit when
   `pairsPerTripDay` is being read regularly.
 - A pair routed to `briefing` whose stop passes before a briefing ever covers it keeps

@@ -44,7 +44,7 @@ export const briefings = new Hono()
     // email that renders a broken image because a row was deleted is a worse
     // outcome than an unrecorded open.
     const id = c.req.param("id");
-    if (isId(id)) await openBriefing(id).catch(() => false);
+    if (isId(id)) await openBriefing(id, "email").catch(() => false);
     return c.body(PIXEL, 200, {
       ...NO_STORE,
       "content-type": "image/gif",
@@ -54,6 +54,6 @@ export const briefings = new Hono()
 
   .post("/:id/opened", async (c) => {
     const id = c.req.param("id");
-    const found = isId(id) && (await openBriefing(id));
+    const found = isId(id) && (await openBriefing(id, "app"));
     return found ? c.body(null, 204) : c.json({ error: "not found" }, 404);
   });

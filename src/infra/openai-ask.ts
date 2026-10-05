@@ -26,6 +26,7 @@ const format = zodTextFormat(askAnswer, "answer");
 
 export const askWithOpenAI: Asker = (input) =>
   generateJson({
+    purpose: "ask",
     instructions: SYSTEM,
     input: [
       {

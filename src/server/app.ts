@@ -5,6 +5,7 @@ import { curation } from "./routes/curation";
 import { devices } from "./routes/devices";
 import { enrichment } from "./routes/enrichment";
 import { interventions } from "./routes/interventions";
+import { ops } from "./routes/ops";
 import { places } from "./routes/places";
 import { route } from "./routes/route";
 import { saved } from "./routes/saved";
@@ -23,6 +24,7 @@ const app = new Hono()
   .route("/curation", curation)
   .route("/devices", devices)
   .route("/interventions", interventions)
+  .route("/ops", ops)
   .route("/places", places)
   .route("/places", enrichment)
   .route("/route", route)

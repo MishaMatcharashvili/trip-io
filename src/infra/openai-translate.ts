@@ -35,6 +35,7 @@ export const translateWithOpenAI: Translator = async (
   text,
 ): Promise<Translated> => {
   const raw = await generateJson({
+    purpose: "translate",
     instructions: SYSTEM,
     input: [{ role: "user", content: text }],
     format: FORMAT,

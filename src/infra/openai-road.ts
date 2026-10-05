@@ -48,6 +48,7 @@ export const readRoadNotice = (input: {
   publishedAt: string;
 }): Promise<unknown> =>
   generateJson({
+    purpose: "road",
     instructions: SYSTEM,
     input: [
       {
