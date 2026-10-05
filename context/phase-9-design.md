@@ -1,6 +1,6 @@
 # Phase 9 design — instrumentation and the kill-criteria dashboard
 
-Status: **designed, not built.** Written 2026-10-05 against `phase-8-detectors` at `cfffc90`. The
+Status: **built** (2026-10-05) — see "Built" at the end for where the build departed from this. Written 2026-10-05 against `phase-8-detectors` at `cfffc90`. The
 checklist is in `context/build-plan.md`; the criteria and what each one requires are
 `docs/implementation-plan.md` §10. This file says how to build it. Update it when a decision here
 changes.
@@ -210,3 +210,34 @@ Step 3 can go first and alone if there is any reason to start recording before t
 Alerting (the dashboard is read on a schedule, by one person), a historical trend store beyond what the
 tables already hold, sampling of dropped verdicts, any public page, and any change to the router's
 behaviour. The graduation of a detector stays a deliberate edit to `INTERRUPT_ELIGIBLE`, in review.
+
+## Built
+
+Everything in "Order and commits" except the last step's `implementation-plan.md` §11 figure, which
+needs measured spend that does not exist yet.
+
+Where the build departed from the design above:
+
+- **The recorder is awaited, not fire-and-forget.** A promise nobody waits for may be frozen with a
+  serverless function before it lands; one insert is milliseconds beside a model call. It still
+  catches its own error, so bookkeeping cannot fail a judgement.
+- **Trip and match ids ride `AsyncLocalStorage`** (`src/infra/model-refs.ts`), set by the judge and the
+  briefing, rather than through the domain ports. Other callers record no trip: that is the "floor".
+- **Migration 0020 is larger than the schema sketch.** It also carries `verdict_audit.in_cohort`,
+  `briefing.app_opened_at` and `intervention.briefing_id`. Each closes a limit the design had only
+  written on the page: an audit that outlives its trip but still knows whether it counted; email opens
+  (pre-fetched by Apple Mail) apart from app opens; and an `ignored` item in a briefing nobody opened.
+  It was regenerated before it was applied anywhere.
+- **The audit frame is every watched trip, not only the cohort**, because the graduation rule needs a
+  week of audited verdicts before any traveller exists. Each audit records whether it was in the cohort,
+  and the kill row counts only those.
+- **The survey is a card on the home page**, not on the trip page: the trip's screens are a full-bleed
+  map, and a finished trip's owner lands on the list. No email link yet (Resend is unset).
+- **Trips with no device cannot mute**, so the mute row's denominator is cohort trips whose owner has
+  a registered device. It reads `not enough data` until there are 20 of them, not the 5 the design
+  said — the floor is the same as the other proportions'.
+
+Checked: the domain by tests (29), every dashboard query and the audit and survey paths by
+`npm run smoke:ops` against Neon, `/ops` served and its API refusals by HTTP with a throwaway operator
+(since deleted), and `next` reported no compilation issues or errors. **Not checked:** any of it in a
+browser, because Chrome's system libraries are missing here (`sudo agent-browser install --with-deps`).

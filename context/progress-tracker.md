@@ -1,6 +1,6 @@
 # Progress tracker
 
-Last updated: 2026-10-01 (Phase 7).
+Last updated: 2026-10-05 (Phase 9).
 
 `context/running-the-pipeline.md` is the switch list: what is still switched off, why, and what
 turning each one on unblocks.
@@ -92,7 +92,7 @@ be updated as phases close, not item-by-item.
 | 6 | Web client | Built. Every screen on the database and Mapbox (roads from the Directions API, `docs/mapbox.md`); checkout is a demo until Flitt |
 | 7 | Native shell | Not started |
 | 8 | Detector expansion + road spike | Built. Events, safety, opening hours and rail are in; the road spike decided **stay manual**. See `context/phase-8-design.md` for what ran live and what did not |
-| 9 | Instrumentation + dashboard | Not started |
+| 9 | Instrumentation + dashboard | Built. `/ops` reads all six kill rows with their sample sizes, plus spend, radius and the audit queue; migration 0020 applied to Neon; model calls are recorded from 2026-10-05. Not yet seen in a browser. See `context/phase-9-design.md` |
 | 10 | 100 travellers | Not started |
 
 ## Kill-criteria snapshot
@@ -144,6 +144,24 @@ From `docs/implementation-plan.md` §13:
    the free first trip is the trial. Payments through Flitt.
 
 ## Log
+
+- **2026-10-05** — Phase 9 built. `/ops` (operators only, `CURATOR_EMAILS`) shows the six kill-criteria
+  rows each with its sample size, a 90% Wilson interval and a band that is `not enough data` below a
+  floor rather than `stop`; the pipeline's funnel, route-reason and rejection mix; model spend; the
+  match radius by distance; and the hand-audit queue, stratified by detector family so a small family is
+  not buried under weather. Audit marks need a reason when wrong, and a per-family table says whether a
+  detector may graduate (a hint — `INTERRUPT_ELIGIBLE` is still a code edit, and safety is never "ready").
+  Three things had no record and now do: **model calls** (`model_call`, written by `generateJson` for
+  every caller, tokens not dollars), **audits** (`verdict_audit`, which stores what was judged so a
+  deleted trip cannot move the rate) and the **post-trip survey** (`trip_survey`, one question on the
+  home page once a watched trip is over). Migration 0020 also adds `briefing.app_opened_at` (the email
+  pixel is pre-fetched by Apple Mail, so an app open is stamped apart) and `intervention.briefing_id`
+  (so acceptance can be read over opened briefings only). `npm run smoke:ops` plants known outcomes and
+  checks every figure moved by exactly that. **Not done:** `gpt-5.4-mini` has no price (the page shows
+  tokens), nothing was seen in a browser (Chrome lacks system libraries here), the survey card and audit
+  click are unrendered, and the cohort is only two trips so every row reads `not enough data`.
+  `/ops` also correctly reports the pipeline as stopped: sensing last ran 41 hours earlier, there being
+  no Trigger.dev account.
 
 - **2026-10-04** — Phase 8 built. Detector 3 (events) and 4 (safety) share a pipeline: `sense-news`
   stores new items from five RSS feeds, the drain translates Georgian to English with the pinned

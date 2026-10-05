@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–8 built; Phase 7 not yet run on a phone. Phase 9 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–9 built; Phase 7 not yet run on a phone. Phase 10 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -106,9 +106,10 @@ Design, research and results in `context/phase-8-design.md`.
 
 ## Phase 9 — instrumentation and kill-criteria dashboard
 
-- [ ] One-page dashboard: all six kill-criteria metrics, measured not estimated
-- [ ] Judge spend, pairs-per-trip-day, rejection-reason mix, radius tuning visible
-- [ ] Hand-audit queue/UI for false-positive rate sampling
+- [x] One-page dashboard: all six kill-criteria metrics, measured not estimated (`/ops`; `context/phase-9-design.md`)
+- [x] Judge spend, pairs-per-trip-day, rejection-reason mix, radius tuning visible — spend shows tokens until `gpt-5.4-mini` has a price in `src/domain/watch/kill-criteria.ts`
+- [x] Hand-audit queue/UI for false-positive rate sampling
+- [ ] Seen in a browser: the `/ops` page, an audit click and the home survey card have been exercised over HTTP and against Neon, not yet rendered (Chrome's system libraries are missing)
 
 ## Phase 10 — 100 travellers
 
