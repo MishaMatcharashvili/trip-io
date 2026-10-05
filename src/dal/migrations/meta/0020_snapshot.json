@@ -1,5 +1,5 @@
 {
-  "id": "606b92ab-5e47-47fb-9f57-c7766af20c3d",
+  "id": "a050b282-a92b-4246-97c7-f98617acec40",
   "prevId": "f809d664-b276-4fb7-8987-10af948304f9",
   "version": "7",
   "dialect": "postgresql",
@@ -1664,6 +1664,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "in_cohort": {
+          "name": "in_cohort",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
         "kind": {
           "name": "kind",
           "type": "text",
@@ -2850,6 +2856,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "app_opened_at": {
+          "name": "app_opened_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3197,6 +3209,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "briefing_id": {
+          "name": "briefing_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3307,6 +3325,19 @@
           "tableTo": "trip_patch",
           "columnsFrom": [
             "patch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "intervention_briefing_id_briefing_id_fk": {
+          "name": "intervention_briefing_id_briefing_id_fk",
+          "tableFrom": "intervention",
+          "tableTo": "briefing",
+          "columnsFrom": [
+            "briefing_id"
           ],
           "columnsTo": [
             "id"

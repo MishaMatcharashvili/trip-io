@@ -59,6 +59,11 @@ export const verdictAudit = pgTable(
     matchId: uuid("match_id").unique(),
     // `weather`, `safety`, ...: the unit graduation is decided in.
     family: text("family").notNull(),
+    // Whether the trip was a cohort trip when it was audited (an owner who is
+    // not an operator, holding a pass). The kill row counts these and the
+    // graduation evidence counts all of them; stored because the trip, and
+    // with it the means of working it out later, can be deleted.
+    inCohort: boolean("in_cohort").notNull(),
     kind: text("kind").notNull(),
     route: text("route").notNull(),
     verdict: jsonb("verdict").notNull(),

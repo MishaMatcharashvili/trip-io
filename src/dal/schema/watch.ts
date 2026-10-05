@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -189,6 +190,13 @@ export const intervention = pgTable(
     // a push, the start of the stop for a briefing item. The hourly sweep reads
     // it, and without that sweep the acceptance denominator is wrong.
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    // The briefing that carried it, for channel `briefing`. An item nobody
+    // opened the briefing to see being `ignored` says nothing about the advice,
+    // so the acceptance rate is also read over opened briefings only.
+    briefingId: uuid("briefing_id").references(
+      (): AnyPgColumn => briefing.id,
+      { onDelete: "set null" },
+    ),
   },
   (t) => [
     index("intervention_trip_id_idx").on(t.tripId),
@@ -236,6 +244,11 @@ export const briefing = pgTable(
     // < 20% stop), so the open is a column from the first briefing sent rather
     // than instrumentation retrofitted in Phase 9.
     openedAt: timestamp("opened_at", { withTimezone: true }),
+    // The first open from the app, as opposed to the email pixel. A mail client
+    // that pre-fetches images (Apple Mail Privacy Protection) opens every email
+    // for its reader, so `opened_at` alone overstates; this one cannot be
+    // pre-fetched, because the app page records it from a client effect.
+    appOpenedAt: timestamp("app_opened_at", { withTimezone: true }),
   },
   (t) => [
     // One per trip-day, enforced rather than assumed: the cron can be re-run by
