@@ -25,7 +25,11 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { nextToAudit, recordAudit } from "../../src/bll/audit.ts";
 import { loadDashboard } from "../../src/bll/ops-dashboard.ts";
-import { submitSurvey, surveyStatus } from "../../src/bll/survey.ts";
+import {
+  pendingSurvey,
+  submitSurvey,
+  surveyStatus,
+} from "../../src/bll/survey.ts";
 import {
   addAllOps,
   appendPatch,
@@ -427,6 +431,10 @@ try {
     "asked once the trip is over",
   );
   expect(
+    (await pendingSurvey(traveller))?.tripId === cohort.tripId,
+    "the home page is told which trip to ask about",
+  );
+  expect(
     (await surveyStatus(staff.tripId)) === "not-yet",
     "not asked mid-trip",
   );
@@ -448,6 +456,7 @@ try {
       "already-answered",
     "and only once",
   );
+  expect((await pendingSurvey(traveller)) === null, "and is not asked again");
   const survey = await surveyCounts(OPERATORS, new Date());
   delta("answered", before.survey.answered, survey.answered, 1);
   delta("would pay", before.survey.yes, survey.yes, 1);

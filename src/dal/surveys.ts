@@ -39,3 +39,27 @@ export async function surveyState(
     answered: Boolean(r.answered),
   };
 }
+
+/**
+ * The most recently finished trip this traveller held a pass for and has not
+ * answered about. Only the last two months: a question about a trip from last
+ * year is asking for a memory, not an opinion.
+ */
+export async function pendingSurveyFor(
+  userId: string,
+  now: Date,
+): Promise<{ tripId: string; title: string } | null> {
+  const rows = await db.execute(sql`
+    SELECT t.id, t.title
+    FROM trip t
+    JOIN watch_pass p ON p.trip_id = t.id
+    WHERE t.user_id = ${userId}
+      AND t.ends_at < ${now.toISOString()}::timestamptz
+      AND t.ends_at > ${now.toISOString()}::timestamptz - interval '60 days'
+      AND NOT EXISTS (SELECT 1 FROM trip_survey s WHERE s.trip_id = t.id)
+    ORDER BY t.ends_at DESC
+    LIMIT 1
+  `);
+  const r = rows.rows[0];
+  return r ? { tripId: r.id as string, title: r.title as string } : null;
+}

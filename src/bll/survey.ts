@@ -1,4 +1,4 @@
-import { insertSurvey, surveyState } from "../dal/surveys.ts";
+import { insertSurvey, pendingSurveyFor, surveyState } from "../dal/surveys.ts";
 
 // The post-trip question: would you pay $5 to have this trip watched. Asked
 // once, after the trip is over, of trips that held a pass — a traveller who
@@ -30,3 +30,7 @@ export async function submitSurvey(
   });
   return written ? "recorded" : "already-answered";
 }
+
+/** The trip to ask this traveller about now, if there is one. */
+export const pendingSurvey = (userId: string, now: Date = new Date()) =>
+  pendingSurveyFor(userId, now);
