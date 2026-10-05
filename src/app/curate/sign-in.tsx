@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
-export function SignIn() {
+export function SignIn({ callbackURL = "/curate" }: { callbackURL?: string }) {
   const [error, setError] = useState<string | null>(null);
 
   async function signIn() {
     setError(null);
     const { error } = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/curate",
+      callbackURL,
     });
     if (error) setError(error.message ?? "sign-in failed");
   }
