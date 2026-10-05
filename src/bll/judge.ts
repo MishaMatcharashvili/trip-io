@@ -19,6 +19,7 @@ import {
 import { placeIdsInProposals } from "../domain/watch/proposal.ts";
 import { type Route, type RouteReason, route } from "../domain/watch/route.ts";
 import { DEFAULT_QUIET_HOURS } from "../domain/watch/settings.ts";
+import { withModelRefs } from "../infra/model-refs.ts";
 import { judgeWithOpenAI } from "../infra/openai-judge.ts";
 import { INTERRUPT_JOB } from "./interrupt.ts";
 
@@ -128,7 +129,9 @@ export async function judgeMatch(
   // an outage that multiplies the jobs every run and means a pair is never
   // given up on. A pair whose job does give up stays queued and unjudged,
   // which is the record of what the pipeline could not do.
-  const raw = await (deps.judge ?? judgeWithOpenAI)(input);
+  const raw = await withModelRefs({ tripId: pair.trip.id, matchId }, () =>
+    (deps.judge ?? judgeWithOpenAI)(input),
+  );
 
   // Tiers are read from the catalogue, not from the list handed to the model:
   // the guard has to be able to catch an id the model took from somewhere else

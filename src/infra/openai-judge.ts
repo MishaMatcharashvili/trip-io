@@ -126,6 +126,7 @@ const FORMAT = zodTextFormat(verdict, "verdict");
 
 export const judgeWithOpenAI: Judge = (input) =>
   generateJson({
+    purpose: "judge",
     instructions: SYSTEM,
     input: [{ role: "user", content: userTurn(input) }],
     format: FORMAT,

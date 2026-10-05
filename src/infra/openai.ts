@@ -1,5 +1,11 @@
 import OpenAI from "openai";
-import type { ResponseFormatTextJSONSchemaConfig } from "openai/resources/responses/responses";
+import type {
+  Response,
+  ResponseFormatTextJSONSchemaConfig,
+} from "openai/resources/responses/responses";
+import { insertModelCall } from "../dal/model-calls.ts";
+import type { ModelPurpose } from "../domain/watch/kill-criteria.ts";
+import { currentModelRefs } from "./model-refs.ts";
 
 // The OpenAI client, shared by the calls this product makes: the trip
 // composer (src/infra/openai-composer.ts), the watch layer's judge
@@ -54,6 +60,11 @@ export function openai(): OpenAI {
 export type Turn = { role: "user" | "assistant"; content: string };
 
 export type JsonCall = {
+  /**
+   * Who is asking, so spend can be reported by what it bought. Required, so the
+   * compiler finds every caller and none is left out of the report.
+   */
+  purpose: ModelPurpose;
   instructions: string;
   input: Turn[];
   /** From `zodTextFormat`: a strict JSON Schema the decoder is held to. */
@@ -74,21 +85,64 @@ export type JsonCall = {
  * of ours.
  */
 export async function generateJson(call: JsonCall): Promise<unknown> {
-  const response = await openai().responses.create({
-    model: MODEL,
-    instructions: call.instructions,
-    input: call.input,
-    text: { format: call.format },
-    reasoning: { effort: call.effort },
-    store: false,
-  });
+  const started = Date.now();
+  let response: Response | undefined;
+  try {
+    response = await openai().responses.create({
+      model: MODEL,
+      instructions: call.instructions,
+      input: call.input,
+      text: { format: call.format },
+      reasoning: { effort: call.effort },
+      store: false,
+    });
 
-  if (response.status === "incomplete") {
-    throw new Error(
-      `the model stopped early: ${response.incomplete_details?.reason ?? "unknown reason"}`,
-    );
+    if (response.status === "incomplete") {
+      throw new Error(
+        `the model stopped early: ${response.incomplete_details?.reason ?? "unknown reason"}`,
+      );
+    }
+    const text = response.output_text;
+    if (!text) throw new Error("the model returned no content");
+    const parsed = JSON.parse(text);
+    await record(call, response, started, null);
+    return parsed;
+  } catch (error) {
+    await record(call, response, started, (error as Error).message);
+    throw error;
   }
-  const text = response.output_text;
-  if (!text) throw new Error("the model returned no content");
-  return JSON.parse(text);
+}
+
+/**
+ * Writes the call down, and never lets that fail the call: a bookkeeping error
+ * must not cost anyone a judgement. Awaited rather than left running — on a
+ * serverless function a promise nobody waits for is one the platform may
+ * freeze before it lands, and one insert is milliseconds beside a model call.
+ * A failed call is recorded too, with whatever usage the response carried.
+ */
+async function record(
+  call: JsonCall,
+  response: Response | undefined,
+  started: number,
+  error: string | null,
+): Promise<void> {
+  const usage = response?.usage;
+  const { tripId, matchId } = currentModelRefs();
+  try {
+    await insertModelCall({
+      purpose: call.purpose,
+      model: MODEL,
+      tripId: tripId ?? null,
+      matchId: matchId ?? null,
+      inputTokens: usage?.input_tokens ?? 0,
+      cachedInputTokens: usage?.input_tokens_details?.cached_tokens ?? 0,
+      outputTokens: usage?.output_tokens ?? 0,
+      reasoningTokens: usage?.output_tokens_details?.reasoning_tokens ?? 0,
+      latencyMs: Date.now() - started,
+      ok: error === null,
+      error,
+    });
+  } catch (writeError) {
+    console.error("model_call not recorded:", (writeError as Error).message);
+  }
 }

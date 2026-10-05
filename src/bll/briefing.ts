@@ -36,6 +36,7 @@ import {
 } from "../domain/watch/briefing.ts";
 import { briefingOffers } from "../domain/watch/interrupt.ts";
 import { renderBriefingEmail } from "../infra/briefing-email.ts";
+import { withModelRefs } from "../infra/model-refs.ts";
 import { briefWithOpenAI } from "../infra/openai-briefing.ts";
 import { emailConfigured, sendWithResend } from "../infra/resend.ts";
 
@@ -189,7 +190,9 @@ export async function writeBriefing(
 
     let raw: unknown;
     try {
-      raw = await (deps.brief ?? briefWithOpenAI)(ask);
+      raw = await withModelRefs({ tripId }, () =>
+        (deps.brief ?? briefWithOpenAI)(ask),
+      );
     } catch (error) {
       // Thrown on, so the queue's backoff gets to try again — unless there is
       // nothing left to try, in which case the morning gets the plain briefing
