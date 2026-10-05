@@ -17,7 +17,7 @@ export function Sheet({
   return (
     <div
       className={cx(
-        "z-20 flex flex-col rounded-t-sheet border-t border-hairline bg-surface shadow-sheet",
+        "pointer-events-auto z-20 flex shrink-0 flex-col rounded-t-sheet border-t border-hairline bg-surface shadow-sheet",
         fill ? "flex-1" : "",
         className,
       )}
@@ -25,6 +25,34 @@ export function Sheet({
       <div className="flex justify-center pb-1 pt-2">
         <span aria-hidden="true" className="h-1 w-9 rounded-full bg-control" />
       </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The layer above a map screen: a floating card at the top and the sheet at
+ * the bottom, in one column so they can never sit on top of each other. When
+ * the screen is too short for both, the card scrolls rather than hiding behind
+ * the sheet — it is the thing that needs an answer.
+ */
+export function SheetStage({
+  floating,
+  children,
+}: {
+  floating?: React.ReactNode;
+  /** The `Sheet`. */
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-20 top-[112px] z-20 flex flex-col justify-between gap-3">
+      {floating ? (
+        <div className="pointer-events-auto min-h-0 px-3 short:overflow-y-auto">
+          {floating}
+        </div>
+      ) : (
+        <span />
+      )}
       {children}
     </div>
   );
