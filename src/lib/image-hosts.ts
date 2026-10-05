@@ -40,15 +40,19 @@ export const imageHosts: readonly ImageHost[] = [
   },
 ];
 
+/** next/image's glob: `**` is anything, `*` is one label or path segment. */
 const matches = (pattern: string, value: string): boolean => {
-  const re = new RegExp(
-    `^${pattern
-      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*\*/g, "\u0000")
-      .replace(/\*/g, "[^./]+")
-      .replace(/\u0000/g, ".*")}$`,
-  );
-  return re.test(value);
+  const source = pattern
+    .split(/(\*\*|\*)/)
+    .map((part) =>
+      part === "**"
+        ? ".*"
+        : part === "*"
+          ? "[^./]+"
+          : part.replace(/[.+^${}()|[\]\\]/g, "\\$&"),
+    )
+    .join("");
+  return new RegExp(`^${source}$`).test(value);
 };
 
 /** Whether `<Image>` would accept this address — next/image's own rule, restated. */
