@@ -178,7 +178,7 @@ export function TripComposer({
               type="button"
               onClick={() => setText(example)}
             >
-              <Chip className="cursor-pointer hover:border-control">
+              <Chip className="h-auto min-h-7 cursor-pointer rounded-2xl py-1 text-left hover:border-control">
                 {example}
               </Chip>
             </button>
