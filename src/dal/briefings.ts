@@ -216,10 +216,10 @@ export async function saveBriefing(row: {
   // so the sweep can mark it `ignored` and the card can still show it later.
   if (row.offers.length > 0) {
     await db.execute(sql`
-      INSERT INTO intervention (trip_id, event_id, channel, offer, expires_at)
+      INSERT INTO intervention (trip_id, event_id, channel, offer, expires_at, briefing_id)
       SELECT ${row.tripId}::uuid, (o->>'eventId')::uuid,
              'briefing'::delivery_channel, o->'offer',
-             (o->>'expiresAt')::timestamptz
+             (o->>'expiresAt')::timestamptz, ${id}::uuid
       FROM jsonb_array_elements(${JSON.stringify(row.offers)}::jsonb) AS o
     `);
   }
@@ -304,10 +304,15 @@ export async function byId(id: string): Promise<StoredBriefing | null> {
  * stamp would turn "opened per trip-day" into "last touched", which measures a
  * different thing.
  */
-export async function markOpened(id: string): Promise<void> {
+export async function markOpened(
+  id: string,
+  via: "email" | "app",
+): Promise<void> {
   await db.execute(sql`
-    UPDATE briefing SET opened_at = now()
-    WHERE id = ${id} AND opened_at IS NULL
+    UPDATE briefing SET
+      opened_at = COALESCE(opened_at, now()),
+      app_opened_at = ${via === "app" ? sql`COALESCE(app_opened_at, now())` : sql`app_opened_at`}
+    WHERE id = ${id}
   `);
 }
 

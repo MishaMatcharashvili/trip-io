@@ -377,9 +377,12 @@ export async function briefingPage(
 }
 
 /** Opened, once. The kill-criteria stamp (src/dal/briefings.ts). */
-export async function openBriefing(id: string): Promise<boolean> {
+export async function openBriefing(
+  id: string,
+  via: "email" | "app",
+): Promise<boolean> {
   const briefing = await byId(id);
   if (!briefing) return false;
-  await markOpened(id);
+  await markOpened(id, via);
   return true;
 }

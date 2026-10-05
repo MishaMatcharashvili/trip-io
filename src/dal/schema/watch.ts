@@ -193,10 +193,9 @@ export const intervention = pgTable(
     // The briefing that carried it, for channel `briefing`. An item nobody
     // opened the briefing to see being `ignored` says nothing about the advice,
     // so the acceptance rate is also read over opened briefings only.
-    briefingId: uuid("briefing_id").references(
-      (): AnyPgColumn => briefing.id,
-      { onDelete: "set null" },
-    ),
+    briefingId: uuid("briefing_id").references((): AnyPgColumn => briefing.id, {
+      onDelete: "set null",
+    }),
   },
   (t) => [
     index("intervention_trip_id_idx").on(t.tripId),
