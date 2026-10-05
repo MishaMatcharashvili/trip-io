@@ -8,6 +8,7 @@
  * of the components.
  */
 
+import type { StopWeather } from "@/domain/forecast";
 import type { DaySegment, WeatherHour } from "@/ui/bars";
 import type { Tone } from "@/ui/cx";
 
@@ -25,6 +26,8 @@ export type Checkpoint = {
   /** Set when a world event matched this node and the judge routed it. */
   conflict?: string;
   booked?: boolean;
+  /** The forecast over this stop, under its time. Real trips, near enough to forecast. */
+  weather?: StopWeather;
   /** Real trips only: the node behind the row. */
   node?: {
     kind: "visit" | "meal" | "transfer" | "stay";
@@ -230,6 +233,13 @@ const georgiaDays: Day[] = [
         state: "upcoming",
         indoor: false,
         booked: true,
+        weather: {
+          sky: "partly",
+          label: "Partly cloudy",
+          temperature: 17,
+          wet: false,
+          gusts: null,
+        },
       },
       {
         id: "3e",
@@ -239,6 +249,13 @@ const georgiaDays: Day[] = [
         state: "upcoming",
         indoor: false,
         conflict: "Inside the rain window",
+        weather: {
+          sky: "rain",
+          label: "Rain",
+          temperature: 11,
+          wet: true,
+          gusts: null,
+        },
       },
       {
         id: "3f",
@@ -248,6 +265,13 @@ const georgiaDays: Day[] = [
         state: "upcoming",
         indoor: true,
         booked: true,
+        weather: {
+          sky: "rain",
+          label: "Light rain",
+          temperature: 9,
+          wet: true,
+          gusts: null,
+        },
       },
     ],
   },

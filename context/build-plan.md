@@ -1,6 +1,6 @@
 # Build plan
 
-Status: Phases 0–7 built; Phase 7 not yet run on a phone. Phase 8 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
+Status: Phases 0–8 built; Phase 7 not yet run on a phone. Phase 9 next. Condensed from `docs/implementation-plan.md` (revision 2) into a
 checklist to work against. That document has the full reasoning for every line here — this one is
 for tracking "what's next," not for re-litigating decisions.
 
@@ -96,11 +96,13 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 
 ## Phase 8 — detector expansion + road-automation spike
 
-- [ ] Detector 3 — events & festivals (local pages + extraction)
-- [ ] Detector 4 — protests & safety (news RSS + extraction), **briefing-only, gated**
-- [ ] Detector 5 — opening-hours (user reports + catalogue drift)
-- [ ] Detector 6 — rail (weekly manual check)
-- [ ] Road-automation spike: evaluate news + Roads Department Facebook extraction against Phase 5–7's real manual events; decide on evidence
+Design, research and results in `context/phase-8-design.md`.
+
+- [~] Detector 3 — events & festivals: five news feeds, Georgian translated to English, extracted and guarded. Run live once; **no tourism feed exists**, and the two sites with an events listing forbid scraping in their terms, so a real events calendar needs their permission
+- [x] Detector 4 — protests & safety: two outlets must agree, a wording guard, and the router can never interrupt on it, whatever the eligible set says. **Briefing-only, gated.** No real safety event has been seen
+- [x] Detector 5 — opening-hours: a one-tap report on the place page; a curator publishes alone, two signed-in travellers publish together. Drift from the catalogue is the validator's job, not a detector's
+- [x] Detector 6 — rail: operators report through the Telegram bot, a Monday reminder asks. Not connected to Telegram yet
+- [x] Road-automation spike: **decided — stay manual** (recall 33–50%, precision 100% on 20 hand-labelled notices from the Roads Department's own feed). **Built, assisted**: the model proposes each notice that lands on a corridor and an operator approves it in the Telegram queue (not yet connected). Facebook was not evaluated; the department's JSON feed made it unnecessary
 
 ## Phase 9 — instrumentation and kill-criteria dashboard
 

@@ -317,6 +317,13 @@ const KIND_NOUNS: Record<string, string> = {
   "road.restriction": "Road restricted",
   "road.delay": "Delays",
   "road.hazard": "Road hazard",
+  "event.festival": "Festival",
+  "event.closure": "Closure for an event",
+  "safety.demonstration": "Demonstration",
+  "safety.advisory": "Advisory",
+  "hours.closed": "Closed",
+  "rail.cancelled": "Train cancelled",
+  "rail.delayed": "Train delayed",
 };
 
 /** "Rain", not "Weather": the word a traveller would use for what happened. */

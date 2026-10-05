@@ -1,9 +1,11 @@
 import { Bot, type BotConfig, type Context, InlineKeyboard } from "grammy";
+import { submitRailReport } from "../../bll/rail-report.ts";
 import {
   moderateReport,
   reviewQueue,
   submitRoadReport,
 } from "../../bll/road-report.ts";
+import { describeRail } from "../../domain/watch/rail.ts";
 import type { ReportTrust } from "../../domain/watch/road.ts";
 import {
   type Button,
@@ -13,6 +15,7 @@ import {
   summary,
   toInput,
 } from "./form.ts";
+import { decodeRail, railScreen, toRailInput } from "./rail-form.ts";
 
 // The road-report bot: detector #2's front door, a form in Telegram against
 // the 12 corridors. Anyone may report; operators — `TELEGRAM_OPERATOR_IDS` —
@@ -79,6 +82,15 @@ export function createBot(
     return ctx.reply(first.text, { reply_markup: keyboard(first.buttons) });
   });
 
+  // Detector #6. Operators only: nobody else's word about a train is taken.
+  bot.command("rail", (ctx) => {
+    if (trustOf(ctx) !== "operator") {
+      return ctx.reply("Only operators can report on the railway.");
+    }
+    const first = railScreen({});
+    return ctx.reply(first.text, { reply_markup: keyboard(first.buttons) });
+  });
+
   bot.command("queue", async (ctx) => {
     if (trustOf(ctx) !== "operator")
       return ctx.reply("Only operators can see the queue.");
@@ -92,6 +104,32 @@ export function createBot(
   });
 
   bot.on("callback_query:data", async (ctx) => {
+    const rail = decodeRail(ctx.callbackQuery.data);
+    if (rail) {
+      if (trustOf(ctx) !== "operator") {
+        return ctx.answerCallbackQuery({ text: "Only operators can do that." });
+      }
+      await ctx.answerCallbackQuery();
+      if (rail.type === "rail-form") {
+        const next = railScreen(rail.state);
+        return ctx.editMessageText(next.text, {
+          reply_markup: keyboard(next.buttons),
+        });
+      }
+      const input = toRailInput(rail.state);
+      if (!input) {
+        return ctx.editMessageText(
+          "That form has expired. /rail to start again.",
+        );
+      }
+      const result = await submitRailReport(input);
+      return ctx.editMessageText(
+        result.ok
+          ? `${result.published ? "Published" : "Recorded"}.\n\n${describeRail(input)}${result.ended ? `\n\nEnded ${result.ended} earlier report${result.ended === 1 ? "" : "s"} on this line.` : ""}`
+          : "That report couldn't be taken. /rail to try again.",
+      );
+    }
+
     const callback = decode(ctx.callbackQuery.data);
 
     if (!callback) {

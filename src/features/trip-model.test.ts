@@ -181,6 +181,8 @@ describe("weatherView", () => {
     at: at(DAY, hhmm),
     precipitation,
     apparentTemperature: 14,
+    temperature: 17,
+    weatherCode: 2,
   });
 
   test("names the wet window in coral", () => {
@@ -198,8 +200,14 @@ describe("weatherView", () => {
 
   test("dry is said plainly", () => {
     const view = weatherView([hour("09:00", 0), hour("10:00", 0.1)]);
-    assert.equal(view?.caption, "Dry · 14–14°C");
+    assert.equal(view?.caption, "Dry");
     assert.equal(view?.captionTone, "neutral");
+    assert.deepEqual(view?.summary, {
+      sky: "partly",
+      label: "Partly cloudy",
+      low: 17,
+      high: 17,
+    });
   });
 });
 

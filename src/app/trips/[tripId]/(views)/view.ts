@@ -2,7 +2,7 @@ import type { WatchOffer } from "@/bll/watch-pass";
 import type { Advisory, Day, Opportunity, Trip } from "@/data/trip";
 import type { DayChip } from "@/features/day-strip-model";
 import type { ChangeRow } from "@/features/trip-model";
-import type { WeatherHour } from "@/ui/bars";
+import type { WeatherHour, WeatherSummary } from "@/ui/bars";
 import type { Tone } from "@/ui/cx";
 
 /**
@@ -40,6 +40,7 @@ export type OverviewView = {
     hours: WeatherHour[];
     caption: string;
     captionTone?: "alert" | "neutral";
+    summary?: WeatherSummary;
   } | null;
   strip: ReadonlyArray<{ name: string; tone: Tone; count: number }>;
   suggestions: string[];

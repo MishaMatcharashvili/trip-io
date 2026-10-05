@@ -54,6 +54,20 @@ export function forecastRibbon(
   return cachedForecast(round(point[0]), round(point[1]), date);
 }
 
+/**
+ * The same forecast for one stop, on a coarser grid: about ten kilometres,
+ * which is already finer than the model's own resolution. A day of stops in
+ * one town is then one call between all of them, where the ribbon's
+ * kilometre grid would make a call of each.
+ */
+export function stopForecast(
+  point: LonLat,
+  date: string,
+): Promise<ForecastHour[] | null> {
+  const round = (n: number) => Math.round(n * 10) / 10;
+  return cachedForecast(round(point[0]), round(point[1]), date);
+}
+
 async function cachedForecast(
   lon: number,
   lat: number,

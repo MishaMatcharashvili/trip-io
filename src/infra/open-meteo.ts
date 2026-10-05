@@ -19,6 +19,7 @@ const HOURLY = [
   "snowfall",
   "wind_gusts_10m",
   "apparent_temperature",
+  "temperature_2m",
   "weather_code",
 ] as const;
 
@@ -29,6 +30,7 @@ type Response = {
     snowfall?: (number | null)[];
     wind_gusts_10m?: (number | null)[];
     apparent_temperature?: (number | null)[];
+    temperature_2m?: (number | null)[];
     weather_code?: (number | null)[];
   };
   error?: boolean;
@@ -55,6 +57,7 @@ function toSeries(body: Response): HourlySeries {
     snowfall: hourly.snowfall,
     windGusts: hourly.wind_gusts_10m,
     apparentTemperature: hourly.apparent_temperature,
+    temperature: hourly.temperature_2m,
     weatherCode: hourly.weather_code,
   };
 }

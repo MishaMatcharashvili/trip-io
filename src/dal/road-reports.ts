@@ -83,6 +83,13 @@ export async function insertReport(
   return (rows.rows[0]?.id as string | undefined) ?? null;
 }
 
+/** A proposal read from a notice, inserted on the default connection. */
+export function insertProposal(
+  row: Parameters<typeof insertReport>[1],
+): Promise<string | null> {
+  return insertReport(db, row);
+}
+
 /** Reports this person has waiting for review that are still worth reviewing. */
 export async function pendingCount(reporterId: string): Promise<number> {
   const rows = await db.execute(sql`
@@ -191,4 +198,31 @@ export async function endRoadEvents(
     RETURNING id
   `);
   return rows.rows.length;
+}
+
+/**
+ * Proposals read from the Roads Department's notices that the operators have
+ * not been told about yet. The reporter id says where they came from
+ * (`isNoticeReporter`); a person's report never waits here, because a person
+ * is in a chat and is answered there.
+ */
+export async function unnotifiedProposals(limit = 20): Promise<StoredReport[]> {
+  const rows = await db.execute(sql`
+    ${SELECT_REPORT}
+    WHERE r.status = 'pending' AND r.notified_at IS NULL
+      AND r.reporter_id LIKE 'georoad:%' AND r.valid_to > now()
+    ORDER BY r.reported_at LIMIT ${limit}
+  `);
+  return rows.rows.map(toReport);
+}
+
+export async function markNotified(ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.execute(sql`
+    UPDATE road_report SET notified_at = now()
+    WHERE id IN (${sql.join(
+      ids.map((i) => sql`${i}::uuid`),
+      sql`, `,
+    )})
+  `);
 }

@@ -20,7 +20,18 @@ import { logger, schedules, task } from "@trigger.dev/sdk";
  * which reads nothing the others write and goes last only so an hour's
  * deliveries have had their chance to be answered before it looks.
  */
-const STAGES = ["sense-weather", "match", "drain", "outcomes"] as const;
+const STAGES = [
+  "sense-weather",
+  "sense-news",
+  "sense-roads",
+  // Reads what sense-news stored, so the events it writes are there for the
+  // match that follows. Judge jobs ride along; the second drain finishes them.
+  "drain",
+  "road-proposals",
+  "match",
+  "drain",
+  "outcomes",
+] as const;
 
 /**
  * The morning pass. `briefing` finds the trip-days that have one and posts a
@@ -128,6 +139,17 @@ export const morningBriefing = schedules.task({
   cron: MORNING_CRON,
   maxDuration: 600,
   run: async () => runStages(MORNING),
+});
+
+/**
+ * Detector #6's clock. There is no feed to poll, so what runs weekly is a
+ * message to the operators asking them to look at the railway's notices.
+ */
+export const railReminder = schedules.task({
+  id: "rail-reminder",
+  cron: { pattern: "0 6 * * 1", timezone: "Asia/Tbilisi" },
+  maxDuration: 120,
+  run: async () => runStages(["rail-reminder"]),
 });
 
 /** The same pass on demand, for the mornings you want to read before they happen. */

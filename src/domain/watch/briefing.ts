@@ -285,6 +285,10 @@ export type Briefing = {
 const KIND_LABELS: Record<string, string> = {
   weather: "Weather",
   road: "Roads",
+  event: "Events",
+  safety: "Safety",
+  hours: "Opening hours",
+  rail: "Rail",
 };
 
 /** The detector a kind belongs to, as a word rather than a namespace. */

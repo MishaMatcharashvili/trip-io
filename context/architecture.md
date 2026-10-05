@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Phases 0–7 built (see `context/progress-tracker.md`). Reflects the decisions of record in
+Status: Phases 0–8 built (see `context/progress-tracker.md`). Reflects the decisions of record in
 `docs/implementation-plan.md`. This file is the living reference for "what we're actually building" —
 update it when an architectural decision changes; don't let it drift from the code.
 
@@ -52,9 +52,9 @@ is moving the code one layer further left.
 | Directory | What lives there | Rule |
 |---|---|---|
 | `src/domain` | The trip document, the patch grammar, the coherent-day validator, the generation pipeline, the catalogue model, the watch layer's event model, weather thresholds, judge guards, the router, the briefing document, the interrupt budget's delivery rules and the road-report vocabulary | Plain functions over plain values. No IO, no environment, no runtime dependency but Zod — so all of it is testable without a database or a model |
-| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts`, `interventions.ts`, `devices.ts`, `road-reports.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
-| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts`, `interrupt.ts`, `interventions.ts`, `watch-settings.ts`, `devices.ts`, `road-report.ts`, `place-enrichment.ts`, `suggestions.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`, `interventionCard`, `alertsPage`) |
-| `src/infra` | Outbound adapters: the OpenAI composer, the OpenAI judge, the OpenAI briefer, the OpenAI suggester, Open-Meteo, Resend, Expo push, Tripadvisor (`tripadvisor.ts`), Google Places (`google-places.ts`), Redis over Upstash (`upstash.ts`), Better Auth | Implements a port the domain declares. The only files that name an external provider |
+| `src/dal` | Connection, schema, migrations, and one repository per aggregate: `trips.ts`, `places.ts`, `plans.ts`, `events.ts`, `watches.ts`, `matches.ts`, `jobs.ts`, `briefings.ts`, `interventions.ts`, `devices.ts`, `road-reports.ts`, `source-items.ts`, `hours-reports.ts`, `rail-reports.ts` | The only layer that writes SQL or imports Drizzle. Repositories take domain values and return domain objects; they hold no policy |
+| `src/bll` | Use cases: `trip-document.ts`, `trip-generation.ts`, `curation.ts`, `sense.ts`, `match.ts`, `judge.ts`, `drain.ts`, `briefing.ts`, `interrupt.ts`, `interventions.ts`, `watch-settings.ts`, `devices.ts`, `road-report.ts`, `place-enrichment.ts`, `suggestions.ts`, `news.ts` (detectors 3 and 4), `hours-report.ts`, `rail-report.ts` | The order things happen in, and the transaction they happen in. Owns the read models the screens ask for (`tripView`, `previewPatch`, `interventionCard`, `alertsPage`) |
+| `src/infra` | Outbound adapters: the OpenAI composer, the OpenAI judge, the OpenAI briefer, the OpenAI suggester, Open-Meteo, Resend, Expo push, Tripadvisor (`tripadvisor.ts`), Google Places (`google-places.ts`), RSS (`rss.ts`), the OpenAI translator, extractor and road-notice reader, the Roads Department's feed (`georoad.ts`), Redis over Upstash (`upstash.ts`), Better Auth | Implements a port the domain declares. The only files that name an external provider |
 | `src/server` | The Hono app, its routers, the session middleware, and the road-report bot behind the Telegram webhook | Validation, status codes, nothing else. Imports use cases, never a repository |
 | `src/app`, `src/ui`, `src/features` | Next.js routes, primitives and composites | Presentation. May call a use case; may not reach a repository |
 
@@ -80,9 +80,11 @@ entry file changes.
 */5 * * * *  /api/cron/match           PostGIS join → event_match → enqueue judge  built
 * * * * *    /api/cron/drain           claim N jobs SKIP LOCKED, stop at 240s      built
 0 3 * * *    /api/cron/briefing        07:30 Tbilisi; one job per live trip-day    built
-*/30 * * * * /api/cron/sense-news      RSS + extraction                            Phase 8
+0 * * * *    /api/cron/sense-news      fetch feeds, store new items, queue reads    built (hourly, in the pipeline task)
 POST         /api/telegram/webhook     road reports → world_event                  built
-0 6 * * 1    /api/cron/sense-rail      weekly manual-check reminder                Phase 8
+0 6 * * 1    /api/cron/rail-reminder   Monday message to operators                  built
+0 * * * *    /api/cron/sense-roads     Roads Department notices → queued reads      built (hourly, in the pipeline task)
+0 * * * *    /api/cron/road-proposals  tell operators what the model proposed       built (hourly, in the pipeline task)
 0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     built
 ```
 

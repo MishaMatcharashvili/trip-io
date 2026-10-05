@@ -114,6 +114,7 @@ function ItineraryPanel({ view }: { view: OverviewView }) {
             hours={weather.hours}
             caption={weather.caption}
             captionTone={weather.captionTone}
+            summary={weather.summary}
           />
         </div>
       ) : null}

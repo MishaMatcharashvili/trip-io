@@ -5,6 +5,7 @@ import type { TripScreen } from "@/bll/trip-screen";
 import { type Checkpoint, type Day, getTrip, type Trip } from "@/data/trip";
 import { summariseHours } from "@/domain/catalogue/opening-hours";
 import { PlaceVoices } from "@/features/place-voices";
+import { ReportClosed } from "@/features/report-closed";
 import { RoutedTripMap } from "@/features/routed-trip-map";
 import { SaveToggle } from "@/features/save-toggle";
 import { StopSuggestions } from "@/features/stop-suggestions";
@@ -422,6 +423,18 @@ export function PlaceBody({
             </a>
           ) : null}
         </div>
+      ) : null}
+
+      {node.placeId &&
+      day.date &&
+      day.state !== "past" &&
+      (node.kind === "visit" || node.kind === "meal") ? (
+        <ReportClosed
+          placeId={node.placeId}
+          name={name}
+          date={day.date}
+          dateLabel={day.state === "today" ? "today" : `on ${day.date}`}
+        />
       ) : null}
 
       {node.kind === "visit" || node.kind === "meal" ? (

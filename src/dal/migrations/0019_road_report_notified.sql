@@ -1,0 +1,1 @@
+ALTER TABLE "road_report" ADD COLUMN "notified_at" timestamp with time zone;

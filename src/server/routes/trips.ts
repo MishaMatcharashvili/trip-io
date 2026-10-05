@@ -30,7 +30,7 @@ import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
-import { CLOCK_TIME, channels } from "@/domain/watch/settings.ts";
+import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
 // The trip document over HTTP. The work is done in src/bll/*; these handlers do
@@ -50,10 +50,7 @@ const watchSettings = z
       .nullable()
       .optional(),
     // The detector families that exist; muting one stops it being matched.
-    mutedSources: z
-      .array(z.enum(["weather", "road"]))
-      .max(2)
-      .optional(),
+    mutedSources: z.array(z.enum(muteFamilies)).max(2).optional(),
     verbosity: z.enum(["affecting", "nearby"]).optional(),
   })
   .refine((s) => Object.values(s).some((v) => v !== undefined), {

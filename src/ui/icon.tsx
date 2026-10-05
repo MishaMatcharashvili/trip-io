@@ -36,6 +36,30 @@ const glyphs = {
       <path d="M8 18.4l-1 2M12 18.4l-1 2M16 18.4l-1 2" />
     </>
   ),
+  // The sky, drawn to the rain glyph's cloud so a row of them reads as a set.
+  cloud: (
+    <path d="M7 17a4 4 0 0 1 .6-7.96 5.5 5.5 0 0 1 10.6 1.7A3.5 3.5 0 0 1 17.5 17z" />
+  ),
+  partlyCloudy: (
+    <>
+      <circle cx="8.5" cy="8.5" r="3" />
+      <path d="M8.5 2.6v1.2M2.6 8.5h1.2M4.3 4.3l.9.9M12.7 4.3l-.9.9" />
+      <path d="M10.4 20.5a3.4 3.4 0 0 1 .3-6.8 4.6 4.6 0 0 1 8.8 1.4 2.7 2.7 0 0 1-.7 5.4z" />
+    </>
+  ),
+  snow: (
+    <>
+      <path d="M7 15a4 4 0 0 1 .6-7.96 5.5 5.5 0 0 1 10.6 1.7A3.5 3.5 0 0 1 17.5 15z" />
+      <path d="M8 18.5h.01M12 20.5h.01M16 18.5h.01" />
+    </>
+  ),
+  bolt: (
+    <>
+      <path d="M7 15a4 4 0 0 1 .6-7.96 5.5 5.5 0 0 1 10.6 1.7A3.5 3.5 0 0 1 17.5 15z" />
+      <path d="M12.8 13.5l-2.3 3.3h3l-2.3 4" />
+    </>
+  ),
+  fog: <path d="M4 8.5h16M6.5 12.5h13M4 16.5h16M8 20h9" />,
   arrowRight: <path d="M5 12h13M12 5l7 7-7 7" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   calendar: (

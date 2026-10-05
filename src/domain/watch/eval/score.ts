@@ -26,6 +26,7 @@ export const ALARM_WORDS = [
   "urgent",
   "beware",
   "caution",
+  "unsafe",
   "emergency",
   "severe weather",
 ];

@@ -28,6 +28,8 @@ export type HourlySeries = {
   windGusts?: (number | null)[];
   /** °C, wind chill and humidity included. */
   apparentTemperature?: (number | null)[];
+  /** °C, the air itself. Read by the screens, not by the detector. */
+  temperature?: (number | null)[];
   /** WMO 4677. */
   weatherCode?: (number | null)[];
 };

@@ -42,7 +42,7 @@ OAuth + `CURATOR_EMAILS`.
 | Design system | `src/ui/` — Mist tokens in `app/globals.css` (`@theme`), primitives (button, card, chip, dot, controls, nav, bars, sheet, 28-glyph icon set) and composites in `src/features/`. Reference page at `/design` |
 | Screens | Every screen reads the database for a real trip or account, on Mapbox; the canvas's Georgia trip (`/trips/georgia`) keeps its fixture render as the reference `/design` links to. New: `/trips/{id}/history`. Detectors not built yet (transport, hours, events, safety) are shown as 'not watched yet', never with invented statuses |
 | Database | Live on Neon (eu-central-1, pooled, PostGIS 3.6). Migrations `0000`–`0013` applied; `0010` adds `saved_place`, `0011` adds `trip_watch.muted_sources`/`verbosity`, `0012`–`0013` add `watch_pass` (owner optional for scripted trips); `0007` adds `intervention.offer`/`expires_at` and one push per event, `0008` adds `device` and `trip_watch.muted_at`, `0009` adds `road_report`; `0005` adds the `briefing` table (one per trip-day, unique on `(trip_id, day)`), `0006` adds `event_match.delivered_at`. `0003` adds `event_match.route_reason`/`rejections` and makes the event/node pair unique, `0004` adds `queued_at`. `0002` adds patch `seq`, `inverse_ops`, patch `meta`, the intervention-needs-an-accepter CHECK, `plan_cache` and `trip_generation` |
-| Detectors | **2 of 7 built**: weather-vs-activity, hourly, thresholds derived here (no Georgian warning feed exists), Open-Meteo on the free tier — commercial key still to buy; and road-corridor, a Telegram form (anyone reports, operators approve), never connected to Telegram. No detector has graduated out of briefing-only: `INTERRUPT_ELIGIBLE` is empty, so nothing the system builds can wake anyone up |
+| Detectors | **6 of 7 built** (flight-status ships dark): weather (Open-Meteo, free tier, thresholds ours), road (Telegram form), events and safety (five news feeds, Georgian translated, model-extracted behind guards), opening hours (one-tap report, quorum) and rail (operator form). **None has graduated:** `INTERRUPT_ELIGIBLE` is empty, and safety is additionally locked out by `NEVER_INTERRUPT`. Events and safety have run live once; hours and rail only against Neon with synthetic input; the bot and the Monday reminder have never touched Telegram |
 | Watch pipeline | `world_event`, `trip_watch`, `event_match`, `job`, `briefing` all live. Cron at `/api/cron/{sense-weather,match,drain,briefing}` behind `CRON_SECRET`. The clock is `src/trigger/watch-pipeline.ts` — `watch-pipeline` hourly, `morning-briefing` at 07:30 Asia/Tbilisi — and there is no Trigger.dev account yet. 321 tests (`npm test`) |
 | Judge | Prompt, guards and router written and unit-tested; the four validators enforce evidence, tier, no-empty-helpful and the confidence floor. On `gpt-5.4-mini`: 28/30 on `judge:eval` in two runs; has not yet judged a real trip |
 | Briefing | Built end to end and **run against Gemini** (2026-09-24): bundle (48h lookahead) → compose → guards → store → email → open tracking. Quiet days, refused drafts and an unreachable model are all written without a model call. In-app view reads the database; email renders in HTML and text with evidence beside every claim. **Nothing has been emailed** (`RESEND_API_KEY` unset) |
@@ -91,7 +91,7 @@ be updated as phases close, not item-by-item.
 | 5 | Interrupts, budget, road form | Built and rehearsed on Neon. Nothing switched on: no detector graduated, no bot token, no phone registered |
 | 6 | Web client | Built. Every screen on the database and Mapbox (roads from the Directions API, `docs/mapbox.md`); checkout is a demo until Flitt |
 | 7 | Native shell | Not started |
-| 8 | Detector expansion + road spike | Not started |
+| 8 | Detector expansion + road spike | Built. Events, safety, opening hours and rail are in; the road spike decided **stay manual**. See `context/phase-8-design.md` for what ran live and what did not |
 | 9 | Instrumentation + dashboard | Not started |
 | 10 | 100 travellers | Not started |
 
@@ -134,7 +134,7 @@ From `docs/implementation-plan.md` §13:
 
 1. **Domain** — parked. `roamline.io` is the best free option found; `wandr.ai` is brokered. Confirm
    at a registrar + trademark search before any design spend.
-2. **Road automation** — decided in Phase 8 on evidence from real manual events; no action needed yet.
+2. ~~**Road automation**~~ — **decided 2026-10-04: stay manual.** Evidence: the Roads Department's own notice feed (api.georoad.gov.ge) read by a model, 20 hand-labelled notices, recall 33–50%, precision 100%. Built the assisted form instead: the model proposes, an operator approves. Re-run on a larger, independently labelled set before reopening full automation.
 3. ~~**Who may submit road reports**~~ — **decided 2026-09-25: anyone, moderated.** Operators publish
    at once at confidence 0.9; everyone else's reports wait for an operator's approval and publish at
    0.8.
@@ -144,6 +144,23 @@ From `docs/implementation-plan.md` §13:
    the free first trip is the trial. Payments through Flitt.
 
 ## Log
+
+- **2026-10-04** — Phase 8 built. Detector 3 (events) and 4 (safety) share a pipeline: `sense-news`
+  stores new items from five RSS feeds, the drain translates Georgian to English with the pinned
+  OpenAI model, gates, extracts, and vets each claim (verbatim quote, a region from the gazetteer,
+  a sane window, confidence capped per kind); safety waits for two outlets and can never
+  interrupt. Detector 5: a place page button, a curator publishes alone and two signed-in
+  travellers together. Detector 6: four rail lines, operators only, a Monday reminder. Migrations
+  0016–0018 applied. The first live run read 118 items and published none (the guards refused the
+  four it extracted, correctly), then one genuine upcoming fair became two events. The road spike
+  read the Roads Department's own notice feed and decided **stay manual** — and found the
+  department coding a notice "restored" for a text that says restricted. Weather also gained a
+  temperature, a sky and a day summary on every stop. Later the same day: mute list for the new families, outlets merged into one event, eleven judge
+  eval fixtures (11/11 on the real judge), and the assisted road flow. Then checked in a browser (a place-page
+  crash on Wikimedia thumbnails, found and fixed) and narrowed news events to a street where the
+  catalogue can place it. **Still not done:** an events calendar (both candidate sites' terms forbid
+  scraping — needs their permission), `kill:count` over the new kinds, and anything on Telegram
+  or a phone.
 
 - **2026-10-01** — Phase 7 built, not yet run on a phone. The Expo app is a thin shell on Expo Router:
   sign-in and sign-up, the trips list, a trip's days and alerts, the intervention card (apply, keep, mute),

@@ -119,6 +119,93 @@ export async function upsertEvent(
 }
 
 /**
+ * Where a street's places cluster inside one municipality: the geometric median
+ * of the catalogue places whose address mentions it (robust to the odd place
+ * that merely contains the name), and the distance within which 90% of them
+ * lie. Null when none match. Judging whether that is enough to believe is the
+ * domain's (`toFootprint`).
+ */
+export async function streetCluster(
+  regionSlug: string,
+  street: string,
+): Promise<{
+  lon: number;
+  lat: number;
+  spreadM: number;
+  places: number;
+} | null> {
+  const rows = await db.execute(sql`
+    WITH pts AS (
+      SELECT p.geom::geometry AS g
+      FROM place p
+      JOIN region r ON r.slug = ${regionSlug}
+                   AND ST_Within(p.geom::geometry, r.geom::geometry)
+      WHERE p.attrs->>'address' ILIKE ${`%${street}%`}
+    ),
+    c AS (SELECT ST_GeometricMedian(ST_Collect(g)) AS m, count(*)::int AS n FROM pts)
+    SELECT c.n AS places, ST_X(c.m) AS lon, ST_Y(c.m) AS lat,
+           percentile_cont(0.9) WITHIN GROUP (
+             ORDER BY ST_Distance(pts.g::geography, c.m::geography)
+           ) AS spread
+    FROM pts, c GROUP BY c.n, c.m
+  `);
+  const r = rows.rows[0];
+  if (!r || r.lon === null) return null;
+  return {
+    places: Number(r.places),
+    lon: Number(r.lon),
+    lat: Number(r.lat),
+    spreadM: Number(r.spread),
+  };
+}
+
+/**
+ * Write a claim that more than one outlet can make. The first outlet inserts
+ * the row; each later one joins `payload.outlets`, one entry per outlet, and
+ * the matcher holds the event back until there are enough of them
+ * (src/dal/matches.ts). Confidence and severity are the first writer's: a
+ * second outlet repeating a claim does not make it more certain than a
+ * detector is allowed to be.
+ */
+export async function upsertCorroborated(
+  draft: EventDraft,
+  event: Pick<WorldEvent, "regionSlug" | "observedAt" | "dedupeKey">,
+  /** Where in the municipality it is, if the street could be found. */
+  footprint?: { lon: number; lat: number; radiusM: number } | null,
+): Promise<{ id: string; outlets: number } | null> {
+  const area = footprint
+    ? sql`ST_Buffer(ST_SetSRID(ST_MakePoint(${footprint.lon}, ${footprint.lat}), 4326)::geography, ${footprint.radiusM})`
+    : sql`ST_SimplifyPreserveTopology(r.geom::geometry, 0.01)::geography`;
+  const rows = await db.execute(sql`
+    INSERT INTO world_event
+      (source, kind, severity, confidence, geom, valid_from, valid_to,
+       observed_at, dedupe_key, payload)
+    SELECT ${draft.source}, ${draft.kind}, ${draft.severity}, ${draft.confidence},
+           ${area},
+           ${draft.validFrom}::timestamptz, ${draft.validTo}::timestamptz,
+           ${event.observedAt}::timestamptz, ${event.dedupeKey},
+           ${JSON.stringify(draft.payload)}::jsonb
+    FROM region r WHERE r.slug = ${event.regionSlug}
+    ON CONFLICT (dedupe_key) DO UPDATE SET
+      observed_at = EXCLUDED.observed_at,
+      payload = world_event.payload || jsonb_build_object('outlets', (
+        SELECT jsonb_agg(x) FROM (
+          SELECT DISTINCT ON (o->>'id') o AS x
+          FROM jsonb_array_elements(
+            COALESCE(world_event.payload->'outlets', '[]'::jsonb)
+            || COALESCE(EXCLUDED.payload->'outlets', '[]'::jsonb)
+          ) o
+          ORDER BY o->>'id'
+        ) s
+      ))
+    RETURNING id, jsonb_array_length(payload->'outlets') AS outlets
+  `);
+  const row = rows.rows[0];
+  if (!row) return null;
+  return { id: row.id as string, outlets: Number(row.outlets) };
+}
+
+/**
  * Let an escalated event be judged again. The dedupe key deliberately collapses
  * a re-forecast onto one row, which means a spell that turns from `minor` into
  * `severe` would otherwise keep the verdict formed when it was drizzle.

@@ -40,6 +40,15 @@ export const INTERRUPT_MIN_CONFIDENCE = 0.7;
  */
 export const INTERRUPT_ELIGIBLE: ReadonlySet<EventKind> = new Set();
 
+/**
+ * Families that never wake anyone, whatever `INTERRUPT_ELIGIBLE` says. The set
+ * above is the process rule written down; this is the second lock. Safety is
+ * LLM extraction over news — the highest-variance source and the highest-stakes
+ * topic — and graduating it should take an edit to this line, in review, with
+ * its own reason, not one more entry in a set on the way to something else.
+ */
+export const NEVER_INTERRUPT: readonly string[] = ["safety"];
+
 export type QuietHours = {
   /** "HH:MM", Tbilisi. May wrap past midnight. */
   start: string;
@@ -136,6 +145,9 @@ export function route({
     reason,
   });
 
+  if (NEVER_INTERRUPT.includes(kind.split(".")[0])) {
+    return briefing("briefing-only-detector");
+  }
   if (!interruptEligible.has(kind)) return briefing("briefing-only-detector");
   if (verdict.horizonHrs > INTERRUPT_HORIZON_HRS) {
     return briefing("beyond-horizon");

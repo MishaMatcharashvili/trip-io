@@ -60,6 +60,10 @@ export const roadReport = pgTable(
     status: roadReportStatus("status").notNull(),
     reviewedBy: text("reviewed_by"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // When the operators were told it was waiting, for the reports that nobody
+    // is in a chat to send: a proposal read from the Roads Department's notices.
+    // Null until then, so each one is sent once.
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
     // The event it became. Set null if the event is ever purged; the report
     // outlives it as a label.
     eventId: uuid("event_id").references(() => worldEvent.id, {

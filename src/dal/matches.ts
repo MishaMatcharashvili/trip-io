@@ -7,6 +7,7 @@ import {
   radiusFor,
   staleAfterHours,
 } from "../domain/watch/event.ts";
+import { SAFETY_QUORUM } from "../domain/watch/extraction.ts";
 import type { Rejection, Verdict } from "../domain/watch/judge.ts";
 import type { Route, RouteReason } from "../domain/watch/route.ts";
 import { db, type Queryable } from "./client.ts";
@@ -91,6 +92,10 @@ const matchable = sql`
     AND tstzrange(e.valid_from, COALESCE(e.valid_to, e.valid_from + interval '1 hour'))
      && tstzrange(n.starts_at, n.starts_at + n.duration_min * interval '1 minute')
     AND ${nodeKindAllowed}
+    -- A claim from the news that only one outlet has made is not yet a fact
+    -- about the world; it waits here, unmatched, for a second.
+    AND (e.kind NOT LIKE 'safety.%'
+         OR COALESCE(jsonb_array_length(e.payload->'outlets'), 0) >= ${SAFETY_QUORUM})
     AND e.observed_at > now() - ${staleAfter} * interval '1 hour'
     AND NOT EXISTS (
       SELECT 1 FROM event_match m WHERE m.event_id = e.id AND m.node_id = n.id

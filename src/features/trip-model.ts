@@ -5,6 +5,7 @@ import type {
 } from "../bll/trip-screen.ts";
 import type { Checkpoint, Day, Source, Trip } from "../data/trip.ts";
 import { ownSite } from "../domain/catalogue/website.ts";
+import { daySummary } from "../domain/forecast.ts";
 import type { LonLat } from "../domain/geo.ts";
 import { diffDays } from "../domain/trip/diff.ts";
 import {
@@ -16,7 +17,7 @@ import {
 } from "../domain/trip/document.ts";
 import { addDays } from "../domain/trip/generate/schedule.ts";
 import { at, kindLabel } from "../domain/watch/briefing.ts";
-import type { DaySegment, WeatherHour } from "../ui/bars.tsx";
+import type { DaySegment, WeatherHour, WeatherSummary } from "../ui/bars.tsx";
 import type { MapStop } from "../ui/map/trip-map.tsx";
 
 // A real trip in the shapes the screens were drawn against (src/data/trip.ts).
@@ -117,12 +118,12 @@ function conflictLine(match: LiveMatch): string {
 const LIVE_DETECTORS = [
   { prefix: "weather", name: "Weather" },
   { prefix: "road", name: "Roads on your route" },
+  { prefix: "rail", name: "Trains" },
+  { prefix: "event", name: "Events and street closures" },
+  { prefix: "hours", name: "Places reported shut" },
+  { prefix: "safety", name: "Announced demonstrations" },
 ] as const;
-const PLANNED_DETECTORS = [
-  "Transport",
-  "Opening hours",
-  "Local events & safety",
-];
+const PLANNED_DETECTORS = ["Marshrutkas and strikes"];
 
 function sources(screen: TripScreen, now: Date): Source[] {
   const checked = screen.lastCheck ? ` · ${ago(screen.lastCheck, now)}` : "";
@@ -439,6 +440,7 @@ export function weatherView(forecast: readonly ForecastHour[]): {
   hours: WeatherHour[];
   caption: string;
   captionTone: "alert" | "neutral";
+  summary?: WeatherSummary;
 } | null {
   const waking = forecast.filter((h) => {
     const hour = Number(hourOf(h.at));
@@ -450,6 +452,7 @@ export function weatherView(forecast: readonly ForecastHour[]): {
     hour: hourOf(h.at),
     intensity: Math.min(1, h.precipitation / HEAVY_MM),
   }));
+  const summary = daySummary(waking) ?? undefined;
   const wet = waking.filter((h) => h.precipitation >= WET_MM);
   if (wet.length) {
     const first = hourOf(wet[0].at);
@@ -457,18 +460,18 @@ export function weatherView(forecast: readonly ForecastHour[]): {
     const mm = wet.reduce((sum, h) => sum + h.precipitation, 0);
     const amount = `${mm.toFixed(mm < 10 ? 1 : 0)} mm`;
     return mm < RAIN_WORTH_SAYING_MM
-      ? { hours, caption: `Light showers · ${amount}`, captionTone: "neutral" }
+      ? {
+          hours,
+          summary,
+          caption: `Light showers · ${amount}`,
+          captionTone: "neutral",
+        }
       : {
           hours,
+          summary,
           caption: `Rain ${first}:00–${String(last).padStart(2, "0")}:00 · ${amount}`,
           captionTone: "alert",
         };
   }
-  const temps = waking
-    .map((h) => h.apparentTemperature)
-    .filter((t): t is number => t !== null);
-  const range = temps.length
-    ? ` · ${Math.round(Math.min(...temps))}–${Math.round(Math.max(...temps))}°C`
-    : "";
-  return { hours, caption: `Dry${range}`, captionTone: "neutral" };
+  return { hours, summary, caption: "Dry", captionTone: "neutral" };
 }

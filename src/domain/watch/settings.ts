@@ -15,6 +15,22 @@ export const DEFAULT_QUIET_HOURS: QuietHours = { start: "22:00", end: "08:00" };
 export const channels = ["push", "email", "briefing"] as const;
 export type Channel = (typeof channels)[number];
 
+/**
+ * The detector families a traveller can switch off for a trip. A family is the
+ * namespace of the event kinds it writes (`event.festival` is "event"); the
+ * matcher mutes by that prefix, so a name here that no kind uses would mute
+ * nothing, and `settings.test.ts` holds the two together.
+ */
+export const muteFamilies = [
+  "weather",
+  "road",
+  "event",
+  "safety",
+  "hours",
+  "rail",
+] as const;
+export type MuteFamily = (typeof muteFamilies)[number];
+
 /** "HH:MM", 24-hour, Tbilisi — the only clock the product tells time on. */
 export const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
