@@ -135,7 +135,7 @@ function FixtureAlert({ trip, alertId }: { trip: Trip; alertId: string }) {
           >
             Apply new route
           </ButtonLink>
-          <div className="flex gap-2.5">
+          <div className="flex flex-col gap-2.5 min-[380px]:flex-row">
             <ButtonLink
               href={`/trips/${trip.id}/replan`}
               size="lg"
