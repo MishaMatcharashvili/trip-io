@@ -203,7 +203,7 @@ export function AuthForm({
         {mode === "sign-up" ? "Already have an account? " : "New to trip.io? "}
         <Link
           href={`${mode === "sign-up" ? "/sign-in" : "/sign-up"}${nextQuery}`}
-          className="font-medium text-agent"
+          className="touch-target font-medium text-agent"
         >
           {mode === "sign-up" ? "Sign in" : "Create an account"}
         </Link>
@@ -214,7 +214,7 @@ export function AuthForm({
           type="button"
           onClick={guest}
           disabled={busy}
-          className="text-small font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
+          className="touch-target text-small font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
         >
           {pending === "guest" ? "Starting…" : "Keep planning as a guest"}
         </button>

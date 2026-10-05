@@ -79,7 +79,7 @@ export function FilterChip({
       aria-pressed={selected}
       onClick={onClick}
       className={cx(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border transition-colors",
+        "touch-target inline-flex shrink-0 items-center gap-1.5 rounded-full border transition-colors",
         size === "md" ? "h-7 px-[11px] text-[12px]" : "h-6 px-2.5 text-mini",
         selected
           ? "border-ink bg-ink font-medium text-canvas"

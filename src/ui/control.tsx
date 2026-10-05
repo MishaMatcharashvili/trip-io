@@ -39,7 +39,7 @@ export function Toggle({
         onChange?.(!on);
       }}
       className={cx(
-        "flex shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40",
+        "touch-target flex shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40",
         track,
         on ? "justify-end bg-agent" : "justify-start bg-fill-strong",
       )}

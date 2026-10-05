@@ -64,7 +64,7 @@ function FixtureAlert({ trip, alertId }: { trip: Trip; alertId: string }) {
         <Link
           href={`/trips/${trip.id}/alerts`}
           aria-label="Close"
-          className="text-ink-faint"
+          className="touch-target text-ink-faint"
         >
           <Icon name="close" size={16} />
         </Link>

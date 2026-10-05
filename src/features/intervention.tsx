@@ -67,7 +67,7 @@ export function InterventionScreen({ card }: { card: InterventionCard }) {
         <Link
           href={`/trips/${card.tripId}/alerts`}
           aria-label="Close"
-          className="text-ink-faint"
+          className="touch-target text-ink-faint"
         >
           <Icon name="close" size={16} />
         </Link>
