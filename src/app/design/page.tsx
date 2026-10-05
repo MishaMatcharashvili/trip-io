@@ -174,12 +174,12 @@ function Spec({
 export default function DesignSystemPage() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex h-[58px] shrink-0 items-center gap-5 border-b border-hairline bg-surface px-6">
+      <header className="flex min-h-[58px] shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline bg-surface px-4 py-2 sm:gap-x-5 sm:px-6">
         <Brand />
-        <span className="h-5 w-px bg-hairline" />
+        <span className="hidden h-5 w-px bg-hairline sm:block" />
         <Title>Design system</Title>
         <div className="flex-1" />
-        <Chip>Mist · map-first</Chip>
+        <Chip className="hidden sm:inline-flex">Mist · map-first</Chip>
         <ThemeSegmented />
       </header>
 
