@@ -9,6 +9,7 @@ import {
   MODEL_PURPOSES,
   perSevenDays,
   priceFor,
+  readyToGraduate,
   spendUsd,
   wilson,
 } from "./kill-criteria.ts";
@@ -199,5 +200,29 @@ describe("model-call purposes", () => {
       "suggest",
       "translate",
     ]);
+  });
+});
+
+describe("graduating a detector", () => {
+  const clean = { family: "weather", daysLive: 8, audited: 40, wrong: 0 };
+
+  test("a week of clean audits is ready", () => {
+    assert.equal(readyToGraduate(clean), true);
+  });
+
+  test("a clean record is not enough without the week", () => {
+    assert.equal(readyToGraduate({ ...clean, daysLive: 6 }), false);
+  });
+
+  test("a week is not enough without the audits", () => {
+    assert.equal(readyToGraduate({ ...clean, audited: 10 }), false);
+  });
+
+  test("a false-positive rate that might be over the line is not ready", () => {
+    assert.equal(readyToGraduate({ ...clean, wrong: 8 }), false);
+  });
+
+  test("safety is never ready, whatever its numbers", () => {
+    assert.equal(readyToGraduate({ ...clean, family: "safety" }), false);
   });
 });

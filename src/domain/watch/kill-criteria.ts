@@ -170,6 +170,42 @@ export function interleaveByFamily<
   return out;
 }
 
+/** Why a verdict was wrong to send. The reasons say which guard to write next. */
+export const AUDIT_REASONS = [
+  "not-relevant",
+  "wrong-place",
+  "already-over",
+  "alarmist",
+  "other",
+] as const;
+export type AuditReason = (typeof AUDIT_REASONS)[number];
+
+/** A week on briefing-only, as `INTERRUPT_ELIGIBLE`'s own rule states it. */
+export const GRADUATION_DAYS = 7;
+
+/**
+ * Whether a family has earned a place in `INTERRUPT_ELIGIBLE`: a week of
+ * running, and a false-positive rate whose whole interval is under the
+ * continue line. It is a hint beside the numbers and edits nothing — the set is
+ * changed by a person, in review, with a reason (src/domain/watch/route.ts).
+ * Safety is never ready, whatever its numbers say: `NEVER_INTERRUPT` is a
+ * second lock for it, and a dashboard that says "ready" about it would be
+ * arguing with that lock.
+ */
+export function readyToGraduate(input: {
+  family: string;
+  daysLive: number;
+  audited: number;
+  wrong: number;
+}): boolean {
+  if (input.family === "safety") return false;
+  return (
+    input.daysLive >= GRADUATION_DAYS &&
+    bandProportion(input.wrong, input.audited, CRITERIA.falsePositive) ===
+      "continue"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Model spend
 
