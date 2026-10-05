@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
+import { pendingSurvey } from "@/bll/survey";
 import { myTrips, type TripListRow, tripScreen } from "@/bll/trip-screen";
 import { passesHeldBy } from "@/bll/watch-pass";
 import { georgia, georgiaMapStops } from "@/data/trip";
@@ -9,6 +10,7 @@ import { HomePlan } from "@/features/home-plan";
 import { PageColumn } from "@/features/page-column";
 import { tbilisiToday } from "@/features/shared-reads";
 import { SiteFrame } from "@/features/site-frame";
+import { SurveyCard } from "@/features/survey-card";
 import { type Hero, TripHero } from "@/features/trip-hero";
 import { dateRange, tripModel, tripStops } from "@/features/trip-model";
 import {
@@ -80,10 +82,11 @@ function Welcome() {
 export default async function TripsHome({ searchParams }: PageProps<"/">) {
   const { trip: wanted } = await searchParams;
   const session = await getAuth().api.getSession({ headers: await headers() });
-  const [rows, passes, planDate] = await Promise.all([
+  const [rows, passes, planDate, survey] = await Promise.all([
     session ? myTrips(session.user.id) : Promise.resolve([]),
     session ? passesHeldBy(session.user.id) : Promise.resolve([]),
     tbilisiToday(),
+    session ? pendingSurvey(session.user.id) : Promise.resolve(null),
   ]);
 
   const today = dayKey(new Date());
@@ -108,6 +111,8 @@ export default async function TripsHome({ searchParams }: PageProps<"/">) {
     <SiteFrame active="Trips" tab="Trips">
       <PageColumn>
         <HomeHeading lead={lead} />
+
+        {survey && <SurveyCard tripId={survey.tripId} title={survey.title} />}
 
         {featured && hero ? (
           <>
