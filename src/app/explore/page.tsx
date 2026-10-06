@@ -7,6 +7,7 @@ import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Dot } from "@/ui/dot";
+import { Icon } from "@/ui/icon";
 import { Eyebrow, Prose, Title } from "@/ui/text";
 
 export const metadata: Metadata = { title: "Explore" };
@@ -31,6 +32,31 @@ const monthName = (month: number) =>
     timeZone: "UTC",
   });
 
+/** The always-visible row of an accordion card; the chevron turns when it opens. */
+function Summary({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <summary
+      className={cx(
+        "flex cursor-pointer list-none items-center gap-2.5 marker:hidden hover:bg-canvas [&::-webkit-details-marker]:hidden",
+        className,
+      )}
+    >
+      {children}
+      <Icon
+        name="chevronDown"
+        size={14}
+        className="shrink-0 text-ink-faint transition-transform group-open:rotate-180"
+      />
+    </summary>
+  );
+}
+
 function RoadsThisSeason({
   month,
   roads,
@@ -43,11 +69,13 @@ function RoadsThisSeason({
     .sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "alert" ? -1 : 1))
     .slice(0, 6);
   return (
-    <div>
-      <div className="flex flex-col gap-1 px-4 pb-3 pt-4">
-        <Eyebrow>Roads this season · {monthName(month)}</Eyebrow>
-        <Title>What I already know about getting there</Title>
-      </div>
+    <details className="group">
+      <Summary className="px-4 py-3.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <Eyebrow>Roads this season · {monthName(month)}</Eyebrow>
+          <Title>What I already know about getting there</Title>
+        </div>
+      </Summary>
       <Divider />
       <div className="flex flex-col px-4 py-2">
         {shown.map((road, i) => (
@@ -77,22 +105,24 @@ function RoadsThisSeason({
         The usual season, not today’s road. A watched trip gets the live
         reports.
       </p>
-    </div>
+    </details>
   );
 }
 
 /** Rtveli, the harvest: worth knowing in September and October only. */
 function SeasonFind() {
   return (
-    <div>
-      <div className="flex items-center gap-2.5 border-b border-hairline bg-canvas px-4 py-2.5">
+    <details className="group">
+      <Summary className="bg-canvas px-4 py-2.5">
         <Dot tone="agent" />
-        <Eyebrow>Worth knowing · no action</Eyebrow>
-      </div>
-      <div className="flex flex-col gap-2.5 p-4">
-        <Title className="text-[15px]">
-          Rtveli in Kakheti until mid-October
-        </Title>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <Eyebrow>Worth knowing · no action</Eyebrow>
+          <Title className="truncate text-[15px]">
+            Rtveli in Kakheti until mid-October
+          </Title>
+        </div>
+      </Summary>
+      <div className="flex flex-col gap-2.5 border-t border-hairline p-4">
         <Prose>
           The grape harvest. Most cellars let you pick and press with them, and
           the feasts run late. It is the best two weeks of the year for a wine
@@ -104,7 +134,7 @@ function SeasonFind() {
           </ButtonLink>
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 

@@ -41,7 +41,9 @@ export function MapStyleSwitch({
   return (
     <fieldset
       className={cx(
-        "flex gap-0.5 rounded-[10px] bg-track-pill p-[3px]",
+        // Opaque, with its own edge and shadow: it floats over satellite
+        // imagery, where a pale pill on a pale control disappears.
+        "flex gap-0.5 rounded-[12px] border border-hairline-strong bg-surface p-1 shadow-lifted",
         className,
       )}
     >
@@ -55,10 +57,10 @@ export function MapStyleSwitch({
             aria-pressed={on}
             onClick={() => setMapStyle(kind)}
             className={cx(
-              "h-[28px] flex-1 rounded-control px-2.5 text-[12px] transition-colors",
+              "h-[32px] flex-1 rounded-control px-2.5 text-[13px] transition-colors",
               on
-                ? "bg-surface font-medium text-ink shadow-card"
-                : "text-ink-muted hover:text-ink",
+                ? "bg-agent font-semibold text-white shadow-card"
+                : "font-medium text-ink hover:bg-track-pill",
             )}
           >
             {mapStyleLabels[kind]}
