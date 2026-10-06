@@ -11,7 +11,7 @@ import { dayHref } from "@/features/trip-links";
 import { ButtonLink } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { Icon } from "@/ui/icon";
-import { Sheet } from "@/ui/sheet";
+import { Sheet, SheetStage } from "@/ui/sheet";
 import { Eyebrow, Headline, Num, Prose, Title } from "@/ui/text";
 import type { OverviewView } from "./view";
 
@@ -139,92 +139,96 @@ export function ActiveTripMobile({ view }: { view: OverviewView }) {
         watch={view.forcePaused ? "paused" : "watching"}
       />
 
-      <div className="absolute inset-x-3 top-[112px] z-20">
-        <ConnectionSwitch
-          sources={view.pausedSources}
-          forceOffline={view.forcePaused}
-        >
-          {state === "advisory" && view.advisory ? (
-            <MobileAdvisory advisory={view.advisory} />
-          ) : null}
-          {state === "applied" && view.applied ? (
-            <MobileApplied applied={view.applied} />
-          ) : null}
-          {state === "calm" ? <MobileCalm view={view} /> : null}
-        </ConnectionSwitch>
-      </div>
-
-      <Sheet className="absolute inset-x-0 bottom-20 z-20">
-        <div className="flex items-start gap-2.5 px-4 pb-2.5 pt-1">
-          <div className="flex flex-1 flex-col gap-0.5">
-            <Eyebrow tone="agent">
-              {all
-                ? "Whole trip"
-                : now
-                  ? "Now"
-                  : day.state === "today"
-                    ? "Today"
-                    : day.stamp}
-            </Eyebrow>
-            <Title className="text-[16px]">
-              {all ? `${trip.dayCount} days` : (now?.title ?? day.summary)}
-            </Title>
-          </div>
-          {view.next ? (
-            <div className="flex flex-col items-end gap-0.5">
-              <Num className="text-small font-semibold">{view.next.time}</Num>
-              <Eyebrow>{view.next.label}</Eyebrow>
-            </div>
-          ) : null}
-        </div>
-
-        <Divider className="mx-4" />
-
-        {next ? (
-          <Link
-            href={`/trips/${trip.id}/place/${next.id}`}
-            className="flex items-center gap-[11px] px-4 py-3"
+      <SheetStage
+        floating={
+          <ConnectionSwitch
+            sources={view.pausedSources}
+            forceOffline={view.forcePaused}
           >
-            <Num className="w-10 text-mini text-ink-faint">{next.time}</Num>
-            <div className="flex-1">
-              <div className="text-small font-medium">{next.title}</div>
-              <div
-                className={
-                  next.conflict
-                    ? "text-mini text-alert"
-                    : "text-mini text-ink-faint"
-                }
-              >
-                {next.conflict ?? next.detail}
+            {state === "advisory" && view.advisory ? (
+              <MobileAdvisory advisory={view.advisory} />
+            ) : null}
+            {state === "applied" && view.applied ? (
+              <MobileApplied applied={view.applied} />
+            ) : null}
+            {state === "calm" ? <MobileCalm view={view} /> : null}
+          </ConnectionSwitch>
+        }
+      >
+        {/* On a phone on its side the decision gets the screen; the sheet's
+            "now" row is one tab away. */}
+        <Sheet className={state === "advisory" ? "landscape-short:hidden" : ""}>
+          <div className="flex items-start gap-2.5 px-4 pb-2.5 pt-1">
+            <div className="flex flex-1 flex-col gap-0.5">
+              <Eyebrow tone="agent">
+                {all
+                  ? "Whole trip"
+                  : now
+                    ? "Now"
+                    : day.state === "today"
+                      ? "Today"
+                      : day.stamp}
+              </Eyebrow>
+              <Title className="text-[16px]">
+                {all ? `${trip.dayCount} days` : (now?.title ?? day.summary)}
+              </Title>
+            </div>
+            {view.next ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <Num className="text-small font-semibold">{view.next.time}</Num>
+                <Eyebrow>{view.next.label}</Eyebrow>
               </div>
-            </div>
-            <Icon name="chevronRight" size={16} className="text-ink-faint" />
-          </Link>
-        ) : null}
+            ) : null}
+          </div>
 
-        <div className="flex items-center gap-3 px-4 pb-2.5">
-          <DayStrip
-            tripId={trip.id}
-            chips={view.days}
-            selected={view.selected}
-            className="min-w-0 flex-1"
+          <Divider className="mx-4" />
+
+          {next ? (
+            <Link
+              href={`/trips/${trip.id}/place/${next.id}`}
+              className="flex items-center gap-[11px] px-4 py-3 short:hidden"
+            >
+              <Num className="w-10 text-mini text-ink-faint">{next.time}</Num>
+              <div className="flex-1">
+                <div className="text-small font-medium">{next.title}</div>
+                <div
+                  className={
+                    next.conflict
+                      ? "text-mini text-alert"
+                      : "text-mini text-ink-faint"
+                  }
+                >
+                  {next.conflict ?? next.detail}
+                </div>
+              </div>
+              <Icon name="chevronRight" size={16} className="text-ink-faint" />
+            </Link>
+          ) : null}
+
+          <div className="flex items-center gap-3 px-4 pb-2.5 short:hidden">
+            <DayStrip
+              tripId={trip.id}
+              chips={view.days}
+              selected={view.selected}
+              className="min-w-0 flex-1"
+            />
+            <Link
+              href={all ? `/trips/${trip.id}/trip` : dayHref(trip.id, day.id)}
+              className="shrink-0 text-mini font-medium text-agent"
+            >
+              {all ? "Plan" : "Open day"}
+            </Link>
+          </div>
+
+          <CommandBar
+            tripId={view.askTripId ?? undefined}
+            initialQuestion={view.initialQuestion}
+            compact
+            placeholder="Ask about your trip"
+            className="mx-4 mb-3.5 landscape-short:hidden"
           />
-          <Link
-            href={all ? `/trips/${trip.id}/trip` : dayHref(trip.id, day.id)}
-            className="shrink-0 text-mini font-medium text-agent"
-          >
-            {all ? "Plan" : "Open day"}
-          </Link>
-        </div>
-
-        <CommandBar
-          tripId={view.askTripId ?? undefined}
-          initialQuestion={view.initialQuestion}
-          compact
-          placeholder="Ask about your trip"
-          className="mx-4 mb-3.5"
-        />
-      </Sheet>
+        </Sheet>
+      </SheetStage>
     </div>
   );
 }

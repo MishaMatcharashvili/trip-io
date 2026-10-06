@@ -61,11 +61,12 @@ export function BottomNav({
   menu?: React.ReactNode;
 }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex h-20 border-t border-hairline bg-surface px-2 pb-[22px] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 flex h-20 justify-center border-t border-hairline bg-surface px-2 pb-[22px] lg:hidden">
       {items.map((item) => {
         const on = item.label === active;
         const className = cx(
-          "relative flex flex-1 flex-col items-center gap-1 pt-2.5",
+          // Capped, so on a wide or landscape screen the tabs stay a thumb apart.
+          "relative flex max-w-[120px] flex-1 flex-col items-center gap-1 pt-2.5",
           on ? "text-agent" : "text-ink-faint",
         );
         const body = (

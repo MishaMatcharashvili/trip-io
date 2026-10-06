@@ -64,13 +64,13 @@ function FixtureAlert({ trip, alertId }: { trip: Trip; alertId: string }) {
         <Link
           href={`/trips/${trip.id}/alerts`}
           aria-label="Close"
-          className="text-ink-faint"
+          className="touch-target text-ink-faint"
         >
           <Icon name="close" size={16} />
         </Link>
       </div>
 
-      <main className="relative z-10 mt-[354px] flex flex-1 flex-col rounded-t-[20px] border-t border-hairline bg-surface shadow-sheet lg:mx-auto lg:mt-[300px] lg:w-[560px] lg:rounded-[20px] lg:border">
+      <main className="relative z-10 mt-[min(354px,42dvh)] flex flex-1 flex-col rounded-t-[20px] border-t border-hairline bg-surface shadow-sheet lg:mx-auto lg:mt-[300px] lg:w-[560px] lg:rounded-[20px] lg:border">
         <div className="flex justify-center pb-0.5 pt-2.5">
           <span
             aria-hidden="true"
@@ -135,7 +135,7 @@ function FixtureAlert({ trip, alertId }: { trip: Trip; alertId: string }) {
           >
             Apply new route
           </ButtonLink>
-          <div className="flex gap-2.5">
+          <div className="flex flex-col gap-2.5 min-[380px]:flex-row">
             <ButtonLink
               href={`/trips/${trip.id}/replan`}
               size="lg"

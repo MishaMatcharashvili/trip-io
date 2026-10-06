@@ -3,7 +3,7 @@ import { Button } from "@/ui/button";
 import { Divider, Panel } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
-import { Sheet } from "@/ui/sheet";
+import { Sheet, SheetStage } from "@/ui/sheet";
 import {
   COMMAND_BAR_FRAME,
   ITINERARY_FRAME,
@@ -152,41 +152,46 @@ export function MapSkeleton() {
           <span className="size-1.5 rounded-full bg-track" />
         </div>
 
-        <Sheet className="absolute inset-x-0 bottom-20 z-20">
-          <div className="flex items-start gap-2.5 px-4 pb-2.5 pt-1">
-            <div className="flex flex-1 flex-col gap-1.5">
-              {bar("h-[9px] w-[40px]")}
-              {bar("h-[15px] w-[180px]")}
+        <SheetStage>
+          <Sheet>
+            <div className="flex items-start gap-2.5 px-4 pb-2.5 pt-1">
+              <div className="flex flex-1 flex-col gap-1.5">
+                {bar("h-[9px] w-[40px]")}
+                {bar("h-[15px] w-[180px]")}
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                {bar("h-[11px] w-[40px]")}
+                {bar("h-[8px] w-[56px]")}
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-1.5">
-              {bar("h-[11px] w-[40px]")}
-              {bar("h-[8px] w-[56px]")}
+            <Divider className="mx-4" />
+            <div className="flex items-center gap-[11px] px-4 py-3 short:hidden">
+              <div className="w-10">{bar("h-[9px] w-[30px]")}</div>
+              <div className="flex flex-1 flex-col gap-1.5">
+                {bar("h-[11px] w-[150px]")}
+                {bar("h-[9px] w-[100px]")}
+              </div>
+              <Icon name="chevronRight" size={16} className="text-ink-faint" />
             </div>
-          </div>
-          <Divider className="mx-4" />
-          <div className="flex items-center gap-[11px] px-4 py-3">
-            <div className="w-10">{bar("h-[9px] w-[30px]")}</div>
-            <div className="flex flex-1 flex-col gap-1.5">
-              {bar("h-[11px] w-[150px]")}
-              {bar("h-[9px] w-[100px]")}
+            <div className="flex items-center gap-3 px-4 pb-2.5 short:hidden">
+              <div className="flex min-w-0 flex-1 gap-1.5 overflow-hidden">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="h-[42px] w-[44px] shrink-0 rounded-[10px] bg-track"
+                  />
+                ))}
+              </div>
+              <span className="shrink-0 text-mini font-medium text-agent">
+                Open day
+              </span>
             </div>
-            <Icon name="chevronRight" size={16} className="text-ink-faint" />
-          </div>
-          <div className="flex items-center gap-3 px-4 pb-2.5">
-            <div className="flex min-w-0 flex-1 gap-1.5 overflow-hidden">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className="h-[42px] w-[44px] shrink-0 rounded-[10px] bg-track"
-                />
-              ))}
-            </div>
-            <span className="shrink-0 text-mini font-medium text-agent">
-              Open day
-            </span>
-          </div>
-          <CommandBarShell compact className="mx-4 mb-3.5" />
-        </Sheet>
+            <CommandBarShell
+              compact
+              className="mx-4 mb-3.5 landscape-short:hidden"
+            />
+          </Sheet>
+        </SheetStage>
       </div>
     </div>
   );

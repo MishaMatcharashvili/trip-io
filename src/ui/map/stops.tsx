@@ -179,6 +179,33 @@ export function mountStops(
       markers.delete(key);
     }
     render(visible);
+    // The labels are in the DOM once React has committed, a beat after this.
+    setTimeout(fitLabels, 50);
+  };
+
+  /**
+   * A label runs to the right of its pin, so one near the map's right edge is
+   * cut off mid-letter. It is measured where it would sit and shortened to what
+   * is left, with an ellipsis; with almost nothing left it is not drawn.
+   */
+  const fitLabels = () => {
+    const edge = map.getContainer().getBoundingClientRect().right - 4;
+    const names: HTMLElement[] = [];
+    for (const el of pins.values()) {
+      const label = el.querySelector<HTMLElement>("[data-stop-label]");
+      if (label) names.push(label);
+    }
+    for (const label of names) {
+      label.style.maxWidth = "";
+      label.style.visibility = "";
+    }
+    for (const label of names) {
+      const { left, right } = label.getBoundingClientRect();
+      if (right <= edge) continue;
+      const room = edge - left;
+      if (room < 40) label.style.visibility = "hidden";
+      else label.style.maxWidth = `${Math.floor(room)}px`;
+    }
   };
 
   const onZoom = () => {
@@ -194,6 +221,7 @@ export function mountStops(
     }
   };
   map.on("zoom", onZoom);
+  map.on("idle", fitLabels);
 
   return {
     update(nextStops, nextSelected) {
@@ -212,6 +240,7 @@ export function mountStops(
     },
     remove() {
       map.off("zoom", onZoom);
+      map.off("idle", fitLabels);
       for (const marker of markers.values()) marker.remove();
       markers.clear();
       pins.clear();
@@ -289,7 +318,7 @@ function StopPin({
   const name = labelled ? (
     <span
       data-stop-label
-      className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap text-[12px] font-medium text-map-label-strong [text-shadow:0_0_3px_var(--color-map-ground),0_0_3px_var(--color-map-ground),0_0_6px_var(--color-map-ground)]"
+      className="pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-medium text-map-label-strong [text-shadow:0_0_3px_var(--color-map-ground),0_0_3px_var(--color-map-ground),0_0_6px_var(--color-map-ground)]"
     >
       {stop.label}
     </span>

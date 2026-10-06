@@ -158,7 +158,10 @@ export default async function TripsHome({ searchParams }: PageProps<"/">) {
         )}
 
         <div className="flex justify-center pt-2">
-          <Link href="/plans" className="text-small font-medium text-agent">
+          <Link
+            href="/plans"
+            className="touch-target text-small font-medium text-agent"
+          >
             Planning is free · see what watching costs
           </Link>
         </div>

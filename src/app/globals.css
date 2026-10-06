@@ -4,6 +4,30 @@
    manual choice in the theme switch wins over the system preference. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* Short screens — a small phone, or any phone on its side — where the map
+   screens drop their secondary rows so the one thing that matters stays on
+   screen. Landscape is its own variant so a portrait keyboard shrinking the
+   viewport never hides an input that has focus. */
+/* A control that draws smaller than a thumb still takes a 44px tap: the extra
+   area is an invisible pseudo-element centred on it, so nothing moves. */
+@utility touch-target {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+@custom-variant short (@media (max-height: 700px));
+@custom-variant landscape-short (@media (max-height: 500px) and (
+    orientation: landscape
+  ));
+
 /*
  * trip.io — "Mist" design tokens.
  *

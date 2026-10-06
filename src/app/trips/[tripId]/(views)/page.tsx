@@ -29,6 +29,7 @@ import {
   tripStops,
   weatherView,
 } from "@/features/trip-model";
+import { cx } from "@/ui/cx";
 import { type LoadedTrip, loadTrip, pickDay } from "../load";
 import { ActiveTripDesktop } from "./desktop";
 import { ActiveTripMobile } from "./mobile";
@@ -281,7 +282,18 @@ export default async function ActiveTripPage({
   return (
     // The bars are the layout's; the map is the canvas, and everything else
     // floats over it.
-    <div className="relative flex-1 overflow-hidden">
+    <div
+      className={cx(
+        // How much of the bottom the phone's sheet and tab bar take, which is
+        // where the map has to stop. It follows the sheet's own breakpoints
+        // in `mobile.tsx`: the day strip drops on short screens, and the whole
+        // sheet drops on a phone on its side when a decision is waiting.
+        "relative flex-1 overflow-hidden [--sheet-h:330px] short:[--sheet-h:210px]",
+        view.state === "advisory"
+          ? "landscape-short:[--sheet-h:80px]"
+          : "landscape-short:[--sheet-h:150px]",
+      )}
+    >
       <TripMapScreen
         stops={stops}
         events={events}

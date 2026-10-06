@@ -42,8 +42,9 @@ type Padding = { top: number; right: number; bottom: number; left: number };
 
 /**
  * Room left for the panels floating over the map, per layout. On a phone the
- * map ends where the itinerary sheet begins (330px), so Mapbox's
- * logo and attribution at the map's foot are never under it; desktop panels stop
+ * map ends where the itinerary sheet begins (`--sheet-h`, set by the screen
+ * that owns the sheet), so Mapbox's logo and attribution at the map's foot are
+ * never under it; desktop panels stop
  * 30px short of the bottom for the same reason.
  */
 const PADDING: Record<"desktop" | "mobile", Padding> = {
@@ -154,7 +155,7 @@ export function TripMapScreen({
           fitPadding={PADDING[layout]}
           className={
             layout === "mobile"
-              ? "absolute inset-x-0 top-0 bottom-[330px]"
+              ? "absolute inset-x-0 top-0 bottom-(--sheet-h)"
               : "absolute inset-0 size-full"
           }
         />
@@ -169,7 +170,7 @@ export function TripMapScreen({
       ) : null}
 
       {layout === "mobile" ? (
-        <div className="absolute bottom-[356px] right-3 z-20 flex max-w-[calc(100%-24px)] flex-col items-end gap-2 lg:hidden">
+        <div className="absolute bottom-[calc(var(--sheet-h)+26px)] right-3 z-20 flex max-w-[calc(100%-24px)] flex-col items-end gap-2 lg:hidden">
           <MapStyleSwitch variant="step" />
           {stops.length >= 2 && routeOpen ? (
             <Panel className="w-[264px] p-3">

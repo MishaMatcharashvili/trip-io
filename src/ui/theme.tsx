@@ -99,7 +99,7 @@ export function ThemeSegmented() {
   const [preference, set] = useThemePreference();
 
   return (
-    <fieldset className="flex gap-0.5 rounded-[10px] bg-track-pill p-[3px]">
+    <fieldset className="flex min-w-0 gap-0.5 rounded-[10px] bg-track-pill p-[3px]">
       <legend className="sr-only">Theme</legend>
       {options.map((option) => {
         const on = option.value === preference;
@@ -110,13 +110,13 @@ export function ThemeSegmented() {
             aria-pressed={on}
             onClick={() => set(option.value)}
             className={cx(
-              "flex h-[30px] items-center gap-1.5 rounded-control px-3 text-[13px] transition-colors",
+              "flex h-[30px] min-w-0 items-center justify-center gap-1.5 rounded-control px-2.5 text-[13px] transition-colors min-[400px]:px-3",
               on
                 ? "bg-surface font-medium text-ink shadow-card"
                 : "text-ink-muted hover:text-ink",
             )}
           >
-            <Icon name={option.icon} size={14} />
+            <Icon name={option.icon} size={14} className="max-[399px]:hidden" />
             {option.label}
           </button>
         );

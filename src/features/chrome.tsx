@@ -16,7 +16,10 @@ export function Brand({
   className?: string;
 }) {
   return (
-    <Link href="/" className={cx("flex items-center gap-[9px]", className)}>
+    <Link
+      href="/"
+      className={cx("touch-target flex items-center gap-[9px]", className)}
+    >
       <Icon name="signal" size={size} className="text-agent" />
       <span className="text-[16px] font-bold tracking-[-0.035em]">trip.io</span>
     </Link>
@@ -217,7 +220,7 @@ export function MobileTitleBar({
           <Link
             href={back}
             aria-label="Back"
-            className="-ml-1 p-1 text-ink-muted"
+            className="touch-target -ml-1 p-1 text-ink-muted"
           >
             <Icon name="chevronLeft" size={20} strokeWidth={1.7} />
           </Link>

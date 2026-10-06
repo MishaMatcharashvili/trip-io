@@ -7,7 +7,7 @@ export default function Loading() {
   return (
     <SheetScreenSkeleton
       mapHeight="h-[420px]"
-      sheetTop="mt-[354px] lg:mt-[300px]"
+      sheetTop="mt-[min(354px,42dvh)] lg:mt-[300px]"
     />
   );
 }
