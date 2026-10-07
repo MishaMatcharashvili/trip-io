@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
+import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
 import { submitSurvey } from "@/bll/survey.ts";
@@ -30,6 +31,11 @@ import {
 import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
+import {
+  INTAKE_MAX_TURNS,
+  intakeMessage,
+  intakeState,
+} from "@/domain/trip/generate/intake.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
@@ -117,6 +123,39 @@ export const trips = new Hono<SessionEnv>()
       { id: await createTrip(c.req.valid("json").trip, c.get("userId")) },
       201,
     ),
+  )
+
+  // One turn of the conversation on /new (src/bll/intake.ts): the request as
+  // it stands and the messages so far in, a reply and the request as it now
+  // stands out. Builds nothing.
+  .post(
+    "/intake",
+    zValidator(
+      "json",
+      z.object({
+        state: intakeState,
+        messages: z
+          .array(intakeMessage)
+          .min(1)
+          .max(INTAKE_MAX_TURNS * 2)
+          .refine((m) => m[m.length - 1]?.role === "traveller", {
+            message: "the last message must be the traveller's",
+          })
+          .refine(
+            (m) =>
+              m.filter((x) => x.role === "traveller").length <=
+              INTAKE_MAX_TURNS,
+            { message: "too many turns" },
+          ),
+      }),
+    ),
+    async (c) => {
+      const { state, messages } = c.req.valid("json");
+      const turn = await planningTurn(c.get("userId"), state, messages);
+      return turn.ok
+        ? c.json(turn)
+        : c.json({ ok: false as const, reason: turn.reason }, 429);
+    },
   )
 
   // Constraints in, a validated trip out (src/bll/trip-generation.ts).
