@@ -95,7 +95,10 @@ function readDays(text: string): number | null {
 /** A start date: "2026-10-12", "12 October", "Oct 12", "in October", "next week". */
 function readStart(text: string, today: string): string | null {
   const iso = text.match(/\b(20\d\d-\d\d-\d\d)\b/);
-  if (iso) return iso[1];
+  // A date already gone, or one that is not a date, is no start date.
+  if (iso) {
+    return iso[1] >= today && !Number.isNaN(Date.parse(iso[1])) ? iso[1] : null;
+  }
 
   const [year] = today.split("-").map(Number);
   const on = (month: number, day: number) => {

@@ -1,10 +1,7 @@
+import { AREA_LABELS } from "@/domain/trip/generate/intake";
+
 /** Focus areas and interests as the traveller reads them. */
-export const areaNames: Record<string, string> = {
-  "tbilisi-core": "Tbilisi",
-  "kazbegi-corridor": "Kazbegi",
-  kakheti: "Kakheti",
-  svaneti: "Svaneti",
-};
+export const areaNames: Record<string, string> = AREA_LABELS;
 
 export const interestNames: Record<string, string> = {
   heritage: "Heritage",

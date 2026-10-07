@@ -21,6 +21,15 @@ describe("understand", () => {
     assert.ok(constraints.safeParse(c).success);
   });
 
+  test("a start date already past is not a start date", () => {
+    const { constraints: c, said } = understand(
+      "5 days from 2020-01-01",
+      TODAY,
+    );
+    assert.ok(!said.includes("startDate"));
+    assert.ok(c.startDate > TODAY);
+  });
+
   test("areas from place names and what they are known for", () => {
     const { constraints: c } = understand(
       "Long weekend in Kakheti with my partner, lots of wine",
