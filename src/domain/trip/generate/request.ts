@@ -4,10 +4,11 @@ import type { Constraints, Interest } from "./constraints.ts";
 import { addDays } from "./schedule.ts";
 
 // "7 days in Georgia, €700, nature and monasteries, with my father" → the
-// constraints generation runs on. Deterministic on purpose: no model call to
-// read a sentence the traveller then corrects on screen anyway, and every rule
-// here is a test. What the words did not say is filled with a default and
-// reported as assumed, so the screen can say "assumed" rather than pretend.
+// constraints generation runs on. Deterministic, and every rule here is a
+// test. On /new the planner is a model (intake.ts); this is what takes its turn
+// when the model cannot, and where a conversation's defaults come from. What
+// the words did not say is filled with a default and reported as assumed, so
+// the screen can say "assumed" rather than pretend.
 
 export type Understood = {
   constraints: Constraints;
