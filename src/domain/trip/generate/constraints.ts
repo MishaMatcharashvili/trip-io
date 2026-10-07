@@ -10,6 +10,8 @@ import { paces } from "../document.ts";
 export const interests = ["heritage", "nature", "culture", "food"] as const;
 export type Interest = (typeof interests)[number];
 
+export const NOTES_MAX_CHARS = 500;
+
 export const constraints = z.object({
   startDate: z.iso.date(),
   days: z.number().int().min(1).max(21),
@@ -23,6 +25,11 @@ export const constraints = z.object({
   mobility: z.enum(["low", "moderate", "high"]),
   /** Excluding flights, for the whole party and the whole trip. */
   budgetEur: z.number().int().min(0).max(100_000),
+  /**
+   * The traveller's wishes the fields above cannot hold ("vegetarian", "no
+   * long drives"), in their own words, for the composer.
+   */
+  notes: z.string().max(NOTES_MAX_CHARS).default(""),
 });
 export type Constraints = z.infer<typeof constraints>;
 
@@ -30,7 +37,7 @@ export type Constraints = z.infer<typeof constraints>;
  * Bumped whenever the prompt or the plan schema changes, so cached plans from
  * an older prompt are never served.
  */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 const partyKind = ({ adults, children }: Constraints["party"]) =>
   children > 0
@@ -63,6 +70,9 @@ export function cacheKey(c: Constraints): string {
     mobility: c.mobility,
     month: Number(c.startDate.slice(5, 7)),
     budget: budgetBand(c),
+    // Wishes change which places suit, so a plan composed for other wishes
+    // is never served for these.
+    notes: c.notes.trim().toLowerCase().replace(/\s+/g, " "),
   };
   return createHash("sha256").update(JSON.stringify(shape)).digest("hex");
 }

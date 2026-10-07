@@ -249,6 +249,7 @@ export function understand(text: string, today: string): Understood {
       100_000,
       pick("budgetEur", readBudget(text), 90 * clampedDays * people),
     ),
+    notes: "",
   };
   return { constraints, said };
 }
