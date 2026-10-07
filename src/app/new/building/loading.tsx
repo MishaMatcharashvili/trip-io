@@ -20,7 +20,7 @@ export default function Loading() {
       <header className="relative z-10 flex h-[58px] shrink-0 items-center gap-2.5 px-6">
         <Brand />
         <div className="flex-1" />
-        <ButtonLink href="/#plan" variant="ghost">
+        <ButtonLink href="/new" variant="ghost">
           Cancel
         </ButtonLink>
       </header>
