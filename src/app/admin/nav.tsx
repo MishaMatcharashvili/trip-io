@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "./actions";
 
 const TABS = [
   { href: "/admin", label: "Overview" },
@@ -34,6 +35,14 @@ export function AdminNav() {
           </Link>
         );
       })}
+      <form action={logout} className="ml-auto">
+        <button
+          type="submit"
+          className="rounded-full px-3 py-1 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+        >
+          Sign out
+        </button>
+      </form>
     </nav>
   );
 }
