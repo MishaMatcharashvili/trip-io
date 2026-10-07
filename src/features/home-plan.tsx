@@ -36,9 +36,10 @@ export function HomePlan({
         {heading ??
           (hasTrips ? "Plan another trip" : "Where do you want to go?")}
       </SectionRule>
-      <Card className="flex w-full flex-col gap-3 rounded-[16px] p-3 shadow-lifted lg:p-4">
+      {/* The suggestions sit to the right of the box; a phone has no right, so they follow it. */}
+      <Card className="flex w-full flex-col gap-3 rounded-[16px] p-3 shadow-lifted lg:flex-row lg:items-start lg:gap-5 lg:p-4">
         <form
-          className="flex items-center gap-3"
+          className="flex min-w-0 flex-1 items-center gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             start(text);
@@ -65,7 +66,7 @@ export function HomePlan({
             <Icon name="arrowRight" size={15} strokeWidth={1.8} />
           </button>
         </form>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 lg:w-[300px] lg:shrink-0 lg:flex-col lg:flex-nowrap lg:items-start lg:border-l lg:border-hairline lg:pl-5">
           {composerExamples.map((example) => (
             <button key={example} type="button" onClick={() => start(example)}>
               <Chip className="h-auto min-h-7 cursor-pointer rounded-2xl py-1 text-left hover:border-control">
