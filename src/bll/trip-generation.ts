@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { candidatesInArea } from "../dal/places.ts";
 import { planCache, recordGeneration } from "../dal/plans.ts";
-import { destination } from "../domain/catalogue/destinations.ts";
+import {
+  destination,
+  destinationName,
+} from "../domain/catalogue/destinations.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
 import {
   CANDIDATE_LIMIT,
@@ -12,6 +15,7 @@ import {
   type Constraints,
   cacheKey,
 } from "../domain/trip/generate/constraints.ts";
+import { assess, reasons } from "../domain/trip/generate/feasibility.ts";
 import {
   type Attempt,
   type Composer,
@@ -78,9 +82,56 @@ export type GeneratedTrip = {
 };
 
 export type GenerationFailure =
-  | { ok: false; reason: "insufficient-coverage"; attempts: Attempt[] }
+  /** The request cannot be done, whatever places there are. No plan was attempted. */
+  | { ok: false; reason: "impossible"; explanations: string[] }
+  | {
+      ok: false;
+      reason: "insufficient-coverage";
+      attempts: Attempt[];
+      explanations: string[];
+    }
   /** The plan validated on the way out and not on the way in: a bug, not an input problem. */
   | { ok: false; reason: "rejected"; failure: AppendFailure };
+
+const listed = (names: string[]) =>
+  names.length > 1
+    ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+    : (names[0] ?? "");
+
+/** Scheduler and validator problems carry their day; the route's do not. */
+const DATED = /^\d{4}-\d\d-\d\d: /;
+
+/**
+ * Why no plan came out, for the traveller: which places have nothing to visit,
+ * or what the last attempt could not fit. A failure is explained in terms of
+ * what they asked for, never as "something went wrong".
+ */
+function explain(
+  wanted: Constraints,
+  failed: { attempts: Attempt[]; uncovered: string[] },
+): string[] {
+  if (failed.uncovered.length) {
+    const names = listed(failed.uncovered.map(destinationName));
+    return [
+      `I don’t have checked places to visit in ${names} yet, so I can’t plan a day there. Take ${failed.uncovered.length === 1 ? "it" : "them"} out, or choose somewhere nearby.`,
+    ];
+  }
+  const last = failed.attempts.findLast((a) => a.problems.length > 0);
+  const route = last?.problems.filter((p) => !DATED.test(p)) ?? [];
+  if (route.length) {
+    return [
+      `I couldn’t fit ${listed([...new Set(wanted.places)].map(destinationName))} into ${wanted.days} ${wanted.days === 1 ? "day" : "days"}: ${route.join("; ")}. Add a day, or take a place out.`,
+    ];
+  }
+  const days = (last?.problems ?? [])
+    .slice(0, 3)
+    .map((p) => p.replace(DATED, ""));
+  return [
+    days.length
+      ? `I couldn’t build days that hold together for this trip: ${days.join("; ")}. Try other dates or a slower pace.`
+      : "There aren’t enough checked places for this trip yet. Try other places, or fewer days.",
+  ];
+}
 
 /**
  * Constraints in, a saved trip out: retrieve candidates, run the pipeline, mint
@@ -96,6 +147,15 @@ export async function generateTrip(
   { compose = composeWithOpenAI }: { compose?: Composer } = {},
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
+
+  // The screen judged the request before sending it; this is the same
+  // judgement again, because the screen is not what decides.
+  const verdict = assess(wanted);
+  if (!verdict.possible) {
+    await recordGeneration(null, key, "failed", []);
+    return { ok: false, reason: "impossible", explanations: reasons(verdict) };
+  }
+
   const result = await generate(wanted, {
     compose,
     cache: planCache,
@@ -111,6 +171,7 @@ export async function generateTrip(
       ok: false,
       reason: "insufficient-coverage",
       attempts: result.attempts,
+      explanations: explain(wanted, result),
     };
   }
 

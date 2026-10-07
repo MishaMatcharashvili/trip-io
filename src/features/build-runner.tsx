@@ -18,27 +18,37 @@ export type BuildStep = { title: string; note: string };
 
 type State =
   | { kind: "running"; step: number }
-  | { kind: "failed"; message: string };
+  | { kind: "failed"; reasons: string[] };
+
+/** A trip that could not be built, and each reason why. */
+class BuildFailure extends Error {
+  constructor(readonly reasons: string[]) {
+    super(reasons.join(" "));
+  }
+}
 
 async function generate(constraints: Constraints) {
   const call = () => apiClient.api.trips.generate.$post({ json: constraints });
   let res = await call();
   if ((res.status as number) === 401) {
     const { error } = await authClient.signIn.anonymous();
-    if (error) throw new Error("Couldn’t start a session to plan in.");
+    if (error) throw new BuildFailure(["Couldn’t start a session to plan in."]);
     res = await call();
   }
   const body = (await res.json().catch(() => null)) as {
     id?: string;
     error?: string;
     message?: string;
+    explanations?: string[];
   } | null;
   if (res.ok && body?.id) return body.id;
-  throw new Error(
-    body?.message ??
-      (body?.error === "insufficient-coverage"
-        ? "There aren’t enough places in those areas yet to build a trip."
-        : "The trip couldn’t be built. Try again, or change what you asked for."),
+  throw new BuildFailure(
+    body?.explanations?.length
+      ? body.explanations
+      : [
+          body?.message ??
+            "The trip couldn’t be built. Try again, or change what you asked for.",
+        ],
   );
 }
 
@@ -75,7 +85,11 @@ export function BuildRunner({
       })
       .catch((error: Error) => {
         clearInterval(clock);
-        setState({ kind: "failed", message: error.message });
+        setState({
+          kind: "failed",
+          reasons:
+            error instanceof BuildFailure ? error.reasons : [error.message],
+        });
       });
     return () => clearInterval(clock);
   }, [constraints, steps.length, router]);
@@ -139,8 +153,18 @@ export function BuildRunner({
       </div>
 
       {state.kind === "failed" ? (
-        <div className="mx-6 mb-6 flex flex-col gap-3 rounded-control bg-alert-tint px-3.5 py-3">
-          <span className="text-small text-alert">{state.message}</span>
+        <div
+          role="alert"
+          className="mx-6 mb-6 flex flex-col gap-3 rounded-control border border-alert/30 bg-alert/10 px-3.5 py-3"
+        >
+          <span className="text-small font-semibold text-alert">
+            This trip can’t be built as asked
+          </span>
+          {state.reasons.map((reason) => (
+            <span key={reason} className="text-small text-ink">
+              {reason}
+            </span>
+          ))}
           <div>
             <ButtonLink href="/#plan" size="sm">
               Change what I asked for
