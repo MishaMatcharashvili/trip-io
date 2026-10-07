@@ -184,7 +184,7 @@ export default async function PlansPage() {
                 ))}
               </div>
             ) : (
-              <ButtonLink href="/#plan" variant="primary" block size="lg">
+              <ButtonLink href="/new" variant="primary" block size="lg">
                 {session ? "Plan a trip to watch" : "Plan your first trip"}
               </ButtonLink>
             )}

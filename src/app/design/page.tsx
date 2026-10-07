@@ -128,7 +128,7 @@ const iconNames: IconName[] = [
 
 const screens = [
   ["Trips — home", "/"],
-  ["New trip", "/#plan"],
+  ["New trip", "/new"],
   ["Building your trip", "/new/building"],
   ["Active trip — map", "/trips/georgia"],
   ["State · nothing to report", "/trips/georgia?state=calm"],

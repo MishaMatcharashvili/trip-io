@@ -1,6 +1,5 @@
 import { HomePlan } from "@/features/home-plan";
 import { PageColumn } from "@/features/page-column";
-import { tbilisiToday } from "@/features/shared-reads";
 import { SiteFrame } from "@/features/site-frame";
 import { Card } from "@/ui/card";
 import { HomeHeading } from "./home-heading";
@@ -11,10 +10,9 @@ const bar = (className: string) => (
 
 // The landing page's loading state, and the fallback for any route without its
 // own (a test says none is left to use it). The frame and the heading are the
-// page's components, the card is where the trip will be, and the composer is the
+// page's components, the card is where the trip will be, and the prompt is the
 // page's own — it is the one part that does not depend on whose trips there are.
-export default async function Loading() {
-  const today = await tbilisiToday();
+export default function Loading() {
   return (
     <SiteFrame active="Trips" tab="Trips">
       <PageColumn>
@@ -37,7 +35,7 @@ export default async function Loading() {
             <div className="h-[38px] w-[200px] rounded-control bg-track" />
           </div>
         </Card>
-        <HomePlan today={today} hasTrips heading={bar("h-[9px] w-[120px]")} />
+        <HomePlan hasTrips heading={bar("h-[9px] w-[120px]")} />
       </PageColumn>
     </SiteFrame>
   );

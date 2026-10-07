@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { focusAreas } from "@/domain/catalogue/focus-areas";
-// Types only: constraints.ts hashes with node:crypto, which has no place in
-// the browser bundle.
 import type { Constraints, Interest } from "@/domain/trip/generate/constraints";
 import { Card } from "@/ui/card";
 import { cx } from "@/ui/cx";

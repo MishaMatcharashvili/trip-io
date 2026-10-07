@@ -1,6 +1,13 @@
 import type { Constraints } from "@/domain/trip/generate/constraints";
 
-// What /new and /new/building pass between them in the browser.
+// What the landing page, /new and /new/building share in the browser.
+
+/** Sentences to start from, on the landing page's prompt and on /new. */
+export const composerExamples = [
+  "7 days in Georgia, €700, nature and monasteries",
+  "Long weekend in Kakheti with my partner",
+  "Four days walking in Svaneti, moderate pace",
+];
 
 /** Constraints as a URL-safe token for /new/building. */
 export function encodeConstraints(c: Constraints): string {

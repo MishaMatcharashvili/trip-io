@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { INTAKE_MAX_CHARS } from "@/domain/trip/generate/intake";
-import { composerExamples } from "@/features/home-plan";
+import { composerExamples } from "@/features/new-trip";
 import { PageColumn } from "@/features/page-column";
 import { tbilisiToday } from "@/features/shared-reads";
 import { SiteFrame } from "@/features/site-frame";
