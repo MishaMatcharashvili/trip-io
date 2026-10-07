@@ -1,8 +1,10 @@
-import { destinationName } from "../../catalogue/destinations.ts";
+import { destination, destinationName } from "../../catalogue/destinations.ts";
 import { haversineM, type LonLat } from "../../geo.ts";
 import type { Pace } from "../document.ts";
+import { straightLineTravel } from "../travel.ts";
 import type { Constraints } from "./constraints.ts";
 import type { Candidate, Plan, PlanDay, PlanStop, Slot } from "./plan.ts";
+import { DAY_START, SLOT_WINDOW } from "./schedule.ts";
 
 // The plan of last resort, when the model has failed twice. No model, no
 // hand-authored templates (curated place ids differ between databases): a
@@ -58,6 +60,9 @@ const LONG_VISIT_MIN = 90;
 const STAY_RADIUS_M = 15_000;
 
 const byId = (a: Candidate, b: Candidate) => (a.id < b.id ? -1 : 1);
+
+const minutesOf = (hhmm: string) =>
+  Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
 /**
  * Days per area, in the traveller's order, in proportion to how much there is
@@ -132,13 +137,27 @@ export function fallbackPlan(
         byId(a, b),
     )[0];
 
+  const whereabouts = (area: string) =>
+    stayFor.get(area)?.lonLat ?? destination(area)?.lonLat ?? null;
+
   const days: PlanDay[] = dayAreas.map((area, i) => {
     const stay = stayFor.get(area);
     let here: LonLat | null = stay?.lonLat ?? null;
     const stops: PlanStop[] = [];
     const shape = DAY_SHAPE[c.pace];
 
+    // The day the trip moves on starts with the drive, and whatever part of
+    // the day the drive takes has no stops in it: arriving at three leaves the
+    // afternoon and dinner, not a morning walk.
+    const from =
+      i > 0 && dayAreas[i - 1] !== area ? whereabouts(dayAreas[i - 1]) : null;
+    const to = whereabouts(area);
+    const arrives =
+      minutesOf(DAY_START[c.pace]) +
+      (from && to ? straightLineTravel.minutes(from, to) : 0);
+
     for (const [index, [slot, kind]] of shape.entries()) {
+      if (minutesOf(SLOT_WINDOW[slot][1]) < arrives) continue;
       const previous = stops.at(-1);
       if (
         kind === "visit" &&

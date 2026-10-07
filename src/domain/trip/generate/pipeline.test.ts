@@ -10,6 +10,7 @@ import {
   candidateRefs,
   generate,
   type PlanCache,
+  routeProblems,
 } from "./pipeline.ts";
 import type { Candidate, Plan, RefPlan } from "./plan.ts";
 
@@ -233,6 +234,116 @@ describe("generate", () => {
     assert.ok(result.ok);
     assert.equal(result.source, "model");
     assert.ok(cache.calls.includes("drop"));
+  });
+});
+
+// Two places a day's drive apart, each with a bed, a table and things to see.
+const somewhere = (
+  slug: string,
+  n: number,
+  group: Candidate["group"],
+  lonLat: [number, number],
+) =>
+  ({
+    ...(candidates.get(P.gergeti) as Candidate),
+    id: `20000000-0000-4000-8000-0000000${slug === "tbilisi" ? "a" : "b"}00${n}`,
+    name: `${slug} ${group} ${n}`,
+    category: group,
+    group,
+    lonLat,
+    openingHours: null,
+    outdoor: false,
+    area: slug,
+    areas: [slug],
+  }) satisfies Candidate;
+const town = (slug: string, lon: number, lat: number) => [
+  somewhere(slug, 1, "lodging", [lon, lat]),
+  somewhere(slug, 2, "heritage", [lon + 0.002, lat]),
+  somewhere(slug, 3, "heritage", [lon + 0.004, lat]),
+  somewhere(slug, 4, "culture", [lon + 0.006, lat]),
+  somewhere(slug, 5, "food", [lon + 0.003, lat]),
+];
+const acrossGeorgia = [
+  ...town("tbilisi", 44.8, 41.695),
+  ...town("mestia", 42.72, 43.045),
+];
+const down: Composer = async () => {
+  throw new Error("down");
+};
+
+describe("the route", () => {
+  const route: Constraints = { ...constraints, places: ["tbilisi", "mestia"] };
+
+  test("a plan that leaves a place out says which", () => {
+    const plan = fallbackPlan({ ...route, places: ["tbilisi"] }, acrossGeorgia);
+    const problems = routeProblems(
+      plan,
+      route.places,
+      new Map(acrossGeorgia.map((p) => [p.id, p])),
+    );
+    assert.equal(problems.length, 2);
+    assert.match(problems[0], /Mestia is on the route/);
+    assert.match(problems[1], /finishes in Mestia/);
+  });
+
+  test("the model's plan is rejected until every place is in it", async () => {
+    const { toRef } = candidateRefs(acrossGeorgia);
+    const stop = (id: string, slot: "morning" | "afternoon") => ({
+      ref: toRef.get(id) as string,
+      slot,
+      kind: "visit" as const,
+      durationMin: 60,
+    });
+    const [bed, church] = acrossGeorgia;
+    const onlyTbilisi: RefPlan = {
+      days: [1, 2].map((day) => ({
+        day,
+        theme: "Tbilisi",
+        stayRef: toRef.get(bed.id) as string,
+        stops: [stop(acrossGeorgia[day].id, "morning")],
+      })),
+    };
+    assert.equal(church.areas[0], "tbilisi");
+    const { compose, seen } = scripted(onlyTbilisi, new Error("down"));
+    const result = await generate(route, {
+      ...deps(compose),
+      candidates: acrossGeorgia,
+    });
+    assert.ok(seen[1]?.problems.some((p) => /Mestia is on the route/.test(p)));
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    assert.equal(result.source, "template");
+  });
+
+  test("the fallback starts at the start, ends at the finish, and drives first", async () => {
+    const result = await generate(route, {
+      ...deps(down),
+      candidates: acrossGeorgia,
+    });
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    const [first, last] = result.plan.days;
+    const areaOf = (id: string) => acrossGeorgia.find((p) => p.id === id)?.area;
+    assert.ok(first.stops.every((s) => areaOf(s.placeId) === "tbilisi"));
+    assert.ok(last.stops.every((s) => areaOf(s.placeId) === "mestia"));
+    // Six and a half hours on the road: nothing before the afternoon.
+    assert.ok(last.stops.length > 0);
+    assert.ok(
+      last.stops.every((s) => s.slot === "afternoon" || s.slot === "evening"),
+    );
+    assert.ok(
+      Object.values(result.doc.nodes).some((n) => n.kind === "transfer"),
+    );
+  });
+
+  test("a place with nothing to visit is named, before any model call", async () => {
+    const result = await generate(route, {
+      ...deps(down),
+      candidates: acrossGeorgia.filter(
+        (p) => p.area === "tbilisi" || p.group === "lodging",
+      ),
+    });
+    assert.ok(!result.ok);
+    assert.deepEqual(result.uncovered, ["mestia"]);
+    assert.deepEqual(result.attempts, []);
   });
 });
 
