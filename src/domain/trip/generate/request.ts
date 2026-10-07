@@ -1,4 +1,8 @@
-import { MAX_PLACES, mentions } from "../../catalogue/destinations.ts";
+import {
+  MAX_PLACES,
+  mentions,
+  unreachable,
+} from "../../catalogue/destinations.ts";
 import type { Pace } from "../document.ts";
 import type { Constraints, Interest } from "./constraints.ts";
 import { addDays } from "./schedule.ts";
@@ -13,6 +17,8 @@ export type Understood = {
   constraints: Constraints;
   /** Fields the words actually said, as opposed to defaults. */
   said: (keyof Constraints)[];
+  /** Places the words asked for that no trip can include, and why. */
+  refused: { name: string; why: string }[];
 };
 
 const MONTHS = [
@@ -61,15 +67,39 @@ const PLACE_HINTS: [string, RegExp][] = [
   ["batumi", /\b(beach(es)?|sea)\b/i],
 ];
 
-/** The places named, in order; a name said twice running is said once. */
+const STARTS =
+  /\b(from|start(s|ing)? (in|from|at)|begin(s|ning)? (in|at)|arriv(e|ing) in|land(ing)? in|fly(ing)? into)$/;
+const FINISHES =
+  /\b(end(s|ing)? (in|at)|finish(es|ing)? (in|at)|back to|return(ing)? to|fly(ing)? out of|leav(e|ing) from)$/;
+const ROUND_TRIP = /\b(round[- ]trip|and back|there and back|loop)\b/i;
+
+/**
+ * The route: the places named, in the order they will be travelled. That is
+ * the order they are said in, unless the sentence says otherwise — "Kazbegi
+ * and Kakheti, starting in Tbilisi" starts in Tbilisi, and "from Batumi to
+ * Tbilisi via Kutaisi" ends there. A name said twice running is said once.
+ */
 function readPlaces(text: string): string[] | null {
-  const named = mentions(text)
-    .map((m) => m.slug)
+  const named = mentions(text);
+  if (named.length === 0) {
+    const hinted = PLACE_HINTS.filter(([, re]) => re.test(text)).map(
+      ([slug]) => slug,
+    );
+    return hinted.length ? hinted : null;
+  }
+
+  const start = named.find((m) => STARTS.test(m.before));
+  const finish =
+    named.findLast((m) => m !== start && FINISHES.test(m.before)) ??
+    // "from A to B": B is where it ends, whatever is named after it.
+    (start && named.find((m) => m !== start && /\bto$/.test(m.before)));
+  const between = named.filter((m) => m !== start && m !== finish);
+  const route = [start, ...between, finish]
+    .flatMap((m) => m?.slug ?? [])
     .filter((slug, i, all) => slug !== all[i - 1]);
-  const places = named.length
-    ? named
-    : PLACE_HINTS.filter(([, re]) => re.test(text)).map(([slug]) => slug);
-  return places.length ? places.slice(0, MAX_PLACES) : null;
+
+  if (ROUND_TRIP.test(text) && route.at(-1) !== route[0]) route.push(route[0]);
+  return route.slice(0, MAX_PLACES);
 }
 
 const INTEREST_WORDS: [Interest, RegExp][] = [
@@ -255,5 +285,5 @@ export function understand(text: string, today: string): Understood {
       pick("budgetEur", readBudget(text), 90 * clampedDays * people),
     ),
   };
-  return { constraints, said };
+  return { constraints, said, refused: unreachable(text) };
 }

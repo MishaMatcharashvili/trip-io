@@ -42,6 +42,45 @@ describe("understand", () => {
     assert.ok(constraints.safeParse(c).success);
   });
 
+  test("the start and the finish, when the sentence names them", () => {
+    const route = (text: string) => understand(text, TODAY).constraints.places;
+    assert.deepEqual(route("From Batumi to Tbilisi via Kutaisi"), [
+      "batumi",
+      "kutaisi",
+      "tbilisi",
+    ]);
+    assert.deepEqual(route("Kazbegi and Kakheti, starting in Tbilisi"), [
+      "tbilisi",
+      "kazbegi",
+      "kakheti",
+    ]);
+    assert.deepEqual(route("Borjomi, Vardzia, finishing in Batumi, 5 days"), [
+      "borjomi",
+      "vardzia",
+      "batumi",
+    ]);
+  });
+
+  test("a round trip names its start again at the end", () => {
+    const route = (text: string) => understand(text, TODAY).constraints.places;
+    assert.deepEqual(route("Tbilisi, Kazbegi and back to Tbilisi"), [
+      "tbilisi",
+      "kazbegi",
+      "tbilisi",
+    ]);
+    assert.deepEqual(route("round trip from Tbilisi to Svaneti"), [
+      "tbilisi",
+      "svaneti",
+      "tbilisi",
+    ]);
+  });
+
+  test("a place no trip can reach is refused, with the reason", () => {
+    const { refused } = understand("Tbilisi and Sukhumi, 4 days", TODAY);
+    assert.equal(refused.length, 1);
+    assert.equal(refused[0].name, "Sukhumi");
+  });
+
   test("what a place is known for, only when no place is named", () => {
     assert.deepEqual(understand("wine tasting", TODAY).constraints.places, [
       "kakheti",
