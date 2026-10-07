@@ -8,6 +8,7 @@ import { SiteFrame } from "@/features/site-frame";
 import { ButtonLink } from "@/ui/button";
 import { Panel } from "@/ui/card";
 import { Dot } from "@/ui/dot";
+import { Icon } from "@/ui/icon";
 import { Eyebrow, Prose, Title } from "@/ui/text";
 
 export const metadata: Metadata = { title: "Explore" };
