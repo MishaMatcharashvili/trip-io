@@ -6,6 +6,7 @@ import {
 } from "@/domain/trip/generate/constraints";
 import { BuildRunner, type BuildStep } from "@/features/build-runner";
 import { Brand } from "@/features/chrome";
+import { areaNames } from "@/features/constraint-labels";
 import { SkeletonLine } from "@/ui/bars";
 import { ButtonLink } from "@/ui/button";
 import { Card, Panel, SectionRule } from "@/ui/card";
@@ -199,13 +200,6 @@ function ReferenceBuilding() {
     </div>
   );
 }
-
-const areaNames: Record<string, string> = {
-  "tbilisi-core": "Tbilisi",
-  "kazbegi-corridor": "Kazbegi",
-  kakheti: "Kakheti",
-  svaneti: "Svaneti",
-};
 
 const WORDS = [
   "",
