@@ -141,7 +141,7 @@ function Browser({
           ) : null}
         </label>
 
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="-mx-4 -my-2.5 flex gap-1.5 overflow-x-auto overflow-y-hidden px-4 py-2.5 [scrollbar-width:none]">
           <FilterChip selected={area === null} onClick={() => setArea(null)}>
             All Georgia
             <span className={area === null ? "opacity-70" : "text-ink-faint"}>
@@ -164,7 +164,7 @@ function Browser({
           ))}
         </div>
 
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="-mx-4 -my-2.5 flex gap-1.5 overflow-x-auto overflow-y-hidden px-4 py-2.5 [scrollbar-width:none]">
           <FilterChip
             size="sm"
             selected={group === null}
