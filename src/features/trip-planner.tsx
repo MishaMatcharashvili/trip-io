@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { unreachable } from "@/domain/catalogue/destinations";
 import type { Constraints } from "@/domain/trip/generate/constraints";
 import { assess } from "@/domain/trip/generate/feasibility";
 import {
@@ -19,6 +20,7 @@ import { Card } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
+import { Eyebrow } from "@/ui/text";
 import { ConstraintCards } from "./constraint-cards";
 import {
   encodeConstraints,
@@ -37,6 +39,8 @@ type Conversation = {
   state: IntakeState;
   /** The planner has nothing left to ask. */
   ready: boolean;
+  /** Places asked for that no trip can go to: the Place card is red while any stand. */
+  unsupported?: string[];
 };
 
 type Reply = {
@@ -44,6 +48,7 @@ type Reply = {
   reply: string;
   state: IntakeState;
   ready: boolean;
+  unsupported: string[];
 };
 
 const OPENING =
@@ -105,11 +110,25 @@ export function TripPlanner({
   const started = useRef(false);
   const end = useRef<HTMLDivElement>(null);
 
-  const { messages, state, ready } = conversation;
+  const { messages, state, ready, unsupported } = conversation;
   const turns = messages.filter((m) => m.role === "traveller").length;
   const talkedOut = turns >= INTAKE_MAX_TURNS;
   const answered = messages.some((m) => m.role === "planner");
-  const verdict = useMemo(() => assess(state.constraints), [state.constraints]);
+  // A place the planner could not take is a reason the trip cannot be done as
+  // asked, with the reason said when it is a known one.
+  const verdict = useMemo(
+    () =>
+      assess(
+        state.constraints,
+        (unsupported ?? []).map((name) => ({
+          name,
+          why:
+            unreachable(name)[0]?.why ??
+            "it is not somewhere a trip inside Georgia can go",
+        })),
+      ),
+    [state.constraints, unsupported],
+  );
 
   const update = (next: Conversation) => {
     setConversation(next);
@@ -133,6 +152,7 @@ export function TripPlanner({
         messages: [...asked, { role: "planner", text: turn.reply }],
         state: turn.state,
         ready: turn.ready,
+        unsupported: turn.unsupported,
       });
     } catch (e) {
       // Unsent: the words go back in the box rather than into a transcript
@@ -167,8 +187,14 @@ export function TripPlanner({
     if (messages.length) end.current?.scrollIntoView({ block: "nearest" });
   }, [messages.length, waiting]);
 
+  // Choosing the places by hand settles them: what was refused is no longer
+  // being asked for.
   const edit = (patch: Partial<Constraints>) =>
-    update({ ...conversation, state: applyEdit(state, patch) });
+    update({
+      ...conversation,
+      state: applyEdit(state, patch),
+      unsupported: "places" in patch ? [] : unsupported,
+    });
 
   const build = () =>
     verdict.possible &&
@@ -176,156 +202,176 @@ export function TripPlanner({
       `/new/building?c=${encodeConstraints(state.constraints)}&r=${crypto.randomUUID()}`,
     );
 
-  return (
-    <div className="flex w-full max-w-[820px] flex-col gap-4">
-      <div role="log" aria-live="polite" className="flex flex-col gap-3">
-        <PlannerSays>{OPENING}</PlannerSays>
+  // The suggestions are a list of their own, to the right of the conversation
+  // on a wide screen and under its opening on a phone. One starts a
+  // conversation; once there is one, it goes into the box to be sent or changed.
+  const suggestions = (
+    <>
+      <Eyebrow>Try one of these</Eyebrow>
+      <div className="flex flex-wrap gap-2 lg:flex-col lg:flex-nowrap lg:items-start">
+        {examples.map((example) => (
+          <button
+            key={example}
+            type="button"
+            disabled={waiting || talkedOut}
+            onClick={() =>
+              messages.length === 0 ? void send(example) : setText(example)
+            }
+          >
+            <Chip className="h-auto min-h-7 cursor-pointer rounded-2xl py-1 text-left hover:border-control">
+              {example}
+            </Chip>
+          </button>
+        ))}
+      </div>
+    </>
+  );
 
-        {messages.length === 0 && !waiting ? (
-          <div className="flex flex-wrap justify-end gap-2 pl-[27px] lg:flex-col lg:items-end">
-            {examples.map((example) => (
-              <button
-                key={example}
-                type="button"
-                onClick={() => void send(example)}
+  return (
+    <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex w-full min-w-0 max-w-[820px] flex-1 flex-col gap-4">
+        <div role="log" aria-live="polite" className="flex flex-col gap-3">
+          <PlannerSays>{OPENING}</PlannerSays>
+
+          {messages.length === 0 && !waiting ? (
+            <div className="flex flex-col gap-2 pl-[27px] lg:hidden">
+              {suggestions}
+            </div>
+          ) : null}
+
+          {messages.map((m, i) =>
+            m.role === "traveller" ? (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: a transcript only grows
+                key={i}
+                className="max-w-[85%] self-end whitespace-pre-wrap rounded-card border border-hairline bg-surface-subtle px-3.5 py-2.5 text-small"
               >
-                <Chip className="h-auto min-h-7 cursor-pointer rounded-2xl py-1 text-left hover:border-control">
-                  {example}
-                </Chip>
-              </button>
-            ))}
+                {m.text}
+              </div>
+            ) : (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a transcript only grows
+              <PlannerSays key={i}>{m.text}</PlannerSays>
+            ),
+          )}
+
+          {waiting ? <PlannerSays faint>Thinking…</PlannerSays> : null}
+        </div>
+
+        {answered ? (
+          <div className="flex flex-col gap-3 lg:pl-[27px]">
+            <ConstraintCards
+              constraints={state.constraints}
+              said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
+              verdict={verdict}
+              onChange={edit}
+              today={today}
+            />
+            {state.constraints.notes ? (
+              <p className="text-mini text-ink-muted">
+                <span className="font-medium text-ink">Keeping in mind:</span>{" "}
+                {state.constraints.notes}{" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    update({
+                      ...conversation,
+                      state: {
+                        ...state,
+                        constraints: { ...state.constraints, notes: "" },
+                      },
+                    })
+                  }
+                  className="font-medium text-agent"
+                >
+                  Clear
+                </button>
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="primary"
+                className="px-5 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={waiting || !verdict.possible}
+                onClick={build}
+              >
+                Build this trip
+              </Button>
+              <span className="text-mini text-ink-faint">
+                {!verdict.possible
+                  ? "Put the red card right first, or tell me what to change."
+                  : ready
+                    ? "Builds from the cards above. Takes up to a minute."
+                    : "You can build now with what is assumed, or keep talking."}
+              </span>
+            </div>
           </div>
         ) : null}
 
-        {messages.map((m, i) =>
-          m.role === "traveller" ? (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: a transcript only grows
-              key={i}
-              className="max-w-[85%] self-end whitespace-pre-wrap rounded-card border border-hairline bg-surface-subtle px-3.5 py-2.5 text-small"
-            >
-              {m.text}
-            </div>
-          ) : (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a transcript only grows
-            <PlannerSays key={i}>{m.text}</PlannerSays>
-          ),
-        )}
-
-        {waiting ? <PlannerSays faint>Thinking…</PlannerSays> : null}
-      </div>
-
-      {answered ? (
-        <div className="flex flex-col gap-3 lg:pl-[27px]">
-          <ConstraintCards
-            constraints={state.constraints}
-            said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
-            verdict={verdict}
-            onChange={edit}
-            today={today}
-          />
-          {state.constraints.notes ? (
-            <p className="text-mini text-ink-muted">
-              <span className="font-medium text-ink">Keeping in mind:</span>{" "}
-              {state.constraints.notes}{" "}
-              <button
-                type="button"
-                onClick={() =>
-                  update({
-                    ...conversation,
-                    state: {
-                      ...state,
-                      constraints: { ...state.constraints, notes: "" },
-                    },
-                  })
-                }
-                className="font-medium text-agent"
-              >
-                Clear
-              </button>
-            </p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="primary"
-              className="px-5 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={waiting || !verdict.possible}
-              onClick={build}
-            >
-              Build this trip
-            </Button>
-            <span className="text-mini text-ink-faint">
-              {!verdict.possible
-                ? "Put the red card right first, or tell me what to change."
-                : ready
-                  ? "Builds from the cards above. Takes up to a minute."
-                  : "You can build now with what is assumed, or keep talking."}
-            </span>
-          </div>
-        </div>
-      ) : null}
-
-      <Card className="flex flex-col gap-2 rounded-[16px] p-3 shadow-lifted lg:p-4">
-        <div className="flex items-end gap-3">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={
-              talkedOut
-                ? "Correct a card above, or build the trip"
-                : answered
-                  ? "Reply, or change anything"
-                  : "7 days in Georgia, €700, nature and monasteries, with my father"
-            }
-            aria-label="Message the planner"
-            rows={2}
-            maxLength={INTAKE_MAX_CHARS}
-            disabled={talkedOut}
-            // biome-ignore lint/a11y/noAutofocus: the page is this box
-            autoFocus
-            onKeyDown={(e) => {
-              // Enter sends, except mid-composition (an IME's Enter picks a
-              // candidate) and on a touch keyboard, where Enter is the only
-              // way to a new line and the button is the way to send.
-              if (
-                e.key !== "Enter" ||
-                e.shiftKey ||
-                e.nativeEvent.isComposing ||
-                window.matchMedia("(pointer: coarse)").matches
-              ) {
-                return;
+        <Card className="flex flex-col gap-2 rounded-[16px] p-3 shadow-lifted lg:p-4">
+          <div className="flex items-end gap-3">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={
+                talkedOut
+                  ? "Correct a card above, or build the trip"
+                  : answered
+                    ? "Reply, or change anything"
+                    : "7 days in Georgia, €700, nature and monasteries, with my father"
               }
-              e.preventDefault();
-              void send(text);
-            }}
-            className="w-full flex-1 resize-none bg-transparent text-[15px] leading-[1.5] outline-none placeholder:text-ink-faint"
-          />
-          <button
-            type="button"
-            aria-label="Send"
-            disabled={waiting || talkedOut || !text.trim()}
-            onClick={() => void send(text)}
-            className="flex size-[38px] shrink-0 items-center justify-center rounded-control bg-agent text-on-accent transition-colors hover:bg-agent-hover disabled:opacity-50"
-          >
-            <Icon
-              name="arrowRight"
-              size={15}
-              strokeWidth={1.8}
-              className="-rotate-90"
+              aria-label="Message the planner"
+              rows={2}
+              maxLength={INTAKE_MAX_CHARS}
+              disabled={talkedOut}
+              // biome-ignore lint/a11y/noAutofocus: the page is this box
+              autoFocus
+              onKeyDown={(e) => {
+                // Enter sends, except mid-composition (an IME's Enter picks a
+                // candidate) and on a touch keyboard, where Enter is the only
+                // way to a new line and the button is the way to send.
+                if (
+                  e.key !== "Enter" ||
+                  e.shiftKey ||
+                  e.nativeEvent.isComposing ||
+                  window.matchMedia("(pointer: coarse)").matches
+                ) {
+                  return;
+                }
+                e.preventDefault();
+                void send(text);
+              }}
+              className="w-full flex-1 resize-none bg-transparent text-[15px] leading-[1.5] outline-none placeholder:text-ink-faint"
             />
-          </button>
-        </div>
-        {error ? (
-          <p className="text-mini text-alert">{error}</p>
-        ) : (
-          <p className="hidden text-mini text-ink-faint lg:block">
-            {talkedOut
-              ? "We have talked this one through. The cards are yours to correct."
-              : "Enter to send · Shift+Enter for a new line"}
-          </p>
-        )}
-      </Card>
-      <div ref={end} />
+            <button
+              type="button"
+              aria-label="Send"
+              disabled={waiting || talkedOut || !text.trim()}
+              onClick={() => void send(text)}
+              className="flex size-[38px] shrink-0 items-center justify-center rounded-control bg-agent text-on-accent transition-colors hover:bg-agent-hover disabled:opacity-50"
+            >
+              <Icon
+                name="arrowRight"
+                size={15}
+                strokeWidth={1.8}
+                className="-rotate-90"
+              />
+            </button>
+          </div>
+          {error ? (
+            <p className="text-mini text-alert">{error}</p>
+          ) : (
+            <p className="hidden text-mini text-ink-faint lg:block">
+              {talkedOut
+                ? "We have talked this one through. The cards are yours to correct."
+                : "Enter to send · Shift+Enter for a new line"}
+            </p>
+          )}
+        </Card>
+        <div ref={end} />
+      </div>
+      <aside className="hidden w-[240px] shrink-0 flex-col gap-2 border-l border-hairline pl-5 lg:flex">
+        {suggestions}
+      </aside>
     </div>
   );
 }
