@@ -219,6 +219,7 @@ export const MODEL_PURPOSES = [
   "ask",
   "suggest",
   "road",
+  "intake",
 ] as const;
 export type ModelPurpose = (typeof MODEL_PURPOSES)[number];
 

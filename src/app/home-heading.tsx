@@ -9,7 +9,7 @@ export function HomeHeading({ lead }: { lead: React.ReactNode }) {
       leadOnPhone={false}
       lead={lead}
       action={
-        <ButtonLink href="/#plan" variant="primary" className="px-[18px]">
+        <ButtonLink href="/new" variant="primary" className="px-[18px]">
           <span className="hidden lg:inline">New trip</span>
           <span className="lg:hidden">New</span>
         </ButtonLink>

@@ -8,7 +8,6 @@ import { georgia, georgiaMapStops } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { HomePlan } from "@/features/home-plan";
 import { PageColumn } from "@/features/page-column";
-import { tbilisiToday } from "@/features/shared-reads";
 import { SiteFrame } from "@/features/site-frame";
 import { SurveyCard } from "@/features/survey-card";
 import { type Hero, TripHero } from "@/features/trip-hero";
@@ -82,10 +81,9 @@ function Welcome() {
 export default async function TripsHome({ searchParams }: PageProps<"/">) {
   const { trip: wanted } = await searchParams;
   const session = await getAuth().api.getSession({ headers: await headers() });
-  const [rows, passes, planDate, survey] = await Promise.all([
+  const [rows, passes, survey] = await Promise.all([
     session ? myTrips(session.user.id) : Promise.resolve([]),
     session ? passesHeldBy(session.user.id) : Promise.resolve([]),
-    tbilisiToday(),
     session ? pendingSurvey(session.user.id) : Promise.resolve(null),
   ]);
 
@@ -126,12 +124,12 @@ export default async function TripsHome({ searchParams }: PageProps<"/">) {
               }))}
             />
             <TripHero hero={hero} />
-            <HomePlan today={planDate} hasTrips />
+            <HomePlan hasTrips />
           </>
         ) : (
           <>
             <Welcome />
-            <HomePlan today={planDate} hasTrips={false} />
+            <HomePlan hasTrips={false} />
             <section className="flex flex-col gap-3">
               <SectionRule>An example trip</SectionRule>
               <TripHero

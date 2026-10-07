@@ -4,10 +4,11 @@ import type { Constraints, Interest } from "./constraints.ts";
 import { addDays } from "./schedule.ts";
 
 // "7 days in Georgia, €700, nature and monasteries, with my father" → the
-// constraints generation runs on. Deterministic on purpose: no model call to
-// read a sentence the traveller then corrects on screen anyway, and every rule
-// here is a test. What the words did not say is filled with a default and
-// reported as assumed, so the screen can say "assumed" rather than pretend.
+// constraints generation runs on. Deterministic, and every rule here is a
+// test. On /new the planner is a model (intake.ts); this is what takes its turn
+// when the model cannot, and where a conversation's defaults come from. What
+// the words did not say is filled with a default and reported as assumed, so
+// the screen can say "assumed" rather than pretend.
 
 export type Understood = {
   constraints: Constraints;
@@ -95,7 +96,10 @@ function readDays(text: string): number | null {
 /** A start date: "2026-10-12", "12 October", "Oct 12", "in October", "next week". */
 function readStart(text: string, today: string): string | null {
   const iso = text.match(/\b(20\d\d-\d\d-\d\d)\b/);
-  if (iso) return iso[1];
+  // A date already gone, or one that is not a date, is no start date.
+  if (iso) {
+    return iso[1] >= today && !Number.isNaN(Date.parse(iso[1])) ? iso[1] : null;
+  }
 
   const [year] = today.split("-").map(Number);
   const on = (month: number, day: number) => {
@@ -249,6 +253,7 @@ export function understand(text: string, today: string): Understood {
       100_000,
       pick("budgetEur", readBudget(text), 90 * clampedDays * people),
     ),
+    notes: "",
   };
   return { constraints, said };
 }

@@ -22,6 +22,7 @@ const constraints: Constraints = {
   party: { adults: 2, children: 0 },
   mobility: "moderate",
   budgetEur: 700,
+  notes: "",
 };
 
 // The model only ever sees curated places; the fixtures' verified and raw

@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { z } from "zod";
+import { buildState } from "@/bll/trip-generation";
 import {
   type Constraints,
   constraints as constraintsSchema,
 } from "@/domain/trip/generate/constraints";
-import { BuildRunner, type BuildStep } from "@/features/build-runner";
+import {
+  BuildRunner,
+  type BuildStep,
+  CancelBuild,
+} from "@/features/build-runner";
 import { Brand } from "@/features/chrome";
+import { areaNames } from "@/features/constraint-labels";
+import { getAuth } from "@/infra/auth";
 import { SkeletonLine } from "@/ui/bars";
 import { ButtonLink } from "@/ui/button";
 import { Card, Panel, SectionRule } from "@/ui/card";
@@ -75,7 +84,7 @@ function ReferenceBuilding() {
       <header className="relative z-10 flex h-[58px] shrink-0 items-center gap-2.5 px-6">
         <Brand />
         <div className="flex-1" />
-        <ButtonLink href="/#plan" variant="ghost">
+        <ButtonLink href="/new" variant="ghost">
           Cancel
         </ButtonLink>
       </header>
@@ -200,13 +209,6 @@ function ReferenceBuilding() {
   );
 }
 
-const areaNames: Record<string, string> = {
-  "tbilisi-core": "Tbilisi",
-  "kazbegi-corridor": "Kazbegi",
-  kakheti: "Kakheti",
-  svaneti: "Svaneti",
-};
-
 const WORDS = [
   "",
   "One",
@@ -247,10 +249,23 @@ const dayLabel = (start: string, i: number) => {
 export default async function BuildingPage({
   searchParams,
 }: PageProps<"/new/building">) {
-  const { c } = await searchParams;
+  const { c, r } = await searchParams;
   if (c === undefined) return <ReferenceBuilding />;
   const wanted = decode(c);
   if (!wanted) redirect("/");
+
+  // A build that has already happened is not started again by coming back to
+  // this address: it opens the trip it made, or the conversation if it was
+  // called off.
+  const requestId = z.uuid().safeParse(r).data;
+  if (requestId) {
+    const session = await getAuth().api.getSession({
+      headers: await headers(),
+    });
+    const state = session ? await buildState(requestId, session.user.id) : null;
+    if (state?.status === "done") redirect(`/trips/${state.tripId}`);
+    if (state?.status === "cancelled") redirect("/new");
+  }
 
   const areas = wanted.areas.map((a) => areaNames[a]).join(" and ");
   const people = wanted.party.adults + wanted.party.children;
@@ -289,9 +304,7 @@ export default async function BuildingPage({
       <header className="relative z-10 flex h-[58px] shrink-0 items-center gap-2.5 px-6">
         <Brand />
         <div className="flex-1" />
-        <ButtonLink href="/#plan" variant="ghost">
-          Cancel
-        </ButtonLink>
+        <CancelBuild requestId={requestId} />
       </header>
 
       <main className="relative z-10 mx-auto flex w-full max-w-[1100px] flex-col items-start gap-7 px-4 py-8 lg:flex-row lg:py-12">
@@ -311,7 +324,11 @@ export default async function BuildingPage({
               soon as it is ready.
             </Prose>
           </div>
-          <BuildRunner constraints={wanted} steps={steps} />
+          <BuildRunner
+            constraints={wanted}
+            steps={steps}
+            requestId={requestId}
+          />
         </Panel>
 
         <div className="flex w-full flex-1 flex-col gap-3">
