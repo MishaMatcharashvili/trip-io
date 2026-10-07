@@ -136,3 +136,27 @@ export function choicesOf(
 
 /** A column is a choice worth offering only while its vocabulary is short. */
 export const CHOICE_LIMIT = 24;
+
+/** How a cell reads on screen; the column's `kind` is how it compares. */
+export type CellFormat = "text" | "date" | "number" | "amount" | "yesno";
+
+/**
+ * A column as plain data, so the server can describe a table and the browser
+ * draw it. `link` names the row field that holds the cell's href; `detail`
+ * columns are long text, shown when a row is opened rather than in the grid.
+ */
+export type ColumnSpec = Column & {
+  label: string;
+  format?: CellFormat;
+  link?: string;
+  detail?: boolean;
+  /** Wide text that wraps, rather than a short value on one line. */
+  wide?: boolean;
+};
+
+export type Table = {
+  columns: ColumnSpec[];
+  rows: Row[];
+  /** How many rows exist; more than `rows` when the repository's cap bit. */
+  total: number;
+};
