@@ -11,18 +11,11 @@ import { Card, Divider } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { Icon } from "@/ui/icon";
 import { ConstraintCards } from "./constraint-cards";
+import { encodeConstraints } from "./new-trip";
 
 // The ask. The sentence is read as it is typed (src/domain/trip/generate/
 // request.ts) and shown back as cards; any card can be corrected by hand, and
 // a correction wins over whatever the sentence says from then on.
-
-/** Constraints as a URL-safe token for /new/building. */
-export function encodeConstraints(c: Constraints): string {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(c))))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
 
 export function TripComposer({
   today,
