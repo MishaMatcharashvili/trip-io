@@ -13,6 +13,7 @@ import { Icon } from "@/ui/icon";
 import { MapStyleSwitch } from "@/ui/map/map-style-switch";
 import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { Eyebrow, Headline, Prose, Title } from "@/ui/text";
+import { ExploreAreaProvider } from "./explore-area";
 import { GROUPS, groupName } from "./explore-model";
 import { ExploreSkeleton } from "./explore-skeleton";
 import { SaveToggle } from "./save-toggle";
@@ -141,7 +142,7 @@ function Browser({
           ) : null}
         </label>
 
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="-mx-4 -my-2.5 flex gap-1.5 overflow-x-auto overflow-y-hidden px-4 py-2.5 [scrollbar-width:none]">
           <FilterChip selected={area === null} onClick={() => setArea(null)}>
             All Georgia
             <span className={area === null ? "opacity-70" : "text-ink-faint"}>
@@ -164,7 +165,7 @@ function Browser({
           ))}
         </div>
 
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
+        <div className="-mx-4 -my-2.5 flex gap-1.5 overflow-x-auto overflow-y-hidden px-4 py-2.5 [scrollbar-width:none]">
           <FilterChip
             size="sm"
             selected={group === null}
@@ -347,6 +348,16 @@ export function ExploreScreen({
     />
   );
 
+  // The cards beside the catalogue follow the region chosen in it.
+  const areaChip = areas.find((a) => a.slug === area);
+  const asideCards = (
+    <ExploreAreaProvider
+      value={areaChip ? { slug: areaChip.slug, name: areaChip.name } : null}
+    >
+      {aside}
+    </ExploreAreaProvider>
+  );
+
   // Until the layout is known, the same shell the page's loading state draws,
   // with the real regions and aside: nothing moves when the map arrives.
   if (desktop === null) {
@@ -377,7 +388,7 @@ export function ExploreScreen({
       </Panel>
 
       <div className="absolute right-6 top-5 z-20 flex w-[340px] flex-col gap-3">
-        {aside}
+        {asideCards}
       </div>
 
       <MapStyleSwitch className="absolute bottom-[30px] right-6 z-20 w-[260px] border border-hairline-strong bg-surface shadow-panel" />
@@ -407,7 +418,7 @@ export function ExploreScreen({
         </div>
         {browser}
         <div className="flex flex-col gap-3 border-t border-hairline bg-canvas px-4 py-4">
-          {aside}
+          {asideCards}
         </div>
       </main>
     </div>
