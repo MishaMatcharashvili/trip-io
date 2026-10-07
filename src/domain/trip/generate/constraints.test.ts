@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { type Constraints, cacheKey, constraints } from "./constraints.ts";
+import { cacheKey } from "./cache-key.ts";
+import { type Constraints, constraints } from "./constraints.ts";
 
 const base: Constraints = {
   startDate: "2026-10-21",

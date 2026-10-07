@@ -3,15 +3,13 @@ import { candidatesInArea } from "../dal/places.ts";
 import { planCache, recordGeneration } from "../dal/plans.ts";
 import type { FocusAreaSlug } from "../domain/catalogue/focus-areas.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
+import { cacheKey } from "../domain/trip/generate/cache-key.ts";
 import {
   CANDIDATE_LIMIT,
   CANDIDATES_PER_AREA_MIN,
   describeHours,
 } from "../domain/trip/generate/candidates.ts";
-import {
-  type Constraints,
-  cacheKey,
-} from "../domain/trip/generate/constraints.ts";
+import type { Constraints } from "../domain/trip/generate/constraints.ts";
 import {
   type Attempt,
   type Composer,
