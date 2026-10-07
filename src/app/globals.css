@@ -249,6 +249,15 @@
   --shadow-notification: 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
+/* Set by the theme switch for the frames around a change of theme, so colours
+   change at once everywhere rather than fading on the few controls that
+   transition them. Unlayered, to beat the utilities' own transitions. */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 @layer base {
   :root {
     color-scheme: light;
