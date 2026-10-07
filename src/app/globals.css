@@ -82,6 +82,9 @@
   --color-ok-line: #cfe9df;
   --color-ok-tint: #eaf6f1;
 
+  /* an assumption the traveller has not confirmed */
+  --color-assumed: #b07a00;
+
   /* Text and glyphs sitting on a solid agent, alert or ok fill. */
   --color-on-accent: #ffffff;
   /* The thumb of a switch — always the lightest thing on its track. */
@@ -213,6 +216,8 @@
   --color-ok: #5cc79a;
   --color-ok-line: #1f4a39;
   --color-ok-tint: #13261f;
+
+  --color-assumed: #e3b341;
 
   --color-on-accent: #0f1318;
   --color-knob: #e6eaee;

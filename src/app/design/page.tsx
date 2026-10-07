@@ -78,6 +78,10 @@ const palette: Array<{ group: string; swatches: Array<[string, string]> }> = [
       ["ok-tint", "bg-ok-tint"],
     ],
   },
+  {
+    group: "An assumption",
+    swatches: [["assumed", "bg-assumed"]],
+  },
 ];
 
 const typeRamp: Array<[string, string, string]> = [

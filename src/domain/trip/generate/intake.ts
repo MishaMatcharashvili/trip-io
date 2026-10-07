@@ -1,8 +1,9 @@
 import { z } from "zod";
 import {
-  type FocusAreaSlug,
-  focusAreaSlugs,
-} from "../../catalogue/focus-areas.ts";
+  destinationName,
+  destinationSlugs,
+  MAX_PLACES,
+} from "../../catalogue/destinations.ts";
 import { paces } from "../document.ts";
 import {
   type Constraints,
@@ -28,14 +29,6 @@ export const INTAKE_MAX_TURNS = 12;
 export const INTAKE_MAX_CHARS = 500;
 const REPLY_MAX_CHARS = 900;
 
-/** The areas as a traveller reads them. */
-export const AREA_LABELS: Record<FocusAreaSlug, string> = {
-  "tbilisi-core": "Tbilisi",
-  "kazbegi-corridor": "Kazbegi",
-  kakheti: "Kakheti",
-  svaneti: "Svaneti",
-};
-
 export const intakeMessage = z.discriminatedUnion("role", [
   z.object({
     role: z.literal("traveller"),
@@ -51,7 +44,7 @@ export type IntakeMessage = z.infer<typeof intakeMessage>;
 const stated = [
   "startDate",
   "days",
-  "areas",
+  "places",
   "pace",
   "interests",
   "party",
@@ -72,7 +65,8 @@ export const intakeReply = z.object({
   reply: z.string().min(1).max(REPLY_MAX_CHARS),
   startDate: z.string().nullable(),
   days: z.number().nullable(),
-  areas: z.array(z.enum(focusAreaSlugs)).nullable(),
+  /** The whole route after this turn, in the order it is travelled. */
+  places: z.array(z.enum(destinationSlugs)).nullable(),
   pace: z.enum(paces).nullable(),
   interests: z.array(z.enum(interests)).nullable(),
   adults: z.number().nullable(),
@@ -81,7 +75,7 @@ export const intakeReply = z.object({
   budgetEur: z.number().nullable(),
   /** The whole of the notes after this turn, not an addition to them. */
   notes: z.string().nullable(),
-  /** Places the traveller asked for that no covered area holds. */
+  /** Places the traveller asked for that no trip can go to. */
   unsupported: z.array(z.string()),
   /** Nothing left that the planner needs to ask. */
   ready: z.boolean(),
@@ -119,18 +113,18 @@ export function initialState(today: string): IntakeState {
 /**
  * The defaults that follow from other fields, for whatever is still unsaid: a
  * budget for this many people and days, a pace for this mobility, and the
- * second area a longer trip has room for.
+ * second place a longer trip has room for.
  */
 function withDefaults(c: Constraints, said: readonly Stated[]): Constraints {
   const has = (k: Stated) => said.includes(k);
   const people = c.party.adults + c.party.children;
   return {
     ...c,
-    areas: has("areas")
-      ? c.areas
+    places: has("places")
+      ? c.places
       : c.days >= 4
-        ? ["tbilisi-core", "kazbegi-corridor"]
-        : ["tbilisi-core"],
+        ? ["tbilisi", "kazbegi"]
+        : ["tbilisi"],
     pace: has("pace") ? c.pace : c.mobility === "low" ? "relaxed" : "moderate",
     budgetEur: has("budgetEur")
       ? c.budgetEur
@@ -172,7 +166,13 @@ export function readIntake(
     patch.startDate = r.startDate;
   }
   if (r.days !== null) patch.days = clamp(r.days, 1, 21);
-  if (r.areas?.length) patch.areas = [...new Set(r.areas)];
+  // In order, and a round trip names its start twice: only a name said twice
+  // running is dropped.
+  if (r.places?.length) {
+    patch.places = r.places
+      .filter((slug, i, all) => slug !== all[i - 1])
+      .slice(0, MAX_PLACES);
+  }
   if (r.pace !== null) patch.pace = r.pace;
   if (r.interests !== null) patch.interests = [...new Set(r.interests)];
   if (r.adults !== null || r.children !== null) {
@@ -213,8 +213,7 @@ const shortDate = (iso: string) =>
 /**
  * A turn without the model: the latest message read by `understand`, merged
  * onto the state, and a reply that says what is held and what was assumed. It
- * cannot tell that a place is not covered, so it says what is. The message
- * itself is kept as notes, since nothing here can pick the wishes out of it.
+ * says the places `understand` refused, and why. The message itself is kept as notes, since nothing here can pick the wishes out of it.
  */
 export function fallbackTurn(
   messages: readonly IntakeMessage[],
@@ -238,7 +237,7 @@ export function fallbackTurn(
   const c = next.constraints;
   const people = c.party.adults + c.party.children;
   const assumed = [
-    !next.said.includes("areas") && "the region",
+    !next.said.includes("places") && "the places",
     !next.said.includes("days") && "the length",
     !next.said.includes("startDate") && "the start date",
     !next.said.includes("party") && "who is travelling",
@@ -246,17 +245,19 @@ export function fallbackTurn(
   ].filter((x): x is string => Boolean(x));
 
   const reply = [
-    `Here is what I have: ${c.days} ${c.days === 1 ? "day" : "days"} around ${list(c.areas.map((a) => AREA_LABELS[a]))} from ${shortDate(c.startDate)}, for ${people} ${people === 1 ? "person" : "people"}, on about €${c.budgetEur}.`,
+    `Here is what I have: ${c.days} ${c.days === 1 ? "day" : "days"} through ${c.places.map(destinationName).join(" → ")} from ${shortDate(c.startDate)}, for ${people} ${people === 1 ? "person" : "people"}, on about €${c.budgetEur}.`,
     assumed.length
       ? `I assumed ${list(assumed)} — tell me what is different, or correct a card.`
       : "Tell me if anything is off, or build it when it looks right.",
-    `I cover ${list(Object.values(AREA_LABELS))} for now.`,
-  ].join(" ");
+    ...read.refused.map((r) => `${r.name} can’t be part of it: ${r.why}.`),
+  ]
+    .join(" ")
+    .slice(0, REPLY_MAX_CHARS);
 
   return {
     reply,
     state: next,
-    unsupported: [],
-    ready: next.said.includes("areas") && next.said.includes("days"),
+    unsupported: read.refused.map((r) => r.name),
+    ready: next.said.includes("places") && next.said.includes("days"),
   };
 }

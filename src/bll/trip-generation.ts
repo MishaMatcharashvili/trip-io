@@ -9,7 +9,10 @@ import {
   releaseRequest,
   requestState,
 } from "../dal/plans.ts";
-import type { FocusAreaSlug } from "../domain/catalogue/focus-areas.ts";
+import {
+  destination,
+  destinationName,
+} from "../domain/catalogue/destinations.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
 import { cacheKey } from "../domain/trip/generate/cache-key.ts";
 import {
@@ -18,6 +21,7 @@ import {
   describeHours,
 } from "../domain/trip/generate/candidates.ts";
 import type { Constraints } from "../domain/trip/generate/constraints.ts";
+import { assess, reasons } from "../domain/trip/generate/feasibility.ts";
 import {
   type Attempt,
   type Composer,
@@ -41,24 +45,36 @@ import {
 // where it meets the catalogue and the log.
 
 /**
- * Places across the requested areas — curated first, verified filling in —
- * spread evenly so one dense area can't crowd the others out of the prompt. A place on the boundary of two areas
- * comes back once, under the first.
+ * Places across the requested destinations — curated first, verified filling
+ * in — spread evenly so one dense destination can't crowd the others out of the
+ * prompt. A place that lies in two of them (Telavi, when Kakheti was asked for
+ * too) comes back once, and knows both.
  */
 export async function loadCandidates(
-  areas: readonly FocusAreaSlug[],
+  places: readonly string[],
   limit = CANDIDATE_LIMIT,
 ): Promise<Candidate[]> {
+  // A round trip names its start twice; it is still one place to retrieve.
+  const wanted = [...new Set(places)].flatMap(
+    (slug) => destination(slug) ?? [],
+  );
   const perArea = Math.max(
     CANDIDATES_PER_AREA_MIN,
-    Math.ceil(limit / Math.max(1, areas.length)),
+    Math.ceil(limit / Math.max(1, wanted.length)),
   );
   const perAreaResults = await Promise.all(
-    areas.map((slug) => candidatesInArea(slug, perArea)),
+    wanted.map((d) => candidatesInArea(d, perArea)),
   );
 
-  const seen = new Set<string>();
-  return perAreaResults.flat().filter((c) => !seen.has(c.id) && seen.add(c.id));
+  const byId = new Map<string, Candidate>();
+  for (const c of perAreaResults.flat()) {
+    const known = byId.get(c.id);
+    byId.set(
+      c.id,
+      known ? { ...known, areas: [...known.areas, ...c.areas] } : c,
+    );
+  }
+  return [...byId.values()];
 }
 
 export type GeneratedTrip = {
@@ -72,11 +88,58 @@ export type GeneratedTrip = {
 };
 
 export type GenerationFailure =
-  | { ok: false; reason: "insufficient-coverage"; attempts: Attempt[] }
+  /** The request cannot be done, whatever places there are. No plan was attempted. */
+  | { ok: false; reason: "impossible"; explanations: string[] }
+  | {
+      ok: false;
+      reason: "insufficient-coverage";
+      attempts: Attempt[];
+      explanations: string[];
+    }
   /** The plan validated on the way out and not on the way in: a bug, not an input problem. */
   | { ok: false; reason: "rejected"; failure: AppendFailure }
   /** The traveller called it off while it was being composed: nothing was written. */
   | { ok: false; reason: "cancelled" };
+
+const listed = (names: string[]) =>
+  names.length > 1
+    ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+    : (names[0] ?? "");
+
+/** Scheduler and validator problems carry their day; the route's do not. */
+const DATED = /^\d{4}-\d\d-\d\d: /;
+
+/**
+ * Why no plan came out, for the traveller: which places have nothing to visit,
+ * or what the last attempt could not fit. A failure is explained in terms of
+ * what they asked for, never as "something went wrong".
+ */
+function explain(
+  wanted: Constraints,
+  failed: { attempts: Attempt[]; uncovered: string[] },
+): string[] {
+  if (failed.uncovered.length) {
+    const names = listed(failed.uncovered.map(destinationName));
+    return [
+      `I don’t have checked places to visit in ${names} yet, so I can’t plan a day there. Take ${failed.uncovered.length === 1 ? "it" : "them"} out, or choose somewhere nearby.`,
+    ];
+  }
+  const last = failed.attempts.findLast((a) => a.problems.length > 0);
+  const route = last?.problems.filter((p) => !DATED.test(p)) ?? [];
+  if (route.length) {
+    return [
+      `I couldn’t fit ${listed([...new Set(wanted.places)].map(destinationName))} into ${wanted.days} ${wanted.days === 1 ? "day" : "days"}: ${route.join("; ")}. Add a day, or take a place out.`,
+    ];
+  }
+  const days = (last?.problems ?? [])
+    .slice(0, 3)
+    .map((p) => p.replace(DATED, ""));
+  return [
+    days.length
+      ? `I couldn’t build days that hold together for this trip: ${days.join("; ")}. Try other dates or a slower pace.`
+      : "There aren’t enough checked places for this trip yet. Try other places, or fewer days.",
+  ];
+}
 
 /**
  * Constraints in, a saved trip out: retrieve candidates, run the pipeline, mint
@@ -99,10 +162,19 @@ export async function generateTrip(
   } = {},
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
+
+  // The screen judged the request before sending it; this is the same
+  // judgement again, because the screen is not what decides.
+  const verdict = assess(wanted);
+  if (!verdict.possible) {
+    await recordGeneration(null, key, "failed", []);
+    return { ok: false, reason: "impossible", explanations: reasons(verdict) };
+  }
+
   const result = await generate(wanted, {
     compose,
     cache: planCache,
-    candidates: await loadCandidates(wanted.areas),
+    candidates: await loadCandidates(wanted.places),
     travel: straightLineTravel,
     newId: randomUUID,
     describeHours,
@@ -114,6 +186,7 @@ export async function generateTrip(
       ok: false,
       reason: "insufficient-coverage",
       attempts: result.attempts,
+      explanations: explain(wanted, result),
     };
   }
 

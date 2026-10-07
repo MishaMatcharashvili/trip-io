@@ -201,12 +201,13 @@ export const trips = new Hono<SessionEnv>()
           const { body, status } = failure(result.failure);
           return c.json(body, status);
         }
+        // Either way the traveller is told why, in terms of what they asked for.
         return c.json(
           {
-            error: "insufficient-coverage" as const,
-            message:
-              "There aren't enough hand-verified places in those areas yet to build a trip.",
-            attempts: result.attempts,
+            error: result.reason,
+            message: result.explanations.join(" "),
+            explanations: result.explanations,
+            attempts: result.reason === "impossible" ? [] : result.attempts,
           },
           422,
         );

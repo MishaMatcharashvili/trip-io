@@ -15,7 +15,7 @@ const unchanged = {
   reply: "Noted.",
   startDate: null,
   days: null,
-  areas: null,
+  places: null,
   pace: null,
   interests: null,
   adults: null,
@@ -40,15 +40,15 @@ describe("initialState", () => {
 describe("readIntake", () => {
   test("merges what changed and marks it said", () => {
     const turn = readIntake(
-      { ...unchanged, days: 3, areas: ["kakheti"], adults: 2 },
+      { ...unchanged, days: 3, places: ["kakheti"], adults: 2 },
       initialState(TODAY),
       TODAY,
     );
     assert.ok(turn);
     assert.equal(turn.state.constraints.days, 3);
-    assert.deepEqual(turn.state.constraints.areas, ["kakheti"]);
+    assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
     assert.deepEqual(turn.state.constraints.party, { adults: 2, children: 0 });
-    assert.deepEqual(turn.state.said.sort(), ["areas", "days", "party"]);
+    assert.deepEqual(turn.state.said.sort(), ["days", "party", "places"]);
   });
 
   test("an unsaid budget follows the days and the party", () => {
@@ -100,14 +100,14 @@ describe("readIntake", () => {
     }
   });
 
-  test("an empty list of areas does not clear them", () => {
+  test("an empty route does not clear the places", () => {
     const turn = readIntake(
-      { ...unchanged, areas: [], unsupported: ["Batumi"] },
+      { ...unchanged, places: [], unsupported: ["Sukhumi"] },
       initialState(TODAY),
       TODAY,
     );
-    assert.ok(turn?.state.constraints.areas.length);
-    assert.deepEqual(turn?.unsupported, ["Batumi"]);
+    assert.ok(turn?.state.constraints.places.length);
+    assert.deepEqual(turn?.unsupported, ["Sukhumi"]);
   });
 
   test("notes replace the notes, cut to their limit", () => {
@@ -123,12 +123,31 @@ describe("readIntake", () => {
     assert.equal(readIntake({ reply: "hi" }, initialState(TODAY), TODAY), null);
     assert.equal(
       readIntake(
-        { ...unchanged, areas: ["batumi"] },
+        { ...unchanged, places: ["atlantis"] },
         initialState(TODAY),
         TODAY,
       ),
       null,
     );
+  });
+});
+
+describe("the route", () => {
+  test("keeps its order and a round trip's return", () => {
+    const turn = readIntake(
+      {
+        ...unchanged,
+        places: ["tbilisi", "tbilisi", "kazbegi", "batumi", "tbilisi"],
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.deepEqual(turn?.state.constraints.places, [
+      "tbilisi",
+      "kazbegi",
+      "batumi",
+      "tbilisi",
+    ]);
   });
 });
 
@@ -148,19 +167,20 @@ describe("fallbackTurn", () => {
       TODAY,
     );
     assert.equal(turn.state.constraints.days, 3);
-    assert.deepEqual(turn.state.constraints.areas, ["kakheti"]);
+    assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
     assert.ok(turn.ready);
     assert.ok(constraints.safeParse(turn.state.constraints).success);
   });
 
-  test("says what it assumed and what it covers", () => {
+  test("says what it assumed, and what cannot be part of the trip", () => {
     const turn = fallbackTurn(
-      said("somewhere warm"),
+      said("somewhere warm, maybe Sukhumi"),
       initialState(TODAY),
       TODAY,
     );
-    assert.match(turn.reply, /I assumed the region/);
-    assert.match(turn.reply, /Tbilisi, Kazbegi, Kakheti and Svaneti/);
+    assert.match(turn.reply, /I assumed the places/);
+    assert.match(turn.reply, /Sukhumi can’t be part of it/);
+    assert.deepEqual(turn.unsupported, ["Sukhumi"]);
     assert.ok(!turn.ready);
   });
 
@@ -180,7 +200,7 @@ describe("fallbackTurn", () => {
       TODAY,
     );
     assert.equal(second.state.constraints.days, 7);
-    assert.deepEqual(second.state.constraints.areas, ["svaneti"]);
+    assert.deepEqual(second.state.constraints.places, ["svaneti"]);
     assert.equal(second.state.constraints.pace, "relaxed");
   });
 

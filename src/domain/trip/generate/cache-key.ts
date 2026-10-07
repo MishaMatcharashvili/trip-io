@@ -27,7 +27,8 @@ function budgetBand(c: Constraints) {
 export function cacheKey(c: Constraints): string {
   const shape = {
     v: PROMPT_VERSION,
-    areas: [...c.areas].sort(),
+    // In order: the same places the other way round is a different trip.
+    places: c.places,
     days: c.days,
     pace: c.pace,
     interests: [...c.interests].sort(),

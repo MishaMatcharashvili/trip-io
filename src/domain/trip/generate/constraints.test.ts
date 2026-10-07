@@ -6,7 +6,7 @@ import { type Constraints, constraints } from "./constraints.ts";
 const base: Constraints = {
   startDate: "2026-10-21",
   days: 5,
-  areas: ["tbilisi-core", "kazbegi-corridor"],
+  places: ["tbilisi", "kazbegi"],
   pace: "moderate",
   interests: [],
   party: { adults: 1, children: 0 },

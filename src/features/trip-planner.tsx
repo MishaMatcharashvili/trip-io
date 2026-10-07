@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Constraints } from "@/domain/trip/generate/constraints";
+import { assess } from "@/domain/trip/generate/feasibility";
 import {
   applyEdit,
   INTAKE_MAX_CHARS,
@@ -28,7 +29,8 @@ import {
 // The conversation on /new. The traveller writes, the planner replies
 // (src/bll/intake.ts) and shows what it holds as cards under its latest
 // message. Sending a message never builds anything: the trip is built by the
-// one button under the cards, and only by it.
+// one button under the cards, and only by it — and not at all while a card is
+// red: a trip that cannot be done is explained, not attempted.
 
 type Conversation = {
   messages: IntakeMessage[];
@@ -107,6 +109,7 @@ export function TripPlanner({
   const turns = messages.filter((m) => m.role === "traveller").length;
   const talkedOut = turns >= INTAKE_MAX_TURNS;
   const answered = messages.some((m) => m.role === "planner");
+  const verdict = useMemo(() => assess(state.constraints), [state.constraints]);
 
   const update = (next: Conversation) => {
     setConversation(next);
@@ -168,6 +171,7 @@ export function TripPlanner({
     update({ ...conversation, state: applyEdit(state, patch) });
 
   const build = () =>
+    verdict.possible &&
     router.push(
       `/new/building?c=${encodeConstraints(state.constraints)}&r=${crypto.randomUUID()}`,
     );
@@ -178,7 +182,7 @@ export function TripPlanner({
         <PlannerSays>{OPENING}</PlannerSays>
 
         {messages.length === 0 && !waiting ? (
-          <div className="flex flex-wrap gap-2 pl-[27px]">
+          <div className="flex flex-wrap justify-end gap-2 pl-[27px] lg:flex-col lg:items-end">
             {examples.map((example) => (
               <button
                 key={example}
@@ -216,6 +220,7 @@ export function TripPlanner({
           <ConstraintCards
             constraints={state.constraints}
             said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
+            verdict={verdict}
             onChange={edit}
             today={today}
           />
@@ -243,16 +248,18 @@ export function TripPlanner({
           <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="primary"
-              className="px-5"
-              disabled={waiting}
+              className="px-5 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={waiting || !verdict.possible}
               onClick={build}
             >
               Build this trip
             </Button>
             <span className="text-mini text-ink-faint">
-              {ready
-                ? "Builds from the cards above. Takes up to a minute."
-                : "You can build now with what is assumed, or keep talking."}
+              {!verdict.possible
+                ? "Put the red card right first, or tell me what to change."
+                : ready
+                  ? "Builds from the cards above. Takes up to a minute."
+                  : "You can build now with what is assumed, or keep talking."}
             </span>
           </div>
         </div>

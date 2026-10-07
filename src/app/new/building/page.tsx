@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { buildState } from "@/bll/trip-generation";
+import { destinationName } from "@/domain/catalogue/destinations";
 import {
   type Constraints,
   constraints as constraintsSchema,
@@ -13,7 +14,6 @@ import {
   CancelBuild,
 } from "@/features/build-runner";
 import { Brand } from "@/features/chrome";
-import { areaNames } from "@/features/constraint-labels";
 import { getAuth } from "@/infra/auth";
 import { SkeletonLine } from "@/ui/bars";
 import { ButtonLink } from "@/ui/button";
@@ -267,7 +267,12 @@ export default async function BuildingPage({
     if (state?.status === "cancelled") redirect("/new");
   }
 
-  const areas = wanted.areas.map((a) => areaNames[a]).join(" and ");
+  // A round trip names its start twice; the heading says each place once.
+  const names = [...new Set(wanted.places)].map(destinationName);
+  const areas =
+    names.length > 2
+      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+      : names.join(" and ");
   const people = wanted.party.adults + wanted.party.children;
   const steps: BuildStep[] = [
     {

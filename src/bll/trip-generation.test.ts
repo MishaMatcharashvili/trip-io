@@ -96,6 +96,7 @@ describe("buildTripOnce", () => {
         ok: false,
         reason: "insufficient-coverage",
         attempts: [],
+        explanations: [],
       }),
     });
     assert.equal(failed.kind, "failed");

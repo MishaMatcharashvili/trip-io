@@ -18,7 +18,14 @@ export type BuildStep = { title: string; note: string };
 
 type State =
   | { kind: "running"; step: number }
-  | { kind: "failed"; message: string };
+  | { kind: "failed"; reasons: string[] };
+
+/** A trip that could not be built, and each reason why. */
+class BuildFailure extends Error {
+  constructor(readonly reasons: string[]) {
+    super(reasons.join(" "));
+  }
+}
 
 /** The build was called off: not a failure, and not something to show as one. */
 class Cancelled extends Error {}
@@ -62,17 +69,15 @@ async function generate(
     id?: string;
     error?: string;
     message?: string;
+    explanations?: string[];
   } | null;
   if (res.ok && body?.id) return body.id;
   // This request is already being built — by this page before a reload, or
   // by another tab. Wait for that one rather than start another.
   if (status === 202 && requestId) return awaitBuild(requestId, alive);
   if (body?.error === "cancelled") throw new Cancelled();
-  throw new Error(
-    body?.message ??
-      (body?.error === "insufficient-coverage"
-        ? "There aren’t enough places in those areas yet to build a trip."
-        : FAILED),
+  throw new BuildFailure(
+    body?.explanations?.length ? body.explanations : [body?.message ?? FAILED],
   );
 }
 
@@ -144,7 +149,12 @@ export function BuildRunner({
       .catch((error: Error) => {
         clearInterval(clock);
         if (error instanceof Cancelled) router.replace("/new");
-        else setState({ kind: "failed", message: error.message });
+        else
+          setState({
+            kind: "failed",
+            reasons:
+              error instanceof BuildFailure ? error.reasons : [error.message],
+          });
       });
     return () => {
       alive = false;
@@ -211,8 +221,18 @@ export function BuildRunner({
       </div>
 
       {state.kind === "failed" ? (
-        <div className="mx-6 mb-6 flex flex-col gap-3 rounded-control bg-alert-tint px-3.5 py-3">
-          <span className="text-small text-alert">{state.message}</span>
+        <div
+          role="alert"
+          className="mx-6 mb-6 flex flex-col gap-3 rounded-control border border-alert/30 bg-alert/10 px-3.5 py-3"
+        >
+          <span className="text-small font-semibold text-alert">
+            This trip can’t be built as asked
+          </span>
+          {state.reasons.map((reason) => (
+            <span key={reason} className="text-small text-ink">
+              {reason}
+            </span>
+          ))}
           <div>
             <ButtonLink href="/new" size="sm">
               Change what I asked for

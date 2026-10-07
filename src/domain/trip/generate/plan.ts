@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { CategoryGroup } from "../../catalogue/categories.ts";
-import type { FocusAreaSlug } from "../../catalogue/focus-areas.ts";
 import type { OpeningHours } from "../../catalogue/opening-hours.ts";
 import type { PlaceTier } from "../../catalogue/tier.ts";
 import type { LonLat } from "../../geo.ts";
@@ -97,6 +96,8 @@ export type Candidate = {
   openingHours: OpeningHours | null;
   /** Visited in the open: bound by daylight. */
   outdoor: boolean;
-  /** The focus area it was retrieved for; the fallback plans one area at a time. */
-  area: FocusAreaSlug;
+  /** The first destination it was retrieved for; the fallback plans one at a time. */
+  area: string;
+  /** Every requested destination it lies in: Telavi's cathedral is in Telavi and in Kakheti. */
+  areas: readonly string[];
 };

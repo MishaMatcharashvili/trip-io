@@ -22,7 +22,7 @@ const answer = {
   reply: "Four days in Svaneti. When would you like to start?",
   startDate: null,
   days: 4,
-  areas: ["svaneti"],
+  places: ["svaneti"],
   pace: null,
   interests: null,
   adults: null,
@@ -45,7 +45,7 @@ describe("planningTurn", () => {
     assert.ok(turn.ok);
     assert.equal(turn.source, "model");
     assert.equal(turn.reply, answer.reply);
-    assert.deepEqual(turn.state.constraints.areas, ["svaneti"]);
+    assert.deepEqual(turn.state.constraints.places, ["svaneti"]);
   });
 
   test("an unreachable model still gets a turn", async () => {
@@ -60,7 +60,7 @@ describe("planningTurn", () => {
     assert.ok(turn.ok);
     assert.equal(turn.source, "fallback");
     assert.equal(turn.state.constraints.days, 4);
-    assert.deepEqual(turn.state.constraints.areas, ["svaneti"]);
+    assert.deepEqual(turn.state.constraints.places, ["svaneti"]);
   });
 
   test("so does an answer of the wrong shape", async () => {

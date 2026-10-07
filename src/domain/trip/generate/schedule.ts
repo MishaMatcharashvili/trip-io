@@ -11,14 +11,14 @@ import type { Candidate, Plan, Slot } from "./plan.ts";
 // result either way. Whatever can't be placed is reported, never forced in —
 // problems go back to the model on the retry, or make the fallback drop a stop.
 
-const DAY_START: Record<Pace, string> = {
+export const DAY_START: Record<Pace, string> = {
   relaxed: "09:30",
   moderate: "09:00",
   packed: "08:00",
 };
 
 /** Earliest and latest start per slot, Tbilisi wall-clock. Morning opens at the pace's day start. */
-const SLOT_WINDOW: Record<Slot, [string | null, string]> = {
+export const SLOT_WINDOW: Record<Slot, [string | null, string]> = {
   morning: [null, "12:00"],
   midday: ["12:30", "14:30"],
   afternoon: ["14:30", "18:00"],

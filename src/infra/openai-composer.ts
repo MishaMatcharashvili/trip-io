@@ -20,6 +20,12 @@ const SYSTEM = `You compose day-by-day itineraries for travellers in Georgia (th
 
 Rules:
 - Choose places ONLY from the candidate list, by their "ref". Never invent a place or a ref.
+- The trip follows "route" in order. Day 1 has stops in the first place on the route, the last day
+  has stops in the last place, and every place on the route gets at least one day in between. A
+  candidate is in a place when its "areas" list names it. Never skip a place on the route, and
+  never reorder it.
+- A day that moves on to the next place begins with the drive there. When the two are far apart,
+  leave the morning empty and put that day's stops in the afternoon and evening.
 - Each day: pick one "stayRef" (the base for the night, a lodging candidate). Keep the same base
   on consecutive days unless the trip is moving on — changing base costs half a day.
 - Keep a day's stops close together. A day should not criss-cross a region.
@@ -38,6 +44,7 @@ Rules:
 const userTurn = (input: ComposeInput) =>
   JSON.stringify({
     trip: {
+      route: input.constraints.places,
       days: input.constraints.days,
       pace: input.constraints.pace,
       interests: input.constraints.interests,
@@ -52,7 +59,7 @@ const userTurn = (input: ComposeInput) =>
       name: c.name,
       kind: c.category,
       group: c.group,
-      area: c.area,
+      areas: c.areas,
       outdoor: c.outdoor,
       hours: c.hours,
       lon: Number(c.lonLat[0].toFixed(4)),

@@ -1,3 +1,4 @@
+import { destinationName } from "../../catalogue/destinations.ts";
 import type { LonLat } from "../../geo.ts";
 import { dayKey, type TripDoc, type TripHeader } from "../document.ts";
 import { CIVIL, sunWindow } from "../sun.ts";
@@ -30,6 +31,8 @@ export type CandidateRef = {
   lonLat: LonLat;
   outdoor: boolean;
   area: Candidate["area"];
+  /** Every place on the route it lies in. */
+  areas: Candidate["areas"];
   /** Human-readable, e.g. "mon–sat 10:00–18:00; sun closed", or "unknown". */
   hours: string;
 };
@@ -79,7 +82,7 @@ export type Attempt = {
 export type GenerateDeps = {
   compose: Composer;
   cache: PlanCache;
-  /** Curated places in the requested areas (candidates.ts). */
+  /** Places in the requested destinations (candidates.ts). */
   candidates: Candidate[];
   travel: TravelEstimator;
   newId: () => string;
@@ -96,9 +99,51 @@ export type GenerateResult =
       warnings: Violation[];
       attempts: Attempt[];
     }
-  | { ok: false; reason: "insufficient-coverage"; attempts: Attempt[] };
+  | {
+      ok: false;
+      reason: "insufficient-coverage";
+      attempts: Attempt[];
+      /** Places on the route with nothing in the catalogue to visit. */
+      uncovered: string[];
+    };
 
 const MAX_FALLBACK_ROUNDS = 12;
+
+/**
+ * What a plan leaves out of the route it was asked for. The trip starts in
+ * the first place and ends in the last, and every place named between them is
+ * visited: a plan that quietly skips one is a different trip, and is rejected
+ * like any other broken plan.
+ */
+export function routeProblems(
+  plan: Plan,
+  route: readonly string[],
+  places: ReadonlyMap<string, Candidate>,
+): string[] {
+  const days = [...plan.days].sort((a, b) => a.day - b.day);
+  const reaches = (day: Plan["days"][number] | undefined, slug: string) =>
+    !!day?.stops.some((s) => places.get(s.placeId)?.areas.includes(slug));
+
+  const start = route[0];
+  const finish = route.at(-1) as string;
+  const problems = [...new Set(route)]
+    .filter((slug) => !days.some((d) => reaches(d, slug)))
+    .map(
+      (slug) =>
+        `${destinationName(slug)} is on the route but no day has a stop there`,
+    );
+  if (!reaches(days[0], start)) {
+    problems.push(
+      `the trip starts in ${destinationName(start)}: day 1 needs a stop there`,
+    );
+  }
+  if (!reaches(days.at(-1), finish)) {
+    problems.push(
+      `the trip finishes in ${destinationName(finish)}: the last day needs a stop there`,
+    );
+  }
+  return problems;
+}
 
 export function tripHeader(c: Constraints): TripHeader {
   const last = addDays(c.startDate, c.days - 1);
@@ -109,7 +154,7 @@ export function tripHeader(c: Constraints): TripHeader {
     party: c.party,
     pace: c.pace,
     budget: `€${c.budgetEur}`,
-    prefs: { areas: c.areas, interests: c.interests, mobility: c.mobility },
+    prefs: { places: c.places, interests: c.interests, mobility: c.mobility },
   };
 }
 
@@ -135,8 +180,11 @@ export async function generate(
   const visitable = deps.candidates.filter(
     (p) => p.group !== "lodging" && p.group !== "transport",
   );
-  if (visitable.length === 0) {
-    return { ok: false, reason: "insufficient-coverage", attempts };
+  const uncovered = [...new Set(c.places)].filter(
+    (slug) => !visitable.some((p) => p.areas.includes(slug)),
+  );
+  if (uncovered.length > 0) {
+    return { ok: false, reason: "insufficient-coverage", attempts, uncovered };
   }
 
   const places = new Map(deps.candidates.map((p) => [p.id, p]));
@@ -186,6 +234,7 @@ export async function generate(
         ...problems.map((p) => `${p.day}: ${p.message}`),
         ...errors.map((v) => `${v.day}: ${v.message}`),
         ...empty,
+        ...routeProblems(plan, c.places, places),
       ],
       offending,
     };
@@ -241,6 +290,7 @@ export async function generate(
       lonLat: p.lonLat,
       outdoor: p.outdoor,
       area: p.area,
+      areas: p.areas,
       hours: deps.describeHours(p),
     })),
     days: Array.from({ length: c.days }, (_, i) => {
@@ -333,5 +383,10 @@ export async function generate(
     if (exclude.size === before) break; // nothing left to drop
   }
 
-  return { ok: false, reason: "insufficient-coverage", attempts };
+  return {
+    ok: false,
+    reason: "insufficient-coverage",
+    attempts,
+    uncovered: [],
+  };
 }
