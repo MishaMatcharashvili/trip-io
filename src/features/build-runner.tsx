@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Constraints } from "@/domain/trip/generate/constraints";
-import { authClient } from "@/lib/auth-client";
+import { withGuestSession } from "@/lib/guest-session";
 import { apiClient } from "@/lib/hono-client";
 import { ButtonLink } from "@/ui/button";
 import { Icon } from "@/ui/icon";
@@ -11,8 +11,7 @@ import { Icon } from "@/ui/icon";
 // Building a trip: one generate call, which takes tens of seconds with the
 // model. The steps are what the pipeline does, in order; they advance on a
 // clock while the call runs and all complete when it answers, then the page
-// moves on to the trip. No session yet means the visitor plans anonymously
-// (context/architecture.md) and the trip is theirs when they sign up.
+// moves on to the trip.
 
 export type BuildStep = { title: string; note: string };
 
@@ -21,13 +20,9 @@ type State =
   | { kind: "failed"; message: string };
 
 async function generate(constraints: Constraints) {
-  const call = () => apiClient.api.trips.generate.$post({ json: constraints });
-  let res = await call();
-  if ((res.status as number) === 401) {
-    const { error } = await authClient.signIn.anonymous();
-    if (error) throw new Error("Couldn’t start a session to plan in.");
-    res = await call();
-  }
+  const res = await withGuestSession(() =>
+    apiClient.api.trips.generate.$post({ json: constraints }),
+  );
   const body = (await res.json().catch(() => null)) as {
     id?: string;
     error?: string;
