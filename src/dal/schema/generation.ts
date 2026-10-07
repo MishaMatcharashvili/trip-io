@@ -7,6 +7,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { user } from "./auth.ts";
 import { id, tstz } from "./columns.ts";
 import { trip } from "./trip.ts";
 
@@ -41,4 +42,22 @@ export const tripGeneration = pgTable(
     createdAt: tstz("created_at"),
   },
   (t) => [index("trip_generation_created_idx").on(t.createdAt)],
+);
+
+// One row per "Build this trip". The browser mints the id, so a reload, a
+// second tab or the back button asks for the same build rather than another:
+// the first claim runs it, and everyone after is told where it stands.
+export const generationRequest = pgTable(
+  "generation_request",
+  {
+    id: uuid("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    tripId: uuid("trip_id").references(() => trip.id, { onDelete: "set null" }),
+    // pending | done | cancelled
+    status: text("status").notNull().default("pending"),
+    createdAt: tstz("created_at"),
+  },
+  (t) => [index("generation_request_created_idx").on(t.createdAt)],
 );
