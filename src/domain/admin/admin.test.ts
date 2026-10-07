@@ -15,13 +15,17 @@ describe("feed vocabulary", () => {
   test("names an outlet by its name and a detector by what it is", () => {
     assert.equal(sourceLabel("civil-ge"), "Civil Georgia");
     assert.equal(sourceLabel("open-meteo"), "Open-Meteo forecast");
+    assert.equal(sourceLabel("georoad"), "Roads Department (georoad.ge)");
     assert.equal(sourceLabel("something-new"), "something-new");
   });
 
-  test("puts every event source on a channel", () => {
-    assert.equal(channelOfEvent("open-meteo"), "weather");
-    assert.equal(channelOfEvent("road-report"), "roads");
-    assert.equal(channelOfEvent("news-safety"), "safety");
+  test("puts every event kind on a channel", () => {
+    assert.equal(channelOfEvent("weather.rain"), "weather");
+    assert.equal(channelOfEvent("road.closure"), "roads");
+    assert.equal(channelOfEvent("rail.delayed"), "rail");
+    assert.equal(channelOfEvent("safety.demonstration"), "safety");
+    assert.equal(channelOfEvent("event.festival"), "events");
+    assert.equal(channelOfEvent("hours.closed"), "hours");
   });
 
   test("quotes a detector's sentence and builds a forecast's from its reading", () => {

@@ -24,27 +24,44 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
 };
 
 /** The event sources the pipeline writes itself, by the id `world_event.source` carries. */
-const EVENT_SOURCES: Record<string, { channel: Channel; label: string }> = {
-  "open-meteo": { channel: "weather", label: "Open-Meteo forecast" },
-  "road-report": {
-    channel: "roads",
-    label: "Road reports (Telegram, Roads Department)",
-  },
-  "rail-report": { channel: "rail", label: "Rail reports (Telegram)" },
-  "hours-report": { channel: "hours", label: "Opening-hours reports" },
-  "news-events": { channel: "events", label: "News: events detector" },
-  "news-safety": { channel: "safety", label: "News: safety detector" },
+const EVENT_SOURCES: Record<string, string> = {
+  "open-meteo": "Open-Meteo forecast",
+  "road-report": "Road reports (Telegram, Roads Department)",
+  "rail-report": "Rail reports (Telegram)",
+  "hours-report": "Opening-hours reports",
+  "news-events": "News: events detector",
+  "news-safety": "News: safety detector",
+  // Not a news feed: the Roads Department's own notices, read by a model.
+  georoad: "Roads Department (georoad.ge)",
 };
 
-export function channelOfEvent(source: string): Channel {
-  return EVENT_SOURCES[source]?.channel ?? "events";
+/**
+ * The channel an event came in on, from its kind rather than its source: the
+ * kind's prefix is the detector's (`event.` and `safety.` are the news
+ * detectors'), where `source` has named an outlet as well as a detector.
+ */
+export function channelOfEvent(kind: string): Channel {
+  switch (kind.split(".")[0]) {
+    case "weather":
+      return "weather";
+    case "road":
+      return "roads";
+    case "rail":
+      return "rail";
+    case "hours":
+      return "hours";
+    case "safety":
+      return "safety";
+    default:
+      return "events";
+  }
 }
 
 /** A source id as a person reads it: an outlet's name, or what the detector is. */
 export function sourceLabel(source: string): string {
   return (
     NEWS_SOURCES.find((s) => s.id === source)?.name ??
-    EVENT_SOURCES[source]?.label ??
+    EVENT_SOURCES[source] ??
     source
   );
 }
