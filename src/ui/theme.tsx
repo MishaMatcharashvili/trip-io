@@ -22,7 +22,17 @@ function apply(preference: ThemePreference) {
   const dark =
     preference === "dark" ||
     (preference === "system" && window.matchMedia(DARK_QUERY).matches);
-  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  const root = document.documentElement;
+  const theme = dark ? "dark" : "light";
+  if (root.getAttribute("data-theme") === theme) return;
+  // Only some controls carry a colour transition, so left alone they fade
+  // while everything else snaps — a flicker. Hold transitions off (globals.css)
+  // until the new colours have painted.
+  root.setAttribute("data-theme-switching", "");
+  root.setAttribute("data-theme", theme);
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => root.removeAttribute("data-theme-switching")),
+  );
 }
 
 function setPreference(preference: ThemePreference) {

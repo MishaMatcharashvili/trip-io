@@ -4,7 +4,8 @@ import { dayKey, type TripDoc, type TripHeader } from "../document.ts";
 import { CIVIL, sunWindow } from "../sun.ts";
 import type { TravelEstimator } from "../travel.ts";
 import { type Violation, validateDoc } from "../validate.ts";
-import { type Constraints, cacheKey } from "./constraints.ts";
+import { cacheKey } from "./cache-key.ts";
+import type { Constraints } from "./constraints.ts";
 import { fallbackPlan } from "./fallback.ts";
 import {
   type Candidate,

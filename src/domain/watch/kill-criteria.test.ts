@@ -195,6 +195,7 @@ describe("model-call purposes", () => {
       "briefing",
       "compose",
       "extract",
+      "intake",
       "judge",
       "road",
       "suggest",

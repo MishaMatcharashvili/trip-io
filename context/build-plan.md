@@ -81,7 +81,7 @@ don't slip in lockstep with calendar weeks. Everything in scope except offline (
 ## Phase 6 — web client
 
 - [x] Map — `TripMap` on every map surface: the trip, the day, the stop, home, Explore, `/new`. Was MapLibre + PMTiles from blob storage with OSRM roads; now Mapbox GL JS with Directions API roads (`docs/mapbox.md`)
-- [x] Trip creation and editing UI — `/new` reads a sentence into constraints (`request.ts`) and builds on `/new/building`; the day editor moves, shortens, removes and adds stops; add a day; plan a trip again on new dates
+- [x] Trip creation and editing UI — `/new` is a conversation with a planner model (`intake.ts`, falling back to `request.ts`) that keeps the constraints and the traveller's notes, and builds on `/new/building` only when asked, once per request id; the day editor moves, shortens, removes and adds stops; add a day; plan a trip again on new dates
 - [x] Itinerary view — the active trip, the whole trip, the day and the stop read the database (`tripScreen` → `tripModel`); "ask about your trip" answers from the trip
 - [x] Checkpoint/undo UI — `/trips/{id}/history`: every version, undo on the head, restore on any earlier one
 - [x] Settings: channels, quiet hours, frequency — plus per-trip muted sources, which the matcher honours (migration 0011)

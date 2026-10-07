@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { type RoadSeason, roadSeason } from "@/domain/catalogue/road-season";
+import { roadSeason } from "@/domain/catalogue/road-season";
+import { Summary } from "@/features/accordion-summary";
 import { type AreaChip, ExploreScreen } from "@/features/explore-screen";
+import { RoadsThisSeason } from "@/features/roads-this-season";
 import { areaCounts, tbilisiToday } from "@/features/shared-reads";
 import { SiteFrame } from "@/features/site-frame";
 import { ButtonLink } from "@/ui/button";
-import { Divider, Panel } from "@/ui/card";
-import { cx } from "@/ui/cx";
+import { Panel } from "@/ui/card";
 import { Dot } from "@/ui/dot";
-import { Icon } from "@/ui/icon";
 import { Eyebrow, Prose, Title } from "@/ui/text";
 
 export const metadata: Metadata = { title: "Explore" };
@@ -32,83 +32,6 @@ const monthName = (month: number) =>
     timeZone: "UTC",
   });
 
-/** The always-visible row of an accordion card; the chevron turns when it opens. */
-function Summary({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <summary
-      className={cx(
-        "flex cursor-pointer list-none items-center gap-2.5 marker:hidden hover:bg-canvas [&::-webkit-details-marker]:hidden",
-        className,
-      )}
-    >
-      {children}
-      <Icon
-        name="chevronDown"
-        size={14}
-        className="shrink-0 text-ink-faint transition-transform group-open:rotate-180"
-      />
-    </summary>
-  );
-}
-
-function RoadsThisSeason({
-  month,
-  roads,
-}: {
-  month: number;
-  roads: RoadSeason[];
-}) {
-  // The hazards first: a quiet road is the default, and the list is short.
-  const shown = [...roads]
-    .sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "alert" ? -1 : 1))
-    .slice(0, 6);
-  return (
-    <details className="group">
-      <Summary className="px-4 py-3.5">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <Eyebrow>Roads this season · {monthName(month)}</Eyebrow>
-          <Title>What I already know about getting there</Title>
-        </div>
-      </Summary>
-      <Divider />
-      <div className="flex flex-col px-4 py-2">
-        {shown.map((road, i) => (
-          <div
-            key={road.slug}
-            className={cx(
-              "flex items-start gap-2.5 py-2.5",
-              i > 0 && "border-t border-track",
-            )}
-          >
-            <Dot tone={road.tone} className="mt-1.5" />
-            <div className="flex-1">
-              <div className="text-small font-medium">{road.name}</div>
-              <div
-                className={cx(
-                  "text-mini",
-                  road.tone === "alert" ? "text-alert" : "text-ink-faint",
-                )}
-              >
-                {road.status}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="px-4 pb-3 text-micro text-ink-faint">
-        The usual season, not today’s road. A watched trip gets the live
-        reports.
-      </p>
-    </details>
-  );
-}
-
 /** Rtveli, the harvest: worth knowing in September and October only. */
 function SeasonFind() {
   return (
@@ -129,7 +52,7 @@ function SeasonFind() {
           weekend.
         </Prose>
         <div>
-          <ButtonLink href="/#plan" size="sm">
+          <ButtonLink href="/new" size="sm">
             Plan a Kakheti weekend
           </ButtonLink>
         </div>
@@ -156,7 +79,10 @@ export default async function ExplorePage() {
         aside={
           <>
             <Panel className="overflow-hidden">
-              <RoadsThisSeason month={month} roads={roadSeason(month)} />
+              <RoadsThisSeason
+                monthName={monthName(month)}
+                roads={roadSeason(month)}
+              />
             </Panel>
             {month === 9 || month === 10 ? (
               <Panel className="overflow-hidden">

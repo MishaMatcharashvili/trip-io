@@ -1,20 +1,26 @@
 import { randomUUID } from "node:crypto";
 import { candidatesInArea } from "../dal/places.ts";
-import { planCache, recordGeneration } from "../dal/plans.ts";
+import {
+  cancelRequest,
+  claimRequest,
+  finishRequest,
+  planCache,
+  recordGeneration,
+  releaseRequest,
+  requestState,
+} from "../dal/plans.ts";
 import {
   destination,
   destinationName,
 } from "../domain/catalogue/destinations.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
+import { cacheKey } from "../domain/trip/generate/cache-key.ts";
 import {
   CANDIDATE_LIMIT,
   CANDIDATES_PER_AREA_MIN,
   describeHours,
 } from "../domain/trip/generate/candidates.ts";
-import {
-  type Constraints,
-  cacheKey,
-} from "../domain/trip/generate/constraints.ts";
+import type { Constraints } from "../domain/trip/generate/constraints.ts";
 import { assess, reasons } from "../domain/trip/generate/feasibility.ts";
 import {
   type Attempt,
@@ -91,7 +97,9 @@ export type GenerationFailure =
       explanations: string[];
     }
   /** The plan validated on the way out and not on the way in: a bug, not an input problem. */
-  | { ok: false; reason: "rejected"; failure: AppendFailure };
+  | { ok: false; reason: "rejected"; failure: AppendFailure }
+  /** The traveller called it off while it was being composed: nothing was written. */
+  | { ok: false; reason: "cancelled" };
 
 const listed = (names: string[]) =>
   names.length > 1
@@ -144,7 +152,14 @@ function explain(
 export async function generateTrip(
   wanted: Constraints,
   userId: string | null,
-  { compose = composeWithOpenAI }: { compose?: Composer } = {},
+  {
+    compose = composeWithOpenAI,
+    stillWanted = async () => true,
+  }: {
+    compose?: Composer;
+    /** Asked once the plan is ready and before anything is written. */
+    stillWanted?: () => Promise<boolean>;
+  } = {},
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
 
@@ -175,6 +190,11 @@ export async function generateTrip(
     };
   }
 
+  if (!(await stillWanted())) {
+    await recordGeneration(null, key, "cancelled", result.attempts);
+    return { ok: false, reason: "cancelled" };
+  }
+
   const tripId = await createTrip(tripHeaderFor(wanted), userId);
   await recordGeneration(tripId, key, result.source, result.attempts);
 
@@ -199,3 +219,78 @@ export async function generateTrip(
     warnings: written.violations,
   };
 }
+
+export type BuildOutcome =
+  | { kind: "built"; trip: GeneratedTrip }
+  /** This request was built before: the same trip, not another. */
+  | { kind: "existing"; tripId: string }
+  /** Another call holds this request and is still composing. */
+  | { kind: "in-progress" }
+  | { kind: "cancelled" }
+  | {
+      kind: "failed";
+      failure: Exclude<GenerationFailure, { reason: "cancelled" }>;
+    };
+
+export type BuildDeps = {
+  claim: typeof claimRequest;
+  finish: typeof finishRequest;
+  release: typeof releaseRequest;
+  state: typeof requestState;
+  generate: typeof generateTrip;
+};
+
+/**
+ * `generateTrip`, at most once per request id. The browser mints the id when
+ * the traveller asks for the build, so a reload, the back button or a second
+ * tab asks for the same build: the first call composes it and the rest are told
+ * where it stands. A failed build releases the id, so trying again works.
+ */
+export async function buildTripOnce(
+  requestId: string,
+  wanted: Constraints,
+  userId: string,
+  overrides: Partial<BuildDeps> = {},
+): Promise<BuildOutcome> {
+  const deps: BuildDeps = {
+    claim: claimRequest,
+    finish: finishRequest,
+    release: releaseRequest,
+    state: requestState,
+    generate: generateTrip,
+    ...overrides,
+  };
+
+  const claim = await deps.claim(requestId, userId);
+  if (claim.status === "done")
+    return { kind: "existing", tripId: claim.tripId };
+  if (claim.status === "pending") return { kind: "in-progress" };
+  if (claim.status === "cancelled") return { kind: "cancelled" };
+
+  let result: Awaited<ReturnType<typeof generateTrip>>;
+  try {
+    result = await deps.generate(wanted, userId, {
+      stillWanted: async () =>
+        (await deps.state(requestId, userId))?.status === "pending",
+    });
+  } catch (error) {
+    await deps.release(requestId);
+    throw error;
+  }
+
+  if (result.ok) {
+    await deps.finish(requestId, result.tripId);
+    return { kind: "built", trip: result };
+  }
+  if (result.reason === "cancelled") return { kind: "cancelled" };
+  await deps.release(requestId);
+  return { kind: "failed", failure: result };
+}
+
+/** Where one of the traveller's build requests stands, or null if they have none by that id. */
+export const buildState = (requestId: string, userId: string) =>
+  requestState(requestId, userId);
+
+/** Calls a build off. False when it had already finished: the trip exists. */
+export const cancelBuild = (requestId: string, userId: string) =>
+  cancelRequest(requestId, userId);

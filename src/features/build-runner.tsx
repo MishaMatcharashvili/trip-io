@@ -3,16 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Constraints } from "@/domain/trip/generate/constraints";
-import { authClient } from "@/lib/auth-client";
+import { withGuestSession } from "@/lib/guest-session";
 import { apiClient } from "@/lib/hono-client";
-import { ButtonLink } from "@/ui/button";
+import { Button, ButtonLink } from "@/ui/button";
 import { Icon } from "@/ui/icon";
+import { forgetConversation } from "./new-trip";
 
 // Building a trip: one generate call, which takes tens of seconds with the
 // model. The steps are what the pipeline does, in order; they advance on a
 // clock while the call runs and all complete when it answers, then the page
-// moves on to the trip. No session yet means the visitor plans anonymously
-// (context/architecture.md) and the trip is theirs when they sign up.
+// moves on to the trip.
 
 export type BuildStep = { title: string; note: string };
 
@@ -27,14 +27,44 @@ class BuildFailure extends Error {
   }
 }
 
-async function generate(constraints: Constraints) {
-  const call = () => apiClient.api.trips.generate.$post({ json: constraints });
-  let res = await call();
-  if ((res.status as number) === 401) {
-    const { error } = await authClient.signIn.anonymous();
-    if (error) throw new BuildFailure(["Couldn’t start a session to plan in."]);
-    res = await call();
+/** The build was called off: not a failure, and not something to show as one. */
+class Cancelled extends Error {}
+
+const POLL_MS = 3000;
+
+/** Waits on a build another call is running, until it has a trip or has none. */
+async function awaitBuild(requestId: string, alive: () => boolean) {
+  while (alive()) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    const res = await apiClient.api.trips.generate[":requestId"].$get({
+      param: { requestId },
+    });
+    const body = (await res.json().catch(() => null)) as {
+      status?: string;
+      tripId?: string;
+    } | null;
+    if (body?.status === "done" && body.tripId) return body.tripId;
+    if (body?.status === "cancelled") throw new Cancelled();
+    // Released: the call that held it failed.
+    if (body?.status === "unknown") break;
   }
+  throw new Error(FAILED);
+}
+
+const FAILED =
+  "The trip couldn’t be built. Try again, or change what you asked for.";
+
+async function generate(
+  constraints: Constraints,
+  requestId: string | undefined,
+  alive: () => boolean,
+) {
+  const res = await withGuestSession(() =>
+    apiClient.api.trips.generate.$post({
+      json: { ...constraints, requestId },
+    }),
+  );
+  const status = res.status as number;
   const body = (await res.json().catch(() => null)) as {
     id?: string;
     error?: string;
@@ -42,22 +72,53 @@ async function generate(constraints: Constraints) {
     explanations?: string[];
   } | null;
   if (res.ok && body?.id) return body.id;
+  // This request is already being built — by this page before a reload, or
+  // by another tab. Wait for that one rather than start another.
+  if (status === 202 && requestId) return awaitBuild(requestId, alive);
+  if (body?.error === "cancelled") throw new Cancelled();
   throw new BuildFailure(
-    body?.explanations?.length
-      ? body.explanations
-      : [
-          body?.message ??
-            "The trip couldn’t be built. Try again, or change what you asked for.",
-        ],
+    body?.explanations?.length ? body.explanations : [body?.message ?? FAILED],
+  );
+}
+
+/**
+ * Calls the build off and goes back to the conversation. A build that has
+ * already finished cannot be called off: the page is about to open the trip.
+ */
+export function CancelBuild({ requestId }: { requestId?: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      variant="ghost"
+      disabled={busy}
+      onClick={async () => {
+        if (!requestId) return router.push("/new");
+        setBusy(true);
+        const res = await apiClient.api.trips.generate[
+          ":requestId"
+        ].cancel.$post({ param: { requestId } });
+        const body = (await res.json().catch(() => null)) as {
+          cancelled?: boolean;
+        } | null;
+        if (body?.cancelled === false) return;
+        router.push("/new");
+      }}
+    >
+      Cancel
+    </Button>
   );
 }
 
 export function BuildRunner({
   constraints,
   steps,
+  requestId,
 }: {
   constraints: Constraints;
   steps: BuildStep[];
+  /** Minted on /new when the build was asked for: the same id is the same build. */
+  requestId?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "running", step: 0 });
@@ -77,22 +138,29 @@ export function BuildRunner({
         ),
       9000,
     );
-    generate(constraints)
+    let alive = true;
+    generate(constraints, requestId, () => alive)
       .then((id) => {
         clearInterval(clock);
         setState({ kind: "running", step: steps.length });
+        forgetConversation();
         router.replace(`/trips/${id}`);
       })
       .catch((error: Error) => {
         clearInterval(clock);
-        setState({
-          kind: "failed",
-          reasons:
-            error instanceof BuildFailure ? error.reasons : [error.message],
-        });
+        if (error instanceof Cancelled) router.replace("/new");
+        else
+          setState({
+            kind: "failed",
+            reasons:
+              error instanceof BuildFailure ? error.reasons : [error.message],
+          });
       });
-    return () => clearInterval(clock);
-  }, [constraints, steps.length, router]);
+    return () => {
+      alive = false;
+      clearInterval(clock);
+    };
+  }, [constraints, requestId, steps.length, router]);
 
   const current = state.kind === "running" ? state.step : -1;
   const progress =
@@ -166,7 +234,7 @@ export function BuildRunner({
             </span>
           ))}
           <div>
-            <ButtonLink href="/#plan" size="sm">
+            <ButtonLink href="/new" size="sm">
               Change what I asked for
             </ButtonLink>
           </div>

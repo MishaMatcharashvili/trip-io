@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
+import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
 import { submitSurvey } from "@/bll/survey.ts";
@@ -20,7 +21,12 @@ import {
   tripView,
   undoLast,
 } from "@/bll/trip-document.ts";
-import { generateTrip } from "@/bll/trip-generation.ts";
+import {
+  buildState,
+  buildTripOnce,
+  cancelBuild,
+  generateTrip,
+} from "@/bll/trip-generation.ts";
 import { itineraryFile, myTrips } from "@/bll/trip-screen.ts";
 import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
 import {
@@ -30,6 +36,11 @@ import {
 import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
 import { tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
+import {
+  INTAKE_MAX_TURNS,
+  intakeMessage,
+  intakeState,
+} from "@/domain/trip/generate/intake.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
@@ -119,38 +130,126 @@ export const trips = new Hono<SessionEnv>()
     ),
   )
 
-  // Constraints in, a validated trip out (src/bll/trip-generation.ts).
-  .post("/generate", zValidator("json", constraints), async (c) => {
-    const result = await generateTrip(c.req.valid("json"), c.get("userId"));
+  // One turn of the conversation on /new (src/bll/intake.ts): the request as
+  // it stands and the messages so far in, a reply and the request as it now
+  // stands out. Builds nothing.
+  .post(
+    "/intake",
+    zValidator(
+      "json",
+      z.object({
+        state: intakeState,
+        messages: z
+          .array(intakeMessage)
+          .min(1)
+          .max(INTAKE_MAX_TURNS * 2)
+          .refine((m) => m[m.length - 1]?.role === "traveller", {
+            message: "the last message must be the traveller's",
+          })
+          .refine(
+            (m) =>
+              m.filter((x) => x.role === "traveller").length <=
+              INTAKE_MAX_TURNS,
+            { message: "too many turns" },
+          ),
+      }),
+    ),
+    async (c) => {
+      const { state, messages } = c.req.valid("json");
+      const turn = await planningTurn(c.get("userId"), state, messages);
+      return turn.ok
+        ? c.json(turn)
+        : c.json({ ok: false as const, reason: turn.reason }, 429);
+    },
+  )
 
-    if (!result.ok) {
-      if (result.reason === "rejected") {
-        const { body, status } = failure(result.failure);
-        return c.json(body, status);
+  // Constraints in, a validated trip out (src/bll/trip-generation.ts). With a
+  // `requestId` the build happens once however often it is asked for: a
+  // repeat gets the same trip, or 202 while the first call is still composing.
+  .post(
+    "/generate",
+    zValidator(
+      "json",
+      z.object({ ...constraints.shape, requestId: z.uuid().optional() }),
+    ),
+    async (c) => {
+      const { requestId, ...wanted } = c.req.valid("json");
+      const userId = c.get("userId");
+
+      let result: Awaited<ReturnType<typeof generateTrip>>;
+      if (requestId) {
+        const outcome = await buildTripOnce(requestId, wanted, userId);
+        if (outcome.kind === "existing") {
+          return c.json({ id: outcome.tripId }, 200);
+        }
+        if (outcome.kind === "in-progress") {
+          return c.json({ status: "in-progress" as const }, 202);
+        }
+        if (outcome.kind === "cancelled") {
+          return c.json({ error: "cancelled" as const }, 409);
+        }
+        result = outcome.kind === "built" ? outcome.trip : outcome.failure;
+      } else {
+        result = await generateTrip(wanted, userId);
       }
-      // Either way the traveller is told why, in terms of what they asked for.
+
+      if (!result.ok) {
+        if (result.reason === "cancelled") {
+          return c.json({ error: "cancelled" as const }, 409);
+        }
+        if (result.reason === "rejected") {
+          const { body, status } = failure(result.failure);
+          return c.json(body, status);
+        }
+        // Either way the traveller is told why, in terms of what they asked for.
+        return c.json(
+          {
+            error: result.reason,
+            message: result.explanations.join(" "),
+            explanations: result.explanations,
+            attempts: result.reason === "impossible" ? [] : result.attempts,
+          },
+          422,
+        );
+      }
+
       return c.json(
         {
-          error: result.reason,
-          message: result.explanations.join(" "),
-          explanations: result.explanations,
-          attempts: result.reason === "impossible" ? [] : result.attempts,
+          id: result.tripId,
+          source: result.source,
+          head: result.head,
+          doc: result.doc,
+          warnings: result.warnings,
         },
-        422,
+        201,
       );
-    }
+    },
+  )
 
-    return c.json(
-      {
-        id: result.tripId,
-        source: result.source,
-        head: result.head,
-        doc: result.doc,
-        warnings: result.warnings,
-      },
-      201,
-    );
-  })
+  // Where a build request stands, for a page that arrived while it was running.
+  .get(
+    "/generate/:requestId",
+    zValidator("param", z.object({ requestId: z.uuid() })),
+    async (c) => {
+      const state = await buildState(
+        c.req.valid("param").requestId,
+        c.get("userId"),
+      );
+      return c.json(state ?? { status: "unknown" as const });
+    },
+  )
+
+  .post(
+    "/generate/:requestId/cancel",
+    zValidator("param", z.object({ requestId: z.uuid() })),
+    async (c) =>
+      c.json({
+        cancelled: await cancelBuild(
+          c.req.valid("param").requestId,
+          c.get("userId"),
+        ),
+      }),
+  )
 
   .get("/:id", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");

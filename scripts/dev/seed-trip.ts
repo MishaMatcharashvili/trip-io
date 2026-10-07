@@ -70,6 +70,7 @@ const result = await generateTrip(
     party: { adults: 2, children: 0 },
     mobility: "moderate",
     budgetEur: 900,
+    notes: "",
   },
   owner.id,
   values.model ? {} : { compose: skipModel },

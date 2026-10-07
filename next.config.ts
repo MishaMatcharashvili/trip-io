@@ -22,8 +22,6 @@ const nextConfig: NextConfig = {
   // Not permanent: browsers keep a 308 for good, and this may move again.
   async redirects() {
     return [
-      // The trip input is on the landing page now; /new is where it used to be.
-      { source: "/new", destination: "/#plan", permanent: false },
       {
         source: "/trips/:tripId/day/:dayId",
         destination: "/trips/:tripId/trip?day=:dayId",
