@@ -21,7 +21,12 @@ import {
   tripView,
   undoLast,
 } from "@/bll/trip-document.ts";
-import { generateTrip } from "@/bll/trip-generation.ts";
+import {
+  buildState,
+  buildTripOnce,
+  cancelBuild,
+  generateTrip,
+} from "@/bll/trip-generation.ts";
 import { itineraryFile, myTrips } from "@/bll/trip-screen.ts";
 import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
 import {
@@ -158,37 +163,92 @@ export const trips = new Hono<SessionEnv>()
     },
   )
 
-  // Constraints in, a validated trip out (src/bll/trip-generation.ts).
-  .post("/generate", zValidator("json", constraints), async (c) => {
-    const result = await generateTrip(c.req.valid("json"), c.get("userId"));
+  // Constraints in, a validated trip out (src/bll/trip-generation.ts). With a
+  // `requestId` the build happens once however often it is asked for: a
+  // repeat gets the same trip, or 202 while the first call is still composing.
+  .post(
+    "/generate",
+    zValidator(
+      "json",
+      z.object({ ...constraints.shape, requestId: z.uuid().optional() }),
+    ),
+    async (c) => {
+      const { requestId, ...wanted } = c.req.valid("json");
+      const userId = c.get("userId");
 
-    if (!result.ok) {
-      if (result.reason === "rejected") {
-        const { body, status } = failure(result.failure);
-        return c.json(body, status);
+      let result: Awaited<ReturnType<typeof generateTrip>>;
+      if (requestId) {
+        const outcome = await buildTripOnce(requestId, wanted, userId);
+        if (outcome.kind === "existing") {
+          return c.json({ id: outcome.tripId }, 200);
+        }
+        if (outcome.kind === "in-progress") {
+          return c.json({ status: "in-progress" as const }, 202);
+        }
+        if (outcome.kind === "cancelled") {
+          return c.json({ error: "cancelled" as const }, 409);
+        }
+        result = outcome.kind === "built" ? outcome.trip : outcome.failure;
+      } else {
+        result = await generateTrip(wanted, userId);
       }
+
+      if (!result.ok) {
+        if (result.reason === "cancelled") {
+          return c.json({ error: "cancelled" as const }, 409);
+        }
+        if (result.reason === "rejected") {
+          const { body, status } = failure(result.failure);
+          return c.json(body, status);
+        }
+        return c.json(
+          {
+            error: "insufficient-coverage" as const,
+            message:
+              "There aren't enough hand-verified places in those areas yet to build a trip.",
+            attempts: result.attempts,
+          },
+          422,
+        );
+      }
+
       return c.json(
         {
-          error: "insufficient-coverage" as const,
-          message:
-            "There aren't enough hand-verified places in those areas yet to build a trip.",
-          attempts: result.attempts,
+          id: result.tripId,
+          source: result.source,
+          head: result.head,
+          doc: result.doc,
+          warnings: result.warnings,
         },
-        422,
+        201,
       );
-    }
+    },
+  )
 
-    return c.json(
-      {
-        id: result.tripId,
-        source: result.source,
-        head: result.head,
-        doc: result.doc,
-        warnings: result.warnings,
-      },
-      201,
-    );
-  })
+  // Where a build request stands, for a page that arrived while it was running.
+  .get(
+    "/generate/:requestId",
+    zValidator("param", z.object({ requestId: z.uuid() })),
+    async (c) => {
+      const state = await buildState(
+        c.req.valid("param").requestId,
+        c.get("userId"),
+      );
+      return c.json(state ?? { status: "unknown" as const });
+    },
+  )
+
+  .post(
+    "/generate/:requestId/cancel",
+    zValidator("param", z.object({ requestId: z.uuid() })),
+    async (c) =>
+      c.json({
+        cancelled: await cancelBuild(
+          c.req.valid("param").requestId,
+          c.get("userId"),
+        ),
+      }),
+  )
 
   .get("/:id", zValidator("param", params), async (c) => {
     const { id } = c.req.valid("param");
