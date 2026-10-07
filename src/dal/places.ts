@@ -5,11 +5,7 @@ import {
   categoryGroups,
   isOutdoor,
 } from "../domain/catalogue/categories.ts";
-import {
-  type AreaMatch,
-  areaBySlug,
-  type FocusAreaSlug,
-} from "../domain/catalogue/focus-areas.ts";
+import type { AreaMatch } from "../domain/catalogue/focus-areas.ts";
 import {
   type OpeningHours,
   openingHours,
@@ -223,7 +219,7 @@ export async function insertCurated(
  * the plan is written (context/architecture.md, place.tier).
  */
 export async function candidatesInArea(
-  slug: FocusAreaSlug,
+  { slug, match }: { slug: string; match: AreaMatch },
   limit: number,
 ): Promise<Candidate[]> {
   const rows = await db.execute(sql`
@@ -237,7 +233,7 @@ export async function candidatesInArea(
              ) AS rank
       FROM place p
       WHERE p.tier IN ('curated', 'verified')
-        AND ${areaPredicate(areaBySlug(slug).match)}
+        AND ${areaPredicate(match)}
     ) ranked
     ORDER BY tier = 'curated' DESC, rank, name
     LIMIT ${limit}
@@ -257,6 +253,7 @@ export async function candidatesInArea(
       openingHours: parsed?.success ? parsed.data : null,
       outdoor: isOutdoor(category),
       area: slug,
+      areas: [slug],
     } satisfies Candidate;
   });
 }

@@ -1,4 +1,4 @@
-import type { FocusAreaSlug } from "../../catalogue/focus-areas.ts";
+import { destinationName } from "../../catalogue/destinations.ts";
 import { haversineM, type LonLat } from "../../geo.ts";
 import type { Pace } from "../document.ts";
 import type { Constraints } from "./constraints.ts";
@@ -65,9 +65,9 @@ const byId = (a: Candidate, b: Candidate) => (a.id < b.id ? -1 : 1);
  */
 export function splitDays(
   days: number,
-  areas: FocusAreaSlug[],
-  weight: (area: FocusAreaSlug) => number,
-): FocusAreaSlug[] {
+  areas: readonly string[],
+  weight: (area: string) => number,
+): string[] {
   const used = areas.slice(0, days);
   const total = used.reduce((s, a) => s + Math.max(1, weight(a)), 0);
   const counts = used.map(
@@ -83,11 +83,11 @@ export function splitDays(
     if (left-- <= 0) break;
     whole[i]++;
   }
-  return used.flatMap((a, i) => Array<FocusAreaSlug>(whole[i]).fill(a));
+  return used.flatMap((a, i) => Array<string>(whole[i]).fill(a));
 }
 
 export function fallbackPlan(
-  c: Pick<Constraints, "days" | "areas" | "pace" | "interests">,
+  c: Pick<Constraints, "days" | "places" | "pace" | "interests">,
   candidates: readonly Candidate[],
   exclude: ReadonlySet<string> = new Set(),
 ): Plan {
@@ -97,14 +97,14 @@ export function fallbackPlan(
     c.interests.length === 0 ||
     (c.interests as readonly string[]).includes(p.group);
 
-  const inArea = (area: FocusAreaSlug) => pool.filter((p) => p.area === area);
+  const inArea = (area: string) => pool.filter((p) => p.areas.includes(area));
   const dayAreas = splitDays(
     c.days,
-    c.areas,
+    c.places,
     (a) => inArea(a).filter(visitable).length,
   );
 
-  const stayFor = new Map<FocusAreaSlug, Candidate | undefined>();
+  const stayFor = new Map<string, Candidate | undefined>();
   for (const area of new Set(dayAreas)) {
     const things = inArea(area).filter((p) => p.group !== "lodging");
     const score = (s: Candidate) =>
@@ -184,7 +184,7 @@ export function fallbackPlan(
 
     return {
       day: i + 1,
-      theme: `${area} (fallback)`,
+      theme: destinationName(area),
       stayId: stay?.id ?? null,
       stops,
     };

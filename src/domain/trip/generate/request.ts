@@ -1,4 +1,4 @@
-import type { FocusAreaSlug } from "../../catalogue/focus-areas.ts";
+import { MAX_PLACES, mentions } from "../../catalogue/destinations.ts";
 import type { Pace } from "../document.ts";
 import type { Constraints, Interest } from "./constraints.ts";
 import { addDays } from "./schedule.ts";
@@ -54,15 +54,23 @@ const num = (s: string) => WORD_NUMBERS[s.toLowerCase()] ?? Number(s);
 const NUMBER =
   "(\\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fourteen)";
 
-const AREA_WORDS: [FocusAreaSlug, RegExp][] = [
-  ["tbilisi-core", /\b(tbilisi|capital|old town|sololaki)\b/i],
-  [
-    "kazbegi-corridor",
-    /\b(kazbegi|stepantsminda|gergeti|gudauri|military (road|highway)|mountains?|caucasus|mtskheta)\b/i,
-  ],
-  ["kakheti", /\b(kakheti|wine|wineries|telavi|sighnaghi|signagi|qvevri)\b/i],
-  ["svaneti", /\b(svaneti|mestia|ushguli)\b/i],
+/** What a place is known for, when the sentence names no place at all. */
+const PLACE_HINTS: [string, RegExp][] = [
+  ["kazbegi", /\b(mountains?|caucasus)\b/i],
+  ["kakheti", /\b(wine|wineries|qvevri)\b/i],
+  ["batumi", /\b(beach(es)?|sea)\b/i],
 ];
+
+/** The places named, in order; a name said twice running is said once. */
+function readPlaces(text: string): string[] | null {
+  const named = mentions(text)
+    .map((m) => m.slug)
+    .filter((slug, i, all) => slug !== all[i - 1]);
+  const places = named.length
+    ? named
+    : PLACE_HINTS.filter(([, re]) => re.test(text)).map(([slug]) => slug);
+  return places.length ? places.slice(0, MAX_PLACES) : null;
+}
 
 const INTEREST_WORDS: [Interest, RegExp][] = [
   [
@@ -213,13 +221,10 @@ export function understand(text: string, today: string): Understood {
 
   const days = pick("days", readDays(text), 5);
   const clampedDays = Math.min(21, Math.max(1, days));
-  const areasSaid = AREA_WORDS.filter(([, re]) => re.test(text)).map(
-    ([slug]) => slug,
-  );
-  const areas = pick(
-    "areas",
-    areasSaid.length ? areasSaid.slice(0, 4) : null,
-    clampedDays >= 4 ? ["tbilisi-core", "kazbegi-corridor"] : ["tbilisi-core"],
+  const places = pick(
+    "places",
+    readPlaces(text),
+    clampedDays >= 4 ? ["tbilisi", "kazbegi"] : ["tbilisi"],
   );
   const interestsSaid = INTEREST_WORDS.filter(([, re]) => re.test(text)).map(
     ([interest]) => interest,
@@ -236,7 +241,7 @@ export function understand(text: string, today: string): Understood {
   const constraints: Constraints = {
     startDate: pick("startDate", readStart(text, today), addDays(today, 14)),
     days: clampedDays,
-    areas,
+    places,
     pace,
     interests: pick(
       "interests",

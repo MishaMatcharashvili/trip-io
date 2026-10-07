@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { destinationName } from "@/domain/catalogue/destinations";
 import {
   type Constraints,
   constraints as constraintsSchema,
@@ -200,13 +201,6 @@ function ReferenceBuilding() {
   );
 }
 
-const areaNames: Record<string, string> = {
-  "tbilisi-core": "Tbilisi",
-  "kazbegi-corridor": "Kazbegi",
-  kakheti: "Kakheti",
-  svaneti: "Svaneti",
-};
-
 const WORDS = [
   "",
   "One",
@@ -252,7 +246,12 @@ export default async function BuildingPage({
   const wanted = decode(c);
   if (!wanted) redirect("/");
 
-  const areas = wanted.areas.map((a) => areaNames[a]).join(" and ");
+  // A round trip names its start twice; the heading says each place once.
+  const names = [...new Set(wanted.places)].map(destinationName);
+  const areas =
+    names.length > 2
+      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+      : names.join(" and ");
   const people = wanted.party.adults + wanted.party.children;
   const steps: BuildStep[] = [
     {

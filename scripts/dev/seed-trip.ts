@@ -4,7 +4,7 @@
 // one day today, the rest ahead.
 //
 //   npm run seed:trip -- --email you@example.com
-//   npm run seed:trip -- --email you@example.com --areas kazbegi-corridor,kakheti --days 6
+//   npm run seed:trip -- --email you@example.com --places tbilisi,kazbegi,kakheti --days 6
 //   npm run seed:trip -- --email you@example.com --model      # compose with OpenAI
 //
 // Without --model the composer is skipped and the pipeline's deterministic
@@ -17,17 +17,14 @@ import { generateTrip } from "../../src/bll/trip-generation.ts";
 import { startFreeWatch } from "../../src/bll/watch-pass.ts";
 import { db } from "../../src/dal/client.ts";
 import { user } from "../../src/dal/schema/index.ts";
-import {
-  type FocusAreaSlug,
-  focusAreaSlugs,
-} from "../../src/domain/catalogue/focus-areas.ts";
+import { destinationSlugs } from "../../src/domain/catalogue/destinations.ts";
 import { dayKey } from "../../src/domain/trip/document.ts";
 import type { Composer } from "../../src/domain/trip/generate/pipeline.ts";
 
 const { values } = parseArgs({
   options: {
     email: { type: "string" },
-    areas: { type: "string", default: "tbilisi-core,kazbegi-corridor" },
+    places: { type: "string", default: "tbilisi,kazbegi" },
     days: { type: "string", default: "5" },
     // Days from today the trip starts on; -1 makes today its second day.
     start: { type: "string", default: "-1" },
@@ -49,10 +46,12 @@ if (!owner) {
   process.exit(1);
 }
 
-const areas = values.areas.split(",") as FocusAreaSlug[];
-for (const area of areas) {
-  if (!focusAreaSlugs.includes(area)) {
-    console.error(`unknown area ${area}; one of ${focusAreaSlugs.join(", ")}`);
+const places = values.places.split(",");
+for (const place of places) {
+  if (!destinationSlugs.includes(place)) {
+    console.error(
+      `unknown place ${place}; one of ${destinationSlugs.join(", ")}`,
+    );
     process.exit(1);
   }
 }
@@ -65,7 +64,7 @@ const result = await generateTrip(
   {
     startDate: dayKey(Date.now() + Number(values.start) * 86_400_000),
     days: Number(values.days),
-    areas,
+    places,
     pace: "moderate",
     interests: ["heritage", "nature", "food"],
     party: { adults: 2, children: 0 },

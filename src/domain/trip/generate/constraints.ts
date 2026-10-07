@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { focusAreaSlugs } from "../../catalogue/focus-areas.ts";
+import { destinationSlugs, MAX_PLACES } from "../../catalogue/destinations.ts";
 import { paces } from "../document.ts";
 
 // What the traveller asks for on /new. Also the input to the warm-start cache
@@ -13,7 +13,12 @@ export type Interest = (typeof interests)[number];
 export const constraints = z.object({
   startDate: z.iso.date(),
   days: z.number().int().min(1).max(21),
-  areas: z.array(z.enum(focusAreaSlugs)).min(1).max(4),
+  /**
+   * Destinations (src/domain/catalogue/destinations.ts) in the order they are
+   * travelled: the first is where the trip starts, the last where it ends. A
+   * round trip names its start again at the end.
+   */
+  places: z.array(z.enum(destinationSlugs)).min(1).max(MAX_PLACES),
   pace: z.enum(paces),
   interests: z.array(z.enum(interests)).max(interests.length),
   party: z.object({
@@ -30,7 +35,7 @@ export type Constraints = z.infer<typeof constraints>;
  * Bumped whenever the prompt or the plan schema changes, so cached plans from
  * an older prompt are never served.
  */
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 
 const partyKind = ({ adults, children }: Constraints["party"]) =>
   children > 0
@@ -55,7 +60,8 @@ function budgetBand(c: Constraints) {
 export function cacheKey(c: Constraints): string {
   const shape = {
     v: PROMPT_VERSION,
-    areas: [...c.areas].sort(),
+    // In order: the same places the other way round is a different trip.
+    places: c.places,
     days: c.days,
     pace: c.pace,
     interests: [...c.interests].sort(),

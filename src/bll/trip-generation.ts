@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { candidatesInArea } from "../dal/places.ts";
 import { planCache, recordGeneration } from "../dal/plans.ts";
-import type { FocusAreaSlug } from "../domain/catalogue/focus-areas.ts";
+import { destination } from "../domain/catalogue/destinations.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
 import {
   CANDIDATE_LIMIT,
@@ -35,24 +35,36 @@ import {
 // where it meets the catalogue and the log.
 
 /**
- * Places across the requested areas — curated first, verified filling in —
- * spread evenly so one dense area can't crowd the others out of the prompt. A place on the boundary of two areas
- * comes back once, under the first.
+ * Places across the requested destinations — curated first, verified filling
+ * in — spread evenly so one dense destination can't crowd the others out of the
+ * prompt. A place that lies in two of them (Telavi, when Kakheti was asked for
+ * too) comes back once, and knows both.
  */
 export async function loadCandidates(
-  areas: readonly FocusAreaSlug[],
+  places: readonly string[],
   limit = CANDIDATE_LIMIT,
 ): Promise<Candidate[]> {
+  // A round trip names its start twice; it is still one place to retrieve.
+  const wanted = [...new Set(places)].flatMap(
+    (slug) => destination(slug) ?? [],
+  );
   const perArea = Math.max(
     CANDIDATES_PER_AREA_MIN,
-    Math.ceil(limit / Math.max(1, areas.length)),
+    Math.ceil(limit / Math.max(1, wanted.length)),
   );
   const perAreaResults = await Promise.all(
-    areas.map((slug) => candidatesInArea(slug, perArea)),
+    wanted.map((d) => candidatesInArea(d, perArea)),
   );
 
-  const seen = new Set<string>();
-  return perAreaResults.flat().filter((c) => !seen.has(c.id) && seen.add(c.id));
+  const byId = new Map<string, Candidate>();
+  for (const c of perAreaResults.flat()) {
+    const known = byId.get(c.id);
+    byId.set(
+      c.id,
+      known ? { ...known, areas: [...known.areas, ...c.areas] } : c,
+    );
+  }
+  return [...byId.values()];
 }
 
 export type GeneratedTrip = {
@@ -87,7 +99,7 @@ export async function generateTrip(
   const result = await generate(wanted, {
     compose,
     cache: planCache,
-    candidates: await loadCandidates(wanted.areas),
+    candidates: await loadCandidates(wanted.places),
     travel: straightLineTravel,
     newId: randomUUID,
     describeHours,

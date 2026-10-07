@@ -21,15 +21,35 @@ describe("understand", () => {
     assert.ok(constraints.safeParse(c).success);
   });
 
-  test("areas from place names and what they are known for", () => {
+  test("places from their names and what they are known for", () => {
     const { constraints: c } = understand(
       "Long weekend in Kakheti with my partner, lots of wine",
       TODAY,
     );
     assert.equal(c.days, 3);
-    assert.deepEqual(c.areas, ["kakheti"]);
+    assert.deepEqual(c.places, ["kakheti"]);
     assert.deepEqual(c.interests, ["food"]);
     assert.deepEqual(c.party, { adults: 2, children: 0 });
+  });
+
+  test("anywhere in Georgia, in the order it is said", () => {
+    const { constraints: c, said } = understand(
+      "A week: Batumi, Kutaisi and Borjomi",
+      TODAY,
+    );
+    assert.deepEqual(c.places, ["batumi", "kutaisi", "borjomi"]);
+    assert.ok(said.includes("places"));
+    assert.ok(constraints.safeParse(c).success);
+  });
+
+  test("what a place is known for, only when no place is named", () => {
+    assert.deepEqual(understand("wine tasting", TODAY).constraints.places, [
+      "kakheti",
+    ]);
+    assert.deepEqual(
+      understand("mountains around Mestia", TODAY).constraints.places,
+      ["mestia"],
+    );
   });
 
   test("dates, nights, word numbers and lari", () => {
@@ -41,7 +61,7 @@ describe("understand", () => {
     assert.equal(c.startDate, "2026-10-12");
     assert.equal(c.budgetEur, 680);
     assert.equal(c.pace, "packed");
-    assert.deepEqual(c.areas, ["svaneti"]);
+    assert.deepEqual(c.places, ["svaneti"]);
   });
 
   test("a month already past this year means next year", () => {

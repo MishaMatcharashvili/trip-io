@@ -16,7 +16,7 @@ import type { Candidate, Plan, RefPlan } from "./plan.ts";
 const constraints: Constraints = {
   startDate: PREV, // Tuesday; day 2 is Wednesday, when the museum is closed
   days: 2,
-  areas: ["kazbegi-corridor"],
+  places: ["kazbegi"],
   pace: "moderate",
   interests: [],
   party: { adults: 2, children: 0 },
@@ -305,18 +305,15 @@ describe("splitDays", () => {
     assert.deepEqual(
       splitDays(
         7,
-        ["tbilisi-core", "kazbegi-corridor", "kakheti"],
-        (a) =>
-          ({ "tbilisi-core": 40, "kazbegi-corridor": 20, kakheti: 20 })[
-            a as string
-          ] ?? 0,
+        ["tbilisi", "kazbegi", "kakheti"],
+        (a) => ({ tbilisi: 40, kazbegi: 20, kakheti: 20 })[a] ?? 0,
       ),
       [
-        "tbilisi-core",
-        "tbilisi-core",
-        "tbilisi-core",
-        "kazbegi-corridor",
-        "kazbegi-corridor",
+        "tbilisi",
+        "tbilisi",
+        "tbilisi",
+        "kazbegi",
+        "kazbegi",
         "kakheti",
         "kakheti",
       ],

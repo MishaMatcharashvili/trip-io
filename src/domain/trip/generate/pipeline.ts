@@ -78,7 +78,7 @@ export type Attempt = {
 export type GenerateDeps = {
   compose: Composer;
   cache: PlanCache;
-  /** Curated places in the requested areas (candidates.ts). */
+  /** Places in the requested destinations (candidates.ts). */
   candidates: Candidate[];
   travel: TravelEstimator;
   newId: () => string;
@@ -108,7 +108,7 @@ export function tripHeader(c: Constraints): TripHeader {
     party: c.party,
     pace: c.pace,
     budget: `€${c.budgetEur}`,
-    prefs: { areas: c.areas, interests: c.interests, mobility: c.mobility },
+    prefs: { places: c.places, interests: c.interests, mobility: c.mobility },
   };
 }
 

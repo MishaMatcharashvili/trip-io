@@ -220,6 +220,9 @@ export const destinations: readonly Destination[] = [
   region("zugdidi", "Zugdidi", 41.831, 42.474, ["dadiani"]),
 ];
 
+/** A route longer than this is a list, not a trip. */
+export const MAX_PLACES = 8;
+
 export const destinationSlugs = destinations.map((d) => d.slug) as [
   string,
   ...string[],

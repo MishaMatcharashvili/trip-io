@@ -210,7 +210,8 @@ export const candidates = new Map<string, Candidate>(
         category: group,
         group,
         outdoor,
-        area: "kazbegi-corridor" as const,
+        area: "kazbegi",
+        areas: ["kazbegi"],
       },
     ];
   }),

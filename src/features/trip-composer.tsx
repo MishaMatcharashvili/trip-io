@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { focusAreas } from "@/domain/catalogue/focus-areas";
+import {
+  destinationName,
+  destinations,
+  MAX_PLACES,
+} from "@/domain/catalogue/destinations";
 // Types only: constraints.ts hashes with node:crypto, which has no place in
 // the browser bundle.
 import type { Constraints, Interest } from "@/domain/trip/generate/constraints";
@@ -18,12 +22,7 @@ import { Eyebrow } from "@/ui/text";
 // request.ts) and shown back as cards; any card can be corrected by hand, and
 // a correction wins over whatever the sentence says from then on.
 
-const areaNames: Record<string, string> = {
-  "tbilisi-core": "Tbilisi",
-  "kazbegi-corridor": "Kazbegi",
-  kakheti: "Kakheti",
-  svaneti: "Svaneti",
-};
+const byName = [...destinations].sort((a, b) => a.name.localeCompare(b.name));
 
 const interests: Interest[] = ["heritage", "nature", "culture", "food"];
 
@@ -49,7 +48,7 @@ export function encodeConstraints(c: Constraints): string {
     .replace(/=+$/, "");
 }
 
-type Field = "areas" | "days" | "budget" | "interests" | "party";
+type Field = "places" | "days" | "budget" | "interests" | "party";
 
 function Toggle({
   on,
@@ -74,6 +73,79 @@ function Toggle({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * The route, in the order it is travelled: the first place is the start, the
+ * last the finish. Any place in Georgia can be added, and any moved earlier.
+ */
+function PlacesEditor({
+  places,
+  onChange,
+}: {
+  places: string[];
+  onChange: (places: string[]) => void;
+}) {
+  const earlier = (i: number) => {
+    const next = [...places];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next);
+  };
+  return (
+    <>
+      {places.map((slug, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: a round trip names a place twice
+          key={`${slug}-${i}`}
+          className="inline-flex h-8 items-center gap-1 rounded-full border border-control bg-surface pl-3 pr-1 text-mini font-medium"
+        >
+          {places.length > 1 && (i === 0 || i === places.length - 1) ? (
+            <span className="text-ink-faint">
+              {i === 0 ? "Start" : "Finish"}
+            </span>
+          ) : null}
+          {destinationName(slug)}
+          {i > 0 ? (
+            <button
+              type="button"
+              aria-label={`Visit ${destinationName(slug)} earlier`}
+              onClick={() => earlier(i)}
+              className="flex size-6 items-center justify-center rounded-full text-ink-faint hover:bg-fill hover:text-ink"
+            >
+              <Icon name="chevronLeft" size={13} />
+            </button>
+          ) : null}
+          {places.length > 1 ? (
+            <button
+              type="button"
+              aria-label={`Remove ${destinationName(slug)}`}
+              onClick={() => onChange(places.filter((_, j) => j !== i))}
+              className="flex size-6 items-center justify-center rounded-full text-ink-faint hover:bg-fill hover:text-ink"
+            >
+              ×
+            </button>
+          ) : null}
+        </span>
+      ))}
+      {places.length < MAX_PLACES ? (
+        <select
+          aria-label="Add a place"
+          value=""
+          onChange={(e) =>
+            e.target.value && onChange([...places, e.target.value])
+          }
+          className="h-8 rounded-control border border-control bg-surface px-2 text-mini text-ink-muted"
+        >
+          <option value="">Add a place…</option>
+          {byName.map((d) => (
+            <option key={d.slug} value={d.slug}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </>
   );
 }
 
@@ -118,10 +190,14 @@ export function TripComposer({
   const cards: { field: Field; label: string; value: string; note: string }[] =
     [
       {
-        field: "areas",
-        label: "Region",
-        value: c.areas.map((a) => areaNames[a]).join(" · "),
-        note: said("areas") ? "Georgia" : "Assumed — tap to choose",
+        field: "places",
+        label: c.places.length === 1 ? "Place" : "Places",
+        value: c.places.map(destinationName).join(" → "),
+        note: said("places")
+          ? c.places.length === 1
+            ? "Start and finish"
+            : `Start in ${destinationName(c.places[0])}, finish in ${destinationName(c.places.at(-1) as string)}`
+          : "Assumed — tap to choose",
       },
       {
         field: "days",
@@ -238,22 +314,12 @@ export function TripComposer({
 
         {editing ? (
           <Card className="flex flex-wrap items-center gap-3 px-4 py-3">
-            {editing === "areas"
-              ? focusAreas.map((a) => (
-                  <Toggle
-                    key={a.slug}
-                    on={c.areas.includes(a.slug)}
-                    onClick={() => {
-                      const next = c.areas.includes(a.slug)
-                        ? c.areas.filter((s) => s !== a.slug)
-                        : [...c.areas, a.slug];
-                      if (next.length) set({ areas: next });
-                    }}
-                  >
-                    {areaNames[a.slug]}
-                  </Toggle>
-                ))
-              : null}
+            {editing === "places" ? (
+              <PlacesEditor
+                places={c.places}
+                onChange={(places) => set({ places })}
+              />
+            ) : null}
             {editing === "days" ? (
               <>
                 <label className="flex items-center gap-2 text-small">
