@@ -33,11 +33,14 @@ import {
   watchSettings as readWatchSettings,
   updateWatchSettings,
 } from "@/bll/watch-settings.ts";
+import { destinations } from "@/domain/catalogue/destinations.ts";
 import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
-import { tripHeader } from "@/domain/trip/document.ts";
+import { dayKey, tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
+import { assessAsked } from "@/domain/trip/generate/feasibility.ts";
 import {
   INTAKE_MAX_TURNS,
+  initialState,
   intakeMessage,
   intakeState,
 } from "@/domain/trip/generate/intake.ts";
@@ -130,9 +133,22 @@ export const trips = new Hono<SessionEnv>()
     ),
   )
 
+  // Where a conversation starts, for a client that cannot run the domain's
+  // code itself (the phone app imports this package's types only): the request
+  // with every field a default, whether it can be done, and what the places in
+  // it are called.
+  .get("/intake", (c) => {
+    const state = initialState(dayKey(new Date()));
+    return c.json({
+      state,
+      assessment: assessAsked(state.constraints),
+      destinations: destinations.map(({ slug, name }) => ({ slug, name })),
+    });
+  })
+
   // One turn of the conversation on /new (src/bll/intake.ts): the request as
-  // it stands and the messages so far in, a reply and the request as it now
-  // stands out. Builds nothing.
+  // it stands and the messages so far in, a reply, the request as it now
+  // stands and whether it can be done out. Builds nothing.
   .post(
     "/intake",
     zValidator(
@@ -158,7 +174,10 @@ export const trips = new Hono<SessionEnv>()
       const { state, messages } = c.req.valid("json");
       const turn = await planningTurn(c.get("userId"), state, messages);
       return turn.ok
-        ? c.json(turn)
+        ? c.json({
+            ...turn,
+            assessment: assessAsked(turn.state.constraints, turn.unsupported),
+          })
         : c.json({ ok: false as const, reason: turn.reason }, 429);
     },
   )
