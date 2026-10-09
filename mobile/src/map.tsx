@@ -1,13 +1,14 @@
 import { Image, useColorScheme, useWindowDimensions, View } from "react-native";
 import { mapboxToken } from "~/config";
 import { usePalette } from "~/theme";
+import type { LonLat } from "~/trip-model.ts";
 
 // The map over a trip: a picture of the route from Mapbox's Static Images
 // API, in the style that matches the phone's theme. A picture and not a map
 // view, so it needs no native module and runs in Expo Go; the map to pan and
 // zoom is the web app's.
 
-export type LonLat = readonly [lon: number, lat: number];
+export type { LonLat } from "~/trip-model.ts";
 
 /** Mapbox draws at most this many pixels a side, before @2x. */
 const MAX_SIDE = 1280;
