@@ -42,13 +42,12 @@ const patchWatch = (
   json: {
     channels?: ("push" | "email" | "briefing")[];
     quietHours?: { start: string; end: string } | null;
-    mutedSources?: ("weather" | "road")[];
+    mutedSources?: SourceKey[];
     verbosity?: "affecting" | "nearby";
   },
 ) => read(client().trips[":id"].watch.$patch({ param: { id }, json }));
 
 const CHANNELS = ["push", "email", "briefing"] as const;
-const SOURCE_KEYS = ["weather", "road"] as const;
 
 /** The watch stores plain strings; the route accepts only the known ones. */
 const known = <T extends string>(
@@ -59,6 +58,8 @@ const known = <T extends string>(
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DEFAULT_QUIET = { start: "22:00", end: "08:00" };
 
+// The detectors that exist, in the web screen's words
+// (src/features/watch-settings-form.tsx), and the one the plan has not built.
 const SOURCES = [
   {
     key: "weather",
@@ -70,7 +71,29 @@ const SOURCES = [
     label: "Roads and closures",
     hint: "Only on roads you will actually drive",
   },
+  {
+    key: "rail",
+    label: "Trains",
+    hint: "Checked by hand once a week, so never up to the hour",
+  },
+  {
+    key: "event",
+    label: "Events and street closures",
+    hint: "Read from the news; festivals nearby and streets shut for them",
+  },
+  {
+    key: "hours",
+    label: "Places reported shut",
+    hint: "When other travellers find a place closed on your day",
+  },
+  {
+    key: "safety",
+    label: "Announced demonstrations",
+    hint: "Only what is scheduled and reported by two outlets. Briefing only, never a push",
+  },
 ] as const;
+type SourceKey = (typeof SOURCES)[number]["key"];
+const SOURCE_KEYS = SOURCES.map((s) => s.key);
 
 export default function WatchSettings() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -178,6 +201,13 @@ export default function WatchSettings() {
             }
           />
         ))}
+        <SwitchRow
+          label="Marshrutkas and strikes"
+          hint="Local transport — coming later"
+          value={false}
+          disabled
+          onChange={() => undefined}
+        />
       </Card>
 
       <Eyebrow>How much to tell you</Eyebrow>
