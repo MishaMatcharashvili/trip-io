@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { Constraints } from "./constraints.ts";
-import { assess, reasons, routeLegs } from "./feasibility.ts";
+import { assess, assessAsked, reasons, routeLegs } from "./feasibility.ts";
 
 const trip = (over: Partial<Constraints> = {}): Constraints => ({
   startDate: "2026-07-10",
@@ -99,5 +99,13 @@ describe("assess", () => {
     const a = assess(trip(), [{ name: "Sukhumi", why: "no way in" }]);
     assert.equal(a.places.level, "impossible");
     assert.deepEqual(reasons(a).length, 1);
+  });
+
+  test("a place the planner could not take is refused, known or not", () => {
+    const known = assessAsked(trip(), ["Sukhumi"]);
+    assert.equal(known.possible, false);
+    const unknown = assessAsked(trip(), ["Atlantis"]);
+    assert.match(reasons(unknown)[0] ?? "", /inside Georgia/);
+    assert.equal(assessAsked(trip()).possible, assess(trip()).possible);
   });
 });
