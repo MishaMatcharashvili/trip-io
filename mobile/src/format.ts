@@ -58,3 +58,37 @@ export function ago(instant: string, now: number = Date.now()): string {
   if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
   return dayMonth.format(new Date(instant));
 }
+
+const shortDay = new Intl.DateTimeFormat("en-GB", {
+  timeZone: ZONE,
+  weekday: "short",
+  day: "numeric",
+});
+
+/** "Tue 16", for a YYYY-MM-DD day key. */
+export const dayStamp = (key: string) =>
+  shortDay.format(new Date(`${key}T12:00:00+04:00`));
+
+/** "45 min", "2h", "2h 40m". */
+export function duration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+/** "Today 10:50", "Yesterday 20:12", or "15 Sep 09:05". */
+export function when(instant: string, now: number = Date.now()): string {
+  const key = dayKeyOf(instant);
+  const day =
+    key === dayKeyOf(now)
+      ? "Today"
+      : key === dayKeyOf(now - 86_400_000)
+        ? "Yesterday"
+        : dayMonth.format(new Date(instant));
+  return `${day} ${timeOf(instant)}`;
+}
+
+/** "Sightseeing spot", from a catalogue category such as `sightseeing_spot`. */
+export const words = (slug: string) =>
+  slug.charAt(0).toUpperCase() + slug.slice(1).replace(/[_-]/g, " ");
