@@ -44,12 +44,19 @@ const hex = (colour: string) => colour.replace("#", "");
 export function mapUrl(
   points: readonly LonLat[],
   size: { width: number; height: number },
-  look: { dark: boolean; line: string; pin: string; mark?: LonLat | null },
+  look: {
+    dark: boolean;
+    line: string;
+    pin: string;
+    mark?: LonLat | null;
+    /** Places, not a route: no line between them. */
+    pins?: boolean;
+  },
 ): string | null {
   if (!mapboxToken || points.length === 0) return null;
   const shown = points.slice(0, MAX_PINS);
   const overlays = [
-    ...(shown.length > 1
+    ...(shown.length > 1 && !look.pins
       ? [
           `path-3+${hex(look.line)}-0.9(${encodeURIComponent(encodePolyline(shown))})`,
         ]
@@ -80,11 +87,17 @@ export function RouteMap({
   mark,
   alert,
   dim,
+  pins,
+  bleed = 20,
 }: {
   points: readonly LonLat[];
   height?: number;
   mark?: LonLat | null;
   alert?: boolean;
+  /** Places, not a route: no line between them. */
+  pins?: boolean;
+  /** How far past the screen's own margin it runs, to reach the edges. */
+  bleed?: number;
   /** The watch is not looking: the map is last known, not current. */
   dim?: boolean;
 }) {
@@ -94,14 +107,14 @@ export function RouteMap({
   const uri = mapUrl(
     points,
     { width, height },
-    { dark, line: p.agent, pin: alert ? p.alert : p.agent, mark },
+    { dark, line: p.agent, pin: alert ? p.alert : p.agent, mark, pins },
   );
   if (!uri) return null;
   return (
     <View
       style={{
         height,
-        marginHorizontal: -20,
+        marginHorizontal: -bleed,
         backgroundColor: p.fill,
         opacity: dim ? 0.55 : 1,
       }}
