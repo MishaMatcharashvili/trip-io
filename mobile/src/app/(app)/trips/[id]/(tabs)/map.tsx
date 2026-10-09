@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { client, messageOf, read } from "~/api";
 import { ago, timeOf } from "~/format";
+import { Chevron } from "~/icon";
 import { RouteMap } from "~/map";
 import { StopLine } from "~/stops";
 import {
@@ -303,7 +304,7 @@ export default function TripMap() {
         <Line
           title="Ask about your trip"
           detail="Answered from your itinerary"
-          trailing={<Small faint>›</Small>}
+          trailing={<Chevron />}
           onPress={() =>
             router.push({ pathname: "/trips/[id]/ai", params: { id } })
           }

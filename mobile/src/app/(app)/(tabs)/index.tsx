@@ -3,6 +3,7 @@ import { useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { client, read } from "~/api";
 import { ago, dateRange } from "~/format";
+import { Chevron } from "~/icon";
 import { RouteMap } from "~/map";
 import { usePalette } from "~/theme";
 import {
@@ -105,7 +106,7 @@ export default function Trips() {
                 bold
                 title={trip.title}
                 detail={`${dateRange(trip.startsAt, trip.endsAt)} · ${stops(trip.stops)}`}
-                trailing={<Small faint>›</Small>}
+                trailing={<Chevron />}
                 onPress={() => open(trip.id)}
               />
             ))}
@@ -130,7 +131,7 @@ export default function Trips() {
                       ? `${trip.applied} ${trip.applied === 1 ? "change" : "changes"} handled`
                       : stops(trip.stops)
                   }`}
-                  trailing={<Small faint>›</Small>}
+                  trailing={<Chevron />}
                   onPress={() => open(trip.id)}
                 />
               ))}
@@ -264,7 +265,7 @@ function FirstRun() {
             <Line
               key={example}
               title={example}
-              trailing={<Small faint>›</Small>}
+              trailing={<Chevron />}
               onPress={() => start(example)}
             />
           ))}

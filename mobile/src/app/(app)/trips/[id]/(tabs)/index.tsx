@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, StyleSheet, View } from "react-native";
 import { baseUrl } from "~/config";
 import { dateRange } from "~/format";
+import { Chevron } from "~/icon";
 import { daysOf, loadScreen } from "~/trip";
 import {
   Body,
@@ -142,19 +143,19 @@ export default function FullTrip() {
               ? `At most ${data.watch.cap} interrupts on this trip`
               : "Not watched yet"
           }
-          trailing={<Small faint>›</Small>}
+          trailing={<Chevron />}
           onPress={() => to("/trips/[id]/watch")}
         />
         <Line
           title="Versions of your trip"
           detail={`${data.history.length} ${data.history.length === 1 ? "change" : "changes"} kept`}
-          trailing={<Small faint>›</Small>}
+          trailing={<Chevron />}
           onPress={() => to("/trips/[id]/versions")}
         />
         <Line
           title="The watch layer"
           detail="Planning is free. Watching is what you pay for."
-          trailing={<Small faint>›</Small>}
+          trailing={<Chevron />}
           onPress={() => to("/trips/[id]/pass")}
         />
       </Group>

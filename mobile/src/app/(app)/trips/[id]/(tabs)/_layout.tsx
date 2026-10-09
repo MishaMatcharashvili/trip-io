@@ -1,5 +1,13 @@
 import { Tabs } from "expo-router";
+import type { ColorValue } from "react-native";
+import { Icon, type IconName } from "~/icon";
 import { usePalette } from "~/theme";
+
+const tab =
+  (name: IconName) =>
+  ({ color }: { color: ColorValue }) => (
+    <Icon name={name} size={22} color={color} />
+  );
 
 // Inside a trip: the day, the map, the whole trip, and what the agent has
 // said. The trip's other screens (a day, a stop, its settings) are pushed over
@@ -14,17 +22,26 @@ export default function TripTabsLayout() {
         tabBarActiveTintColor: p.agent,
         tabBarInactiveTintColor: p.inkFaint,
         tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.hairline },
-        // No glyphs: the tabs are named, and the label is the affordance.
-        tabBarIcon: () => null,
-        tabBarLabelStyle: { fontSize: 13, fontWeight: "600" },
-        tabBarIconStyle: { display: "none" },
+        tabBarLabelStyle: { fontSize: 10.5, fontWeight: "600" },
         sceneStyle: { backgroundColor: p.canvas },
       }}
     >
-      <Tabs.Screen name="today" options={{ title: "Today" }} />
-      <Tabs.Screen name="map" options={{ title: "Map" }} />
-      <Tabs.Screen name="index" options={{ title: "Trip" }} />
-      <Tabs.Screen name="ai" options={{ title: "AI" }} />
+      <Tabs.Screen
+        name="today"
+        options={{ title: "Today", tabBarIcon: tab("calendar") }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{ title: "Map", tabBarIcon: tab("map") }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{ title: "Trip", tabBarIcon: tab("list") }}
+      />
+      <Tabs.Screen
+        name="ai"
+        options={{ title: "AI", tabBarIcon: tab("sparkle") }}
+      />
     </Tabs>
   );
 }

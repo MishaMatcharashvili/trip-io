@@ -1,4 +1,5 @@
 import { View } from "react-native";
+import { Chevron } from "~/icon";
 import { type Stop, stopDetail } from "~/trip";
 import { Dot, Line, Small } from "~/ui";
 
@@ -40,7 +41,7 @@ export function StopLine({
           />
         </>
       }
-      trailing={onPress ? <Small faint>›</Small> : null}
+      trailing={onPress ? <Chevron /> : null}
     />
   );
 }
