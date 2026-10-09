@@ -286,12 +286,13 @@ function Fact({
           {note}
         </Small>
       ) : null}
-      {judgement && judgement.level !== "ok" ? (
-        <Small mini tone="alert">
-          {judgement.note}
-        </Small>
-      ) : judgement ? (
-        <Small mini faint>
+      {/* An untroubled judgement often has nothing to add. */}
+      {judgement?.note ? (
+        <Small
+          mini
+          tone={judgement.level === "ok" ? undefined : "alert"}
+          faint={judgement.level === "ok"}
+        >
           {judgement.note}
         </Small>
       ) : null}
