@@ -10,7 +10,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: p.agent,
         tabBarInactiveTintColor: p.inkFaint,
         tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.hairline },
-        // No glyphs: the two tabs are named, and the label is the affordance.
+        // No glyphs: the tabs are named, and the label is the affordance.
         tabBarIcon: () => null,
         tabBarLabelStyle: { fontSize: 13, fontWeight: "600" },
         tabBarIconStyle: { display: "none" },
@@ -18,7 +18,9 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Trips" }} />
-      <Tabs.Screen name="account" options={{ title: "Account" }} />
+      <Tabs.Screen name="explore" options={{ title: "Explore" }} />
+      <Tabs.Screen name="saved" options={{ title: "Saved" }} />
+      <Tabs.Screen name="account" options={{ title: "Profile" }} />
     </Tabs>
   );
 }
