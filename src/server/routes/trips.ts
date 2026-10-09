@@ -77,7 +77,10 @@ const watchSettings = z
       .nullable()
       .optional(),
     // The detector families that exist; muting one stops it being matched.
-    mutedSources: z.array(z.enum(muteFamilies)).max(2).optional(),
+    mutedSources: z
+      .array(z.enum(muteFamilies))
+      .max(muteFamilies.length)
+      .optional(),
     verbosity: z.enum(["affecting", "nearby"]).optional(),
   })
   .refine((s) => Object.values(s).some((v) => v !== undefined), {
