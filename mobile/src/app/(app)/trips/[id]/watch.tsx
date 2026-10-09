@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { client, messageOf, read, statusOf } from "~/api";
@@ -74,6 +74,7 @@ const SOURCES = [
 
 export default function WatchSettings() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { data: watch, error, loading, refresh } = useLoad(() => loadWatch(id));
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -99,10 +100,16 @@ export default function WatchSettings() {
         {error ? <Notice tone="alert">{error}</Notice> : null}
         {loading ? <Loading /> : null}
         {!loading && !error ? (
-          <Notice>
-            Nothing is being watched on this trip yet. Watching starts from the
-            trip on trip.io.
-          </Notice>
+          <>
+            <Notice>Nothing is being watched on this trip yet.</Notice>
+            <Button
+              label="The watch layer"
+              variant="secondary"
+              onPress={() =>
+                router.push({ pathname: "/trips/[id]/pass", params: { id } })
+              }
+            />
+          </>
         ) : null}
       </Screen>
     );
