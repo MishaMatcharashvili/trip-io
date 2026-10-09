@@ -9,7 +9,11 @@ const tab =
     <Icon name={name} size={22} color={color} />
   );
 
-export default function TabsLayout() {
+// Inside a trip: the day, the map, the whole trip, and what the agent has
+// said. The trip's other screens (a day, a stop, its settings) are pushed over
+// these by the stack in ../../../_layout.tsx.
+
+export default function TripTabsLayout() {
   const p = usePalette();
   return (
     <Tabs
@@ -23,20 +27,20 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
+        name="today"
+        options={{ title: "Today", tabBarIcon: tab("calendar") }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{ title: "Map", tabBarIcon: tab("map") }}
+      />
+      <Tabs.Screen
         name="index"
-        options={{ title: "Trips", tabBarIcon: tab("route") }}
+        options={{ title: "Trip", tabBarIcon: tab("list") }}
       />
       <Tabs.Screen
-        name="explore"
-        options={{ title: "Explore", tabBarIcon: tab("explore") }}
-      />
-      <Tabs.Screen
-        name="saved"
-        options={{ title: "Saved", tabBarIcon: tab("bookmark") }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{ title: "Profile", tabBarIcon: tab("user") }}
+        name="ai"
+        options={{ title: "AI", tabBarIcon: tab("sparkle") }}
       />
     </Tabs>
   );

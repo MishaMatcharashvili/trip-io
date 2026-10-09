@@ -2,6 +2,7 @@ import {
   type Destination,
   destination,
   destinationName,
+  unreachable,
 } from "../../catalogue/destinations.ts";
 import { haversineM } from "../../geo.ts";
 import { straightLineTravel } from "../travel.ts";
@@ -211,6 +212,25 @@ export function assess(
     budget,
     possible: [places, days, budget].every((j) => j.level !== "impossible"),
   };
+}
+
+/**
+ * `assess`, with the places the planner could not take. Each is a reason the
+ * trip cannot be done as asked, and the reason is said when it is a known one.
+ */
+export function assessAsked(
+  c: Constraints,
+  unsupported: readonly string[] = [],
+): Assessment {
+  return assess(
+    c,
+    unsupported.map((name) => ({
+      name,
+      why:
+        unreachable(name)[0]?.why ??
+        "it is not somewhere a trip inside Georgia can go",
+    })),
+  );
 }
 
 /** Every reason a request cannot work, in the order the cards are shown. */

@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
+import { briefingPage } from "@/bll/briefing.ts";
 import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
@@ -27,17 +28,25 @@ import {
   cancelBuild,
   generateTrip,
 } from "@/bll/trip-generation.ts";
-import { itineraryFile, myTrips } from "@/bll/trip-screen.ts";
+import {
+  dayForecast,
+  itineraryFile,
+  myTrips,
+  tripScreen,
+} from "@/bll/trip-screen.ts";
 import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
 import {
   watchSettings as readWatchSettings,
   updateWatchSettings,
 } from "@/bll/watch-settings.ts";
+import { destinations } from "@/domain/catalogue/destinations.ts";
 import { ASK_MAX_CHARS } from "@/domain/trip/ask.ts";
-import { tripHeader } from "@/domain/trip/document.ts";
+import { dayKey, tripHeader } from "@/domain/trip/document.ts";
 import { constraints } from "@/domain/trip/generate/constraints.ts";
+import { assessAsked } from "@/domain/trip/generate/feasibility.ts";
 import {
   INTAKE_MAX_TURNS,
+  initialState,
   intakeMessage,
   intakeState,
 } from "@/domain/trip/generate/intake.ts";
@@ -49,6 +58,12 @@ import { requireSession, type SessionEnv } from "../auth.ts";
 // validation, status codes and nothing else.
 
 const params = z.object({ id: z.uuid() });
+
+/** A point as `lon,lat`, the way the catalogue's `near` takes one. */
+const lonLat = z
+  .string()
+  .regex(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/, "expected lon,lat")
+  .transform((s) => s.split(",").map(Number) as [number, number]);
 
 const clockTime = z.string().regex(CLOCK_TIME, "expected HH:MM");
 
@@ -62,7 +77,10 @@ const watchSettings = z
       .nullable()
       .optional(),
     // The detector families that exist; muting one stops it being matched.
-    mutedSources: z.array(z.enum(muteFamilies)).max(2).optional(),
+    mutedSources: z
+      .array(z.enum(muteFamilies))
+      .max(muteFamilies.length)
+      .optional(),
     verbosity: z.enum(["affecting", "nearby"]).optional(),
   })
   .refine((s) => Object.values(s).some((v) => v !== undefined), {
@@ -130,9 +148,22 @@ export const trips = new Hono<SessionEnv>()
     ),
   )
 
+  // Where a conversation starts, for a client that cannot run the domain's
+  // code itself (the phone app imports this package's types only): the request
+  // with every field a default, whether it can be done, and what the places in
+  // it are called.
+  .get("/intake", (c) => {
+    const state = initialState(dayKey(new Date()));
+    return c.json({
+      state,
+      assessment: assessAsked(state.constraints),
+      destinations: destinations.map(({ slug, name }) => ({ slug, name })),
+    });
+  })
+
   // One turn of the conversation on /new (src/bll/intake.ts): the request as
-  // it stands and the messages so far in, a reply and the request as it now
-  // stands out. Builds nothing.
+  // it stands and the messages so far in, a reply, the request as it now
+  // stands and whether it can be done out. Builds nothing.
   .post(
     "/intake",
     zValidator(
@@ -158,7 +189,10 @@ export const trips = new Hono<SessionEnv>()
       const { state, messages } = c.req.valid("json");
       const turn = await planningTurn(c.get("userId"), state, messages);
       return turn.ok
-        ? c.json(turn)
+        ? c.json({
+            ...turn,
+            assessment: assessAsked(turn.state.constraints, turn.unsupported),
+          })
         : c.json({ ok: false as const, reason: turn.reason }, 429);
     },
   )
@@ -259,6 +293,47 @@ export const trips = new Hono<SessionEnv>()
     const view = await tripView(id);
     return view ? c.json(view) : c.json({ error: "not found" }, 404);
   })
+
+  // Everything the trip's screens show, in one read: the document, its places
+  // and where they are, what the watch has matched, the alerts and the patch
+  // log. What the web's pages read on the server, for a client that cannot.
+  .get("/:id/screen", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+
+    const screen = await tripScreen(id);
+    return screen ? c.json(screen) : c.json({ error: "not found" }, 404);
+  })
+
+  // This morning's briefing, or the last one written. Null on a trip that has
+  // not had one yet: an answer, not a missing page.
+  .get("/:id/briefing", zValidator("param", params), async (c) => {
+    const { id } = c.req.valid("param");
+    const access = await accessTrip(id, c.get("userId"));
+    if (!access.ok) return denied(c, access.reason);
+    return c.json({ page: await briefingPage(id) });
+  })
+
+  // The hourly forecast for one day of the trip at one point: the rain ribbon
+  // over a day. Null when the day is over or too far ahead to forecast.
+  .get(
+    "/:id/forecast",
+    zValidator("param", params),
+    zValidator("query", z.object({ date: z.iso.date(), near: lonLat })),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const access = await accessTrip(id, c.get("userId"));
+      if (!access.ok) return denied(c, access.reason);
+
+      const { date, near } = c.req.valid("query");
+      // Rounded as the web's ribbon rounds it, so one town is one forecast.
+      const round = (n: number) => Math.round(n * 10) / 10;
+      return c.json({
+        hours: await dayForecast([round(near[0]), round(near[1])], date),
+      });
+    },
+  )
 
   // The one question after a trip: would you pay for it to be watched
   // (src/bll/survey.ts). Asked once, of the owner, once the trip is over.

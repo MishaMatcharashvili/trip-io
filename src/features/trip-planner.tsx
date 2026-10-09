@@ -2,9 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { unreachable } from "@/domain/catalogue/destinations";
 import type { Constraints } from "@/domain/trip/generate/constraints";
-import { assess } from "@/domain/trip/generate/feasibility";
+import { assessAsked } from "@/domain/trip/generate/feasibility";
 import {
   applyEdit,
   INTAKE_MAX_CHARS,
@@ -117,16 +116,7 @@ export function TripPlanner({
   // A place the planner could not take is a reason the trip cannot be done as
   // asked, with the reason said when it is a known one.
   const verdict = useMemo(
-    () =>
-      assess(
-        state.constraints,
-        (unsupported ?? []).map((name) => ({
-          name,
-          why:
-            unreachable(name)[0]?.why ??
-            "it is not somewhere a trip inside Georgia can go",
-        })),
-      ),
+    () => assessAsked(state.constraints, unsupported),
     [state.constraints, unsupported],
   );
 
