@@ -8,8 +8,10 @@ import { paces } from "../document.ts";
 import {
   type Constraints,
   constraints,
+  DEFAULT_ENDPOINT,
   interests,
   NOTES_MAX_CHARS,
+  routeOf,
 } from "./constraints.ts";
 import { understand } from "./request.ts";
 
@@ -45,6 +47,8 @@ const stated = [
   "startDate",
   "days",
   "places",
+  "start",
+  "finish",
   "pace",
   "interests",
   "party",
@@ -67,6 +71,9 @@ export const intakeReply = z.object({
   days: z.number().nullable(),
   /** The whole route after this turn, in the order it is travelled. */
   places: z.array(z.enum(destinationSlugs)).nullable(),
+  /** Where the traveller arrives and leaves from; null leaves it as it was. */
+  start: z.enum(destinationSlugs).nullable(),
+  finish: z.enum(destinationSlugs).nullable(),
   pace: z.enum(paces).nullable(),
   interests: z.array(z.enum(interests)).nullable(),
   adults: z.number().nullable(),
@@ -125,6 +132,13 @@ function withDefaults(c: Constraints, said: readonly Stated[]): Constraints {
       : c.days >= 4
         ? ["tbilisi", "kazbegi"]
         : ["tbilisi"],
+    start: has("start") ? c.start : DEFAULT_ENDPOINT,
+    // Said where it starts and not where it finishes: it finishes where it started.
+    finish: has("finish")
+      ? c.finish
+      : has("start")
+        ? c.start
+        : DEFAULT_ENDPOINT,
     pace: has("pace") ? c.pace : c.mobility === "low" ? "relaxed" : "moderate",
     budgetEur: has("budgetEur")
       ? c.budgetEur
@@ -173,6 +187,8 @@ export function readIntake(
       .filter((slug, i, all) => slug !== all[i - 1])
       .slice(0, MAX_PLACES);
   }
+  if (r.start !== null) patch.start = r.start;
+  if (r.finish !== null) patch.finish = r.finish;
   if (r.pace !== null) patch.pace = r.pace;
   if (r.interests !== null) patch.interests = [...new Set(r.interests)];
   if (r.adults !== null || r.children !== null) {
@@ -245,7 +261,7 @@ export function fallbackTurn(
   ].filter((x): x is string => Boolean(x));
 
   const reply = [
-    `Here is what I have: ${c.days} ${c.days === 1 ? "day" : "days"} through ${c.places.map(destinationName).join(" → ")} from ${shortDate(c.startDate)}, for ${people} ${people === 1 ? "person" : "people"}, on about €${c.budgetEur}.`,
+    `Here is what I have: ${c.days} ${c.days === 1 ? "day" : "days"} through ${routeOf(c).map(destinationName).join(" → ")} from ${shortDate(c.startDate)}, for ${people} ${people === 1 ? "person" : "people"}, on about €${c.budgetEur}.`,
     assumed.length
       ? `I assumed ${list(assumed)} — tell me what is different, or correct a card.`
       : "Tell me if anything is off, or build it when it looks right.",

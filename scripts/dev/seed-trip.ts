@@ -25,6 +25,9 @@ const { values } = parseArgs({
   options: {
     email: { type: "string" },
     places: { type: "string", default: "tbilisi,kazbegi" },
+    // Where the trip starts and finishes; neither is a stop.
+    from: { type: "string", default: "tbilisi" },
+    to: { type: "string", default: "tbilisi" },
     days: { type: "string", default: "5" },
     // Days from today the trip starts on; -1 makes today its second day.
     start: { type: "string", default: "-1" },
@@ -47,7 +50,7 @@ if (!owner) {
 }
 
 const places = values.places.split(",");
-for (const place of places) {
+for (const place of [...places, values.from, values.to]) {
   if (!destinationSlugs.includes(place)) {
     console.error(
       `unknown place ${place}; one of ${destinationSlugs.join(", ")}`,
@@ -65,6 +68,8 @@ const result = await generateTrip(
     startDate: dayKey(Date.now() + Number(values.start) * 86_400_000),
     days: Number(values.days),
     places,
+    start: values.from,
+    finish: values.to,
     pace: "moderate",
     interests: ["heritage", "nature", "food"],
     party: { adults: 2, children: 0 },

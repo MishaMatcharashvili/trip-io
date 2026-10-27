@@ -52,36 +52,80 @@ describe("understand", () => {
   });
 
   test("the start and the finish, when the sentence names them", () => {
-    const route = (text: string) => understand(text, TODAY).constraints.places;
-    assert.deepEqual(route("From Batumi to Tbilisi via Kutaisi"), [
-      "batumi",
-      "kutaisi",
-      "tbilisi",
-    ]);
-    assert.deepEqual(route("Kazbegi and Kakheti, starting in Tbilisi"), [
-      "tbilisi",
-      "kazbegi",
-      "kakheti",
-    ]);
-    assert.deepEqual(route("Borjomi, Vardzia, finishing in Batumi, 5 days"), [
-      "borjomi",
-      "vardzia",
-      "batumi",
-    ]);
+    const route = (text: string) => {
+      const { places, start, finish } = understand(text, TODAY).constraints;
+      return { start, places, finish };
+    };
+    assert.deepEqual(route("From Batumi to Tbilisi via Kutaisi"), {
+      start: "batumi",
+      places: ["kutaisi", "tbilisi"],
+      finish: "tbilisi",
+    });
+    assert.deepEqual(route("Kazbegi and Kakheti, starting in Tbilisi"), {
+      start: "tbilisi",
+      places: ["kazbegi", "kakheti"],
+      finish: "tbilisi",
+    });
+    assert.deepEqual(route("Borjomi, Vardzia, finishing in Batumi, 5 days"), {
+      start: "tbilisi",
+      places: ["borjomi", "vardzia"],
+      finish: "batumi",
+    });
   });
 
-  test("a round trip names its start again at the end", () => {
-    const route = (text: string) => understand(text, TODAY).constraints.places;
-    assert.deepEqual(route("Tbilisi, Kazbegi and back to Tbilisi"), [
-      "tbilisi",
-      "kazbegi",
-      "tbilisi",
-    ]);
-    assert.deepEqual(route("round trip from Tbilisi to Svaneti"), [
-      "tbilisi",
-      "svaneti",
-      "tbilisi",
-    ]);
+  test("a trip starts and finishes in Tbilisi unless the words say otherwise", () => {
+    const { constraints: c, said } = understand(
+      "A week: Batumi, Kutaisi and Borjomi",
+      TODAY,
+    );
+    assert.equal(c.start, "tbilisi");
+    assert.equal(c.finish, "tbilisi");
+    assert.ok(!said.includes("start") && !said.includes("finish"));
+  });
+
+  test("a round trip starts and finishes in the same place, which is not a stop", () => {
+    const route = (text: string) => {
+      const { places, start, finish } = understand(text, TODAY).constraints;
+      return { start, places, finish };
+    };
+    assert.deepEqual(route("Tbilisi, Kazbegi and back to Tbilisi"), {
+      start: "tbilisi",
+      places: ["kazbegi"],
+      finish: "tbilisi",
+    });
+    assert.deepEqual(route("round trip from Tbilisi to Svaneti"), {
+      start: "tbilisi",
+      places: ["svaneti"],
+      finish: "tbilisi",
+    });
+    for (const text of [
+      "Tbilisi - Sighnaghi - Tbilisi",
+      "tbilisi-sighnaghi-tbilisi",
+      "Tbilisi → Sighnaghi → Tbilisi",
+    ]) {
+      assert.deepEqual(route(text), {
+        start: "tbilisi",
+        places: ["signagi"],
+        finish: "tbilisi",
+      });
+    }
+  });
+
+  test("a journey starts where it begins, visits where it goes and finishes there", () => {
+    for (const text of ["Tbilisi to Sighnaghi", "tbilisi-sighnaghi"]) {
+      const { start, places, finish } = understand(text, TODAY).constraints;
+      assert.equal(start, "tbilisi");
+      assert.deepEqual(places, ["signagi"]);
+      assert.equal(finish, "signagi");
+    }
+  });
+
+  test("a name with a hyphen in it is one place, not a journey", () => {
+    const { places } = understand(
+      "4 days in Samtskhe-Javakheti",
+      TODAY,
+    ).constraints;
+    assert.deepEqual(places, ["samtskhe-javakheti"]);
   });
 
   test("a place no trip can reach is refused, with the reason", () => {

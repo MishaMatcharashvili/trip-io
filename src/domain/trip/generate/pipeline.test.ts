@@ -18,6 +18,9 @@ const constraints: Constraints = {
   startDate: PREV, // Tuesday; day 2 is Wednesday, when the museum is closed
   days: 2,
   places: ["kazbegi"],
+  // Nothing to drive to or from: the day is in Kazbegi from first to last.
+  start: "kazbegi",
+  finish: "kazbegi",
   pace: "moderate",
   interests: [],
   party: { adults: 2, children: 0 },
@@ -273,7 +276,12 @@ const down: Composer = async () => {
 };
 
 describe("the route", () => {
-  const route: Constraints = { ...constraints, places: ["tbilisi", "mestia"] };
+  const route: Constraints = {
+    ...constraints,
+    places: ["tbilisi", "mestia"],
+    start: "tbilisi",
+    finish: "mestia",
+  };
 
   test("a plan that leaves a place out says which", () => {
     const plan = fallbackPlan({ ...route, places: ["tbilisi"] }, acrossGeorgia);
@@ -282,9 +290,20 @@ describe("the route", () => {
       route.places,
       new Map(acrossGeorgia.map((p) => [p.id, p])),
     );
-    assert.equal(problems.length, 2);
+    assert.equal(problems.length, 1);
     assert.match(problems[0], /Mestia is on the route/);
-    assert.match(problems[1], /finishes in Mestia/);
+  });
+
+  test("the start and the finish need no stop of their own", () => {
+    const plan = fallbackPlan({ ...route, places: ["mestia"] }, acrossGeorgia);
+    assert.deepEqual(
+      routeProblems(
+        plan,
+        ["mestia"],
+        new Map(acrossGeorgia.map((p) => [p.id, p])),
+      ),
+      [],
+    );
   });
 
   test("the model's plan is rejected until every place is in it", async () => {
@@ -333,6 +352,30 @@ describe("the route", () => {
     assert.ok(
       Object.values(result.doc.nodes).some((n) => n.kind === "transfer"),
     );
+  });
+
+  test("a day trip drives out from the start and back to the finish, before dark", async () => {
+    const dayTrip: Constraints = {
+      ...route,
+      days: 1,
+      places: ["signagi"],
+      start: "tbilisi",
+      finish: "tbilisi",
+    };
+    const result = await generate(dayTrip, {
+      ...deps(down),
+      candidates: town("signagi", 45.724, 41.484),
+    });
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    const titles = Object.values(result.doc.nodes)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map((n) => n.meta.title);
+    assert.match(titles[0], /^Drive to /);
+    assert.equal(titles.at(-1), "Drive to Tbilisi");
+    // Home by dark means no dinner out there.
+    assert.ok(!titles.some((t) => t.startsWith("Dinner")));
+    // And no bed: the traveller sleeps where they started.
+    assert.ok(!titles.some((t) => t.startsWith("Check in")));
   });
 
   test("a place with nothing to visit is named, before any model call", async () => {

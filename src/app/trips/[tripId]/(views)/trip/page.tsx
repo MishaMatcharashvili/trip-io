@@ -16,6 +16,7 @@ import {
   centroid,
   duration,
   mapStops,
+  overviewStops,
   tripStops,
   weatherView,
 } from "@/features/trip-model";
@@ -40,6 +41,7 @@ function WholeTrip({
   stats,
   totals,
   stops,
+  road,
   switcher,
   days,
   actions,
@@ -48,6 +50,8 @@ function WholeTrip({
   stats: Figure[];
   totals: Figure[];
   stops: MapStop[];
+  /** Where the road runs through, for every day at once: not through every stop. */
+  road?: MapStop[];
   switcher?: React.ReactNode;
   /** The days, each opening in place. */
   days: React.ReactNode;
@@ -59,7 +63,11 @@ function WholeTrip({
       stats={stats}
       totals={totals}
       map={
-        <RoutedTripMap stops={stops} className="absolute inset-0 size-full" />
+        <RoutedTripMap
+          stops={stops}
+          road={road}
+          className="absolute inset-0 size-full"
+        />
       }
       switcher={switcher}
       days={days}
@@ -253,6 +261,8 @@ export default async function FullTripPage({
         told ? `${told} · ${applied} applied` : "None yet",
       ])}
       stops={stops}
+      // Every day at once: the road between where they are spent, not every stop.
+      road={focused ? undefined : overviewStops(trip)}
       switcher={
         trip.days.length > 1 ? (
           <DayStrip

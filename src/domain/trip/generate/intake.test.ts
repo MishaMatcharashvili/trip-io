@@ -16,6 +16,8 @@ const unchanged = {
   startDate: null,
   days: null,
   places: null,
+  start: null,
+  finish: null,
   pace: null,
   interests: null,
   adults: null,
@@ -49,6 +51,35 @@ describe("readIntake", () => {
     assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
     assert.deepEqual(turn.state.constraints.party, { adults: 2, children: 0 });
     assert.deepEqual(turn.state.said.sort(), ["days", "party", "places"]);
+  });
+
+  test("a trip starts and finishes in Tbilisi until the planner says otherwise", () => {
+    const first = readIntake(
+      { ...unchanged, places: ["signagi"] },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(first?.state.constraints.start, "tbilisi");
+    assert.equal(first?.state.constraints.finish, "tbilisi");
+    assert.ok(!first?.state.said.includes("start"));
+
+    // Said where it starts and not where it ends: it ends where it began.
+    const second = readIntake(
+      { ...unchanged, start: "kutaisi" },
+      first?.state ?? initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(second?.state.constraints.start, "kutaisi");
+    assert.equal(second?.state.constraints.finish, "kutaisi");
+    assert.deepEqual(second?.state.said.sort(), ["places", "start"]);
+
+    const third = readIntake(
+      { ...unchanged, finish: "batumi" },
+      second?.state ?? initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(third?.state.constraints.start, "kutaisi");
+    assert.equal(third?.state.constraints.finish, "batumi");
   });
 
   test("an unsaid budget follows the days and the party", () => {
@@ -182,6 +213,17 @@ describe("fallbackTurn", () => {
     assert.match(turn.reply, /Sukhumi can’t be part of it/);
     assert.deepEqual(turn.unsupported, ["Sukhumi"]);
     assert.ok(!turn.ready);
+  });
+
+  test("the words say where it starts, and the reply says the whole route", () => {
+    const turn = fallbackTurn(
+      said("Tbilisi - Sighnaghi - Tbilisi, 2 days"),
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.deepEqual(turn.state.constraints.places, ["signagi"]);
+    assert.match(turn.reply, /Tbilisi → Sighnaghi → Tbilisi/);
+    assert.ok(turn.ready);
   });
 
   test("a later message does not undo an earlier one", () => {

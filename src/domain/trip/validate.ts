@@ -278,8 +278,11 @@ export function validateDay(
     prev = { ...cur, timed: true };
   }
 
+  // The trip's last day may end on a transfer: on its way to where the
+  // traveller leaves from, with no night to get back for.
   const last = today[today.length - 1];
-  if (last.node.kind !== "stay") {
+  const leaving = last.node.kind === "transfer" && day === dayKey(tripEnd);
+  if (last.node.kind !== "stay" && !leaving) {
     const tonight = baseAt(all, nodeEnd(last.node));
     const from = where(last.node);
     const to = tonight && where(tonight.node);

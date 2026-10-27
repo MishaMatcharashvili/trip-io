@@ -23,6 +23,8 @@ const answer = {
   startDate: null,
   days: 4,
   places: ["svaneti"],
+  start: null,
+  finish: null,
   pace: null,
   interests: null,
   adults: null,
