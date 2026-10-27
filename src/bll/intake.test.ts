@@ -34,6 +34,7 @@ const answer = {
   notes: null,
   unsupported: [],
   ready: false,
+  suggestions: [],
 };
 
 describe("planningTurn", () => {
