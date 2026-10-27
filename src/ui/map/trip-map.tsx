@@ -73,6 +73,12 @@ export type MapStop = {
 export type MapRoute = {
   /** Leg i runs from stop i to stop i + 1. */
   legs: readonly (readonly LonLat[])[];
+  /**
+   * Whether each leg is behind the traveller, when the legs are not the pins'
+   * own: the whole-trip road runs between the places the days are spent in,
+   * not through every stop, so a stop's state cannot say.
+   */
+  done?: readonly boolean[];
   /** Other ways between the same two stops, drawn beside the chosen one. */
   alternatives?: readonly (readonly LonLat[])[];
   /** Being replaced: drawn faded so it does not pass for current. */
@@ -261,14 +267,18 @@ export function TripMap({
 
   useEffect(() => {
     if (!overlays) return;
-    // Legs that no longer match the stops (one added since) are not drawn.
-    const matches = route && route.legs.length === stops.length - 1;
+    // Legs that no longer match the stops (one added since) are not drawn,
+    // unless the route says they were never the stops' own.
+    const matches =
+      route && (route.done || route.legs.length === stops.length - 1);
     overlays.setRoute(
       {
         legs: matches
           ? route.legs.map((path, i) => ({
               path,
-              done: stops[i + 1].state !== "upcoming",
+              done: route.done
+                ? (route.done[i] ?? false)
+                : stops[i + 1].state !== "upcoming",
             }))
           : [],
         alternatives: matches ? (route.alternatives ?? []) : [],

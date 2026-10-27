@@ -12,7 +12,6 @@ import {
   todayWeather,
   watchStrip,
 } from "@/data/trip";
-import type { LonLat } from "@/domain/geo";
 import { dayKey } from "@/domain/trip/document";
 import { chipsFor } from "@/features/day-strip-model";
 import { forecastRibbon } from "@/features/shared-reads";
@@ -21,10 +20,12 @@ import { dayHref } from "@/features/trip-links";
 import { type StopCard, TripMapScreen } from "@/features/trip-map-screen";
 import {
   ago,
+  centroid,
   changeRows,
   detectorStrip,
   duration,
   mapStops,
+  overviewStops,
   timeRange,
   tripStops,
   weatherView,
@@ -122,6 +123,7 @@ function fixtureView(
   return {
     view,
     stops: georgiaMapStops,
+    overview: undefined,
     route: undefined,
     cards: all
       ? trip.days.flatMap((d) => stopCards(trip, d))
@@ -162,13 +164,7 @@ async function realView(
       ? changeRows(screen.before, screen.doc)
       : null;
 
-  const centre =
-    stops.length && !all
-      ? ([
-          stops.reduce((s, p) => s + p.lonLat[0], 0) / stops.length,
-          stops.reduce((s, p) => s + p.lonLat[1], 0) / stops.length,
-        ] as LonLat)
-      : null;
+  const centre = all ? null : centroid(stops);
   const forecast =
     centre && day.date ? await forecastRibbon(centre, day.date) : null;
 
@@ -255,6 +251,8 @@ async function realView(
   return {
     view,
     stops,
+    // Every day at once: the road runs between where the days are spent.
+    overview: all ? overviewStops(trip) : undefined,
     cards: all
       ? trip.days.flatMap((d) => stopCards(trip, d, alertHref))
       : stopCards(trip, day, alertHref),
@@ -270,7 +268,7 @@ export default async function ActiveTripPage({
   const { state, day, ask } = await searchParams;
 
   const fixture = getTrip(tripId);
-  const { view, stops, cards, events } = fixture
+  const { view, stops, overview, cards, events } = fixture
     ? fixtureView(fixture, state, typeof day === "string" ? day : undefined)
     : await realView(
         await loadTrip(tripId),
@@ -298,8 +296,10 @@ export default async function ActiveTripPage({
         stops={stops}
         events={events}
         cards={cards}
-        // One road for one day: across the whole trip it would join the days.
+        // One road for one day; the whole trip's runs between the places its
+        // days are spent in, since through every stop it would join the days.
         routed={view.mode === "day"}
+        overview={overview}
         dimmed={view.forcePaused}
       />
       <ActiveTripDesktop view={view} />
