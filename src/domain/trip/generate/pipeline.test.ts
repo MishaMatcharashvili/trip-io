@@ -466,6 +466,25 @@ describe("the route", () => {
 });
 
 describe("fallbackPlan", () => {
+  test("a morning the drive has used up gets one visit, and the rest go to the afternoon", () => {
+    // Two hours from Tbilisi to Sighnaghi: arriving after eleven leaves room
+    // for one visit before noon, not two.
+    const plan = fallbackPlan(
+      {
+        ...constraints,
+        days: 1,
+        places: ["signagi"],
+        start: "tbilisi",
+        finish: "tbilisi",
+      },
+      town("signagi", 45.724, 41.484),
+    );
+    const slots = plan.days[0].stops
+      .filter((s) => s.kind === "visit")
+      .map((s) => s.slot);
+    assert.deepEqual(slots, ["morning", "afternoon", "afternoon"]);
+  });
+
   test("uses one base per area, and each day takes its share of what there is to visit", () => {
     const plan = fallbackPlan(constraints, curated);
     assert.equal(plan.days.length, 2);

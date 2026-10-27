@@ -241,7 +241,15 @@ export function fallbackPlan(
         free,
         minutesOf(SLOT_WINDOW[slot][0] ?? DAY_START[c.pace]),
       );
-      if (begins + durationMin > mustLeaveBy) continue;
+      // A slot already used up by the drive or the stops before is left for
+      // the next one, rather than given a stop the scheduler cannot place and
+      // the pipeline would then drop from the trip altogether.
+      if (
+        begins > minutesOf(SLOT_WINDOW[slot][1]) ||
+        begins + durationMin > mustLeaveBy
+      ) {
+        continue;
+      }
       free = begins + durationMin + BETWEEN_STOPS_MIN;
       (kind === "visit" ? usedVisits : usedMeals).add(pick.id);
       stops.push({ placeId: pick.id, slot, kind, durationMin });
