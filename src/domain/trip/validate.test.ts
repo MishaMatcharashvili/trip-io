@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { TripDoc } from "./document.ts";
 import type { PatchOp } from "./patch.ts";
-import { at, DAY, kazbegiDoc, N, P, PREV, places } from "./test-fixtures.ts";
+import {
+  at,
+  DAY,
+  kazbegiDoc,
+  N,
+  nodeId,
+  P,
+  PREV,
+  places,
+} from "./test-fixtures.ts";
 import { straightLineTravel } from "./travel.ts";
 import {
   type Author,
@@ -108,6 +117,31 @@ describe("travel", () => {
           v.nodeIds.includes(N.dinner) && v.nodeIds.includes(N.stayKazbegi),
       ),
     );
+  });
+});
+
+describe("the trip's last day", () => {
+  const leaving = (endsAt: string) => {
+    const doc = kazbegiDoc();
+    doc.trip.endsAt = endsAt;
+    doc.nodes[nodeId(99)] = {
+      kind: "transfer",
+      placeId: null,
+      lonLat: [44.8015, 41.6938],
+      startsAt: at(DAY, "21:30"),
+      durationMin: 180,
+      indoor: false,
+      meta: { title: "Drive to Tbilisi", urban: true },
+    };
+    return only(validateDay(doc, DAY, ctx()), "travel");
+  };
+
+  test("may end on the drive to where the traveller leaves from", () => {
+    assert.deepEqual(leaving(at(DAY, "23:59")), []);
+  });
+
+  test("a day that is not the last still has to end in its own bed", () => {
+    assert.ok(leaving(at("2026-09-20", "23:59")).length > 0);
   });
 });
 
