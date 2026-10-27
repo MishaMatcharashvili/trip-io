@@ -22,6 +22,7 @@ import {
   type Lease,
   setInteractive,
 } from "./pool.ts";
+import { legStates } from "./route-states.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
 import { useMapStyle } from "./use-map-style.ts";
 
@@ -271,15 +272,20 @@ export function TripMap({
     // unless the route says they were never the stops' own.
     const matches =
       route && (route.done || route.legs.length === stops.length - 1);
+    const covered = matches
+      ? route.legs.map((_, i) =>
+          route.done
+            ? (route.done[i] ?? false)
+            : stops[i + 1].state !== "upcoming",
+        )
+      : [];
+    // Underway: something is behind the traveller, or they are at a stop.
+    const underway = stops.some((s) => s.state !== "upcoming");
+    const states = legStates(covered, underway);
     overlays.setRoute(
       {
         legs: matches
-          ? route.legs.map((path, i) => ({
-              path,
-              done: route.done
-                ? (route.done[i] ?? false)
-                : stops[i + 1].state !== "upcoming",
-            }))
+          ? route.legs.map((path, i) => ({ path, state: states[i] }))
           : [],
         alternatives: matches ? (route.alternatives ?? []) : [],
         stale: Boolean(route?.stale),
