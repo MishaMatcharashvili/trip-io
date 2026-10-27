@@ -281,6 +281,43 @@ describe("generate", () => {
       assert.ok(cache.calls.includes("put"));
     });
 
+    test("two museums in a day nobody asked for go back to the model", async () => {
+      // Sorts after every fixture, so the other refs stay what they were.
+      const gallery: Candidate = {
+        ...(candidates.get(P.museum) as Candidate),
+        id: "f0000000-0000-4000-8000-000000000001",
+        name: "Kazbegi Gallery",
+        category: "art_gallery",
+      };
+      // The fixture's museum is filed under its group; the catalogue's are "museum".
+      const pool = [
+        ...curated.map((p) =>
+          p.id === P.museum ? { ...p, category: "museum" } : p,
+        ),
+        gallery,
+      ];
+      const heavy = fullPlan();
+      heavy.days[0].stops[0] = {
+        ref: `p${pool.length}`,
+        slot: "afternoon",
+        kind: "visit",
+        durationMin: 40,
+      };
+      const { compose, seen } = scripted(heavy, fullPlan());
+      const cache = memoryCache();
+      const result = await generate(
+        { ...constraints, interests: ["food", "nature"] },
+        { ...deps(compose, cache), candidates: pool },
+      );
+      assert.ok(result.ok);
+      assert.equal(result.source, "retry");
+      assert.match(
+        seen[1]?.problems.join("\n") ?? "",
+        /2 museums and galleries \("Kazbegi Gallery", /,
+      );
+      assert.ok(cache.calls.includes("put"));
+    });
+
     test("a plan that stays sparse is still the trip, but is not cached", async () => {
       const { compose } = scripted(goodPlan(), goodPlan());
       const cache = memoryCache();

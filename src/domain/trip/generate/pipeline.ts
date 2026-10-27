@@ -4,6 +4,7 @@ import { dayKey, type TripDoc, type TripHeader } from "../document.ts";
 import { CIVIL, sunWindow } from "../sun.ts";
 import type { TravelEstimator } from "../travel.ts";
 import { type Violation, validateDoc } from "../validate.ts";
+import { museumHeavy } from "./balance.ts";
 import { cacheKey } from "./cache-key.ts";
 import type { Constraints } from "./constraints.ts";
 import { fallbackPlan } from "./fallback.ts";
@@ -234,9 +235,12 @@ export async function generate(
     return {
       doc,
       warnings: violations.filter((v) => v.severity === "warning"),
-      // Soft: a day the catalogue cannot fill is still a day. Asked about once,
-      // of the model; never a reason to throw the plan away.
-      idle: idleGaps(doc, c.dayEnds).map((g) => g.message),
+      // Soft: a day the catalogue cannot fill, or can fill only with museums,
+      // is still a day. Asked about once, of the model; never a reason to
+      // throw the plan away.
+      idle: [...idleGaps(doc, c.dayEnds), ...museumHeavy(plan, places, c)].map(
+        (g) => g.message,
+      ),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
         ...errors.map((v) => `${v.day}: ${v.message}`),
