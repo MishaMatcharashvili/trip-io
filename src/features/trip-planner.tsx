@@ -40,6 +40,8 @@ type Conversation = {
   ready: boolean;
   /** Places asked for that no trip can go to: the Place card is red while any stand. */
   unsupported?: string[];
+  /** One-tap answers to the planner's latest question. */
+  suggestions?: string[];
 };
 
 type Reply = {
@@ -48,6 +50,7 @@ type Reply = {
   state: IntakeState;
   ready: boolean;
   unsupported: string[];
+  suggestions: string[];
 };
 
 const OPENING =
@@ -110,6 +113,10 @@ export function TripPlanner({
   const end = useRef<HTMLDivElement>(null);
 
   const { messages, state, ready, unsupported } = conversation;
+  // Offered only under the question they answer: the planner's last word, with
+  // nothing sent since.
+  const answers =
+    messages.at(-1)?.role === "planner" ? (conversation.suggestions ?? []) : [];
   const turns = messages.filter((m) => m.role === "traveller").length;
   const talkedOut = turns >= INTAKE_MAX_TURNS;
   const answered = messages.some((m) => m.role === "planner");
@@ -143,6 +150,7 @@ export function TripPlanner({
         state: turn.state,
         ready: turn.ready,
         unsupported: turn.unsupported,
+        suggestions: turn.suggestions ?? [],
       });
     } catch (e) {
       // Unsent: the words go back in the box rather than into a transcript
@@ -245,6 +253,22 @@ export function TripPlanner({
           )}
 
           {waiting ? <PlannerSays faint>Thinking…</PlannerSays> : null}
+
+          {answers.length && !waiting && !talkedOut ? (
+            <div className="flex flex-wrap gap-2 pl-[27px]">
+              {answers.map((answer) => (
+                <button
+                  key={answer}
+                  type="button"
+                  onClick={() => void send(answer)}
+                >
+                  <Chip className="cursor-pointer hover:border-control">
+                    {answer}
+                  </Chip>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {answered ? (
