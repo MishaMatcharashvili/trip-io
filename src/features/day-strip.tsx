@@ -60,7 +60,10 @@ export function DayStrip({
       aria-label="Days of the trip"
       aria-busy={pending}
       className={cx(
-        "flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]",
+        // `shrink-0`: in a height-capped flex column (the map's day panel) the strip
+        // is squeezed to nothing and, being a scroll container, clips its chips
+        // and scrolls them vertically. It keeps its height and only ever moves sideways.
+        "flex shrink-0 gap-1.5 overflow-x-auto overflow-y-hidden pb-0.5 [scrollbar-width:none]",
         className,
       )}
     >
