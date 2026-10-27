@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { nodeEnd } from "../document.ts";
 import { candidates, idSequence, P, PREV } from "../test-fixtures.ts";
 import { straightLineTravel } from "../travel.ts";
 import type { Constraints } from "./constraints.ts";
@@ -428,7 +429,7 @@ describe("the route", () => {
     );
   });
 
-  test("a day trip drives out from the start and back to the finish, before dark", async () => {
+  test("a day trip drives out from the start, fills the day, and drives back to the finish", async () => {
     const dayTrip: Constraints = {
       ...route,
       days: 1,
@@ -446,8 +447,21 @@ describe("the route", () => {
       .map((n) => n.meta.title);
     assert.match(titles[0], /^Drive to /);
     assert.equal(titles.at(-1), "Drive to Tbilisi");
-    // Home by dark means no dinner out there.
-    assert.ok(!titles.some((t) => t.startsWith("Dinner")));
+    // A full day, not a morning: the afternoon has its visits, and the
+    // drive home is not cut short by dusk.
+    const nodes = Object.values(result.doc.nodes).sort((a, b) =>
+      a.startsAt.localeCompare(b.startsAt),
+    );
+    const home = nodes.at(-1);
+    assert.ok(home);
+    const local = (ms: number) =>
+      new Date(ms + 4 * 3_600_000).toISOString().slice(11, 16);
+    assert.ok(local(Date.parse(home.startsAt)) >= "17:00");
+    assert.ok(local(nodeEnd(home)) <= "22:00");
+    assert.ok(
+      nodes.filter((n) => n.kind === "visit").length >= 3,
+      titles.join(", "),
+    );
     // And no bed: the traveller sleeps where they started.
     assert.ok(!titles.some((t) => t.startsWith("Check in")));
   });

@@ -202,6 +202,7 @@ export async function generate(
       newId: deps.newId,
       start: destination(c.start)?.lonLat ?? null,
       finish: finishOf(c),
+      dayEnds: c.dayEnds,
     });
     const doc: TripDoc = { trip: header, nodes };
     const violations = validateDoc(doc, {

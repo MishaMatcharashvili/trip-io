@@ -4,6 +4,7 @@ import type { Pace, TripNode } from "../document.ts";
 import { CIVIL, sunWindow } from "../sun.ts";
 import type { TravelEstimator } from "../travel.ts";
 import { IMPLICIT_LEG_MAX_MIN, LEG_BUFFER_MIN } from "../validate.ts";
+import { DEFAULT_DAY_ENDS } from "./constraints.ts";
 import type { Candidate, Plan, Slot } from "./plan.ts";
 
 // Untimed plan → timed trip nodes. Deterministic: the model output, a cached
@@ -17,13 +18,26 @@ export const DAY_START: Record<Pace, string> = {
   packed: "08:00",
 };
 
-/** Earliest and latest start per slot, Tbilisi wall-clock. Morning opens at the pace's day start. */
+/**
+ * Earliest and latest start per slot, Tbilisi wall-clock. Morning opens at the
+ * pace's day start, and no slot starts after the day ends: dinner at half six
+ * is a day that ends at eight.
+ */
 export const SLOT_WINDOW: Record<Slot, [string | null, string]> = {
   morning: [null, "12:00"],
   midday: ["12:30", "14:30"],
   afternoon: ["14:30", "18:00"],
-  evening: ["19:00", "21:30"],
+  evening: ["18:30", "21:30"],
 };
+
+/**
+ * How long after the day ends the drive home may still be on the road. A day
+ * that ends at eight with dinner in Sighnaghi gets back to Tbilisi at ten; a
+ * day in Stepantsminda has to leave before dinner. Darkness is not the limit:
+ * a drive after dusk is a warning (validate.ts), and a full day in October
+ * would otherwise be over at four.
+ */
+export const HOME_BY_MIN = 120;
 const slotOrder: Slot[] = ["morning", "midday", "afternoon", "evening"];
 
 const STAY_CHECK_IN_MIN = 15;
@@ -35,6 +49,9 @@ const roundUp5 = (ms: number) => Math.ceil(ms / (5 * MIN)) * 5 * MIN;
 /** Georgia is UTC+4 year-round; wall-clock times are built with that offset. */
 const wall = (day: string, hhmm: string) =>
   Date.parse(`${day}T${hhmm}:00+04:00`);
+/** The other way: a moment as "HH:MM" on Tbilisi's wall clock. */
+const hhmm = (ms: number) =>
+  new Date(ms + 4 * 3_600_000).toISOString().slice(11, 16);
 
 export function addDays(day: string, n: number): string {
   const d = new Date(`${day}T00:00:00Z`);
@@ -66,6 +83,8 @@ export type ScheduleInput = {
   start?: LonLat | null;
   /** Where the traveller leaves from: the last day ends with the drive there. */
   finish?: { lonLat: LonLat; name: string } | null;
+  /** "HH:MM": no stop starts after it, and no drive ends more than HOME_BY_MIN past it. */
+  dayEnds?: string;
 };
 
 export function schedule(input: ScheduleInput): {
@@ -75,6 +94,7 @@ export function schedule(input: ScheduleInput): {
   const { plan, startDate, pace, places, travel, newId } = input;
   const startAt = input.start ?? null;
   const finish = input.finish ?? null;
+  const dayEnds = input.dayEnds ?? DEFAULT_DAY_ENDS;
   const nodes: Record<string, TripNode> = {};
   const problems: ScheduleProblem[] = [];
   let baseId: string | null = null;
@@ -93,6 +113,8 @@ export function schedule(input: ScheduleInput): {
     const sun = (at: LonLat) => sunWindow(date, at, CIVIL);
     const problem = (placeId: string, message: string) =>
       problems.push({ day: date, placeId, message });
+    const ends = wall(date, dayEnds);
+    const homeBy = ends + HOME_BY_MIN * MIN;
 
     let cursor = wall(date, DAY_START[pace]);
     let here: LonLat | null = baseId
@@ -118,7 +140,8 @@ export function schedule(input: ScheduleInput): {
         ? driveStart + drive
         : cursor + (leg > 0 ? (leg + LEG_BUFFER_MIN) * MIN : 0);
 
-      const [open, latest] = SLOT_WINDOW[stop.slot];
+      const [open, slotLatest] = SLOT_WINDOW[stop.slot];
+      const latest = slotLatest < dayEnds ? slotLatest : dayEnds;
       const earliest = Math.max(
         roundUp5(ready),
         wall(date, open ?? DAY_START[pace]),
@@ -149,14 +172,14 @@ export function schedule(input: ScheduleInput): {
       if (start > wall(date, latest)) {
         problem(
           stop.placeId,
-          `"${place.name}" can't be fitted into the ${stop.slot} (${stop.durationMin} min): closed or after dark`,
+          `"${place.name}" can't be fitted into the ${stop.slot} (${stop.durationMin} min): closed, after dark, or after the day ends at ${dayEnds}`,
         );
         continue;
       }
-      if (drive && light && driveStart + drive > light.set.getTime()) {
+      if (drive && driveStart + drive > homeBy) {
         problem(
           stop.placeId,
-          `the drive to "${place.name}" would end after dark`,
+          `the drive to "${place.name}" would end after ${hhmm(homeBy)}, too late in a day that ends at ${dayEnds}`,
         );
         continue;
       }
@@ -240,12 +263,12 @@ export function schedule(input: ScheduleInput): {
     if (leg > IMPLICIT_LEG_MAX_MIN) {
       const drive = roundUp5(leg * MIN);
       const driveStart = roundUp5(tail.cursor);
-      const light = sunWindow(tail.date, finish.lonLat, CIVIL);
-      if (light && driveStart + drive > light.set.getTime()) {
+      const homeBy = wall(tail.date, dayEnds) + HOME_BY_MIN * MIN;
+      if (driveStart + drive > homeBy) {
         problems.push({
           day: tail.date,
           placeId: lastPlaceId,
-          message: `the drive to ${finish.name} would end after dark`,
+          message: `the drive to ${finish.name} would end after ${hhmm(homeBy)}, too late in a day that ends at ${dayEnds}: end the day's stops earlier`,
         });
       }
       node({
