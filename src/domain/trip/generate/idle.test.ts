@@ -100,4 +100,35 @@ describe("idleGaps", () => {
     ];
     assert.deepEqual(idleGaps(doc("packed", two)), []);
   });
+
+  test("a day over hours before it was meant to end has a hole at its end", () => {
+    // The day trip as it was built: home from Mtskheta by four.
+    const morning = [
+      node("visit", "Jvari Monastery", "09:30", 60),
+      node("meal", "Lunch · Salobie Bia", "12:30", 75),
+      node("visit", "Svetitskhoveli Cathedral", "14:00", 60),
+      node("transfer", "Drive to Tbilisi", "15:15", 40),
+    ];
+    const [gap, ...rest] = idleGaps(doc("moderate", morning), "20:00");
+    assert.equal(rest.length, 0);
+    assert.equal(gap.minutes, 245);
+    assert.match(gap.message, /"Drive to Tbilisi" ends at 15:55/);
+    assert.match(gap.message, /until about 20:00/);
+    // Without an end to the day there is nothing to fall short of.
+    assert.deepEqual(idleGaps(doc("moderate", morning)), []);
+  });
+
+  test("a day that runs to dinner fills its day, and so does one asked to end early", () => {
+    const full = [
+      node("visit", "A", "10:00", 90),
+      node("meal", "Lunch", "12:30", 75),
+      node("visit", "B", "14:30", 90),
+      node("visit", "C", "16:15", 60),
+      node("meal", "Dinner", "18:30", 90),
+    ];
+    assert.deepEqual(idleGaps(doc("moderate", full), "20:00"), []);
+    const early = full.slice(0, 4);
+    assert.equal(idleGaps(doc("moderate", early), "20:00").length, 1);
+    assert.deepEqual(idleGaps(doc("moderate", early), "18:00"), []);
+  });
 });

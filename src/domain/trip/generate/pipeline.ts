@@ -236,7 +236,7 @@ export async function generate(
       warnings: violations.filter((v) => v.severity === "warning"),
       // Soft: a day the catalogue cannot fill is still a day. Asked about once,
       // of the model; never a reason to throw the plan away.
-      idle: idleGaps(doc).map((g) => g.message),
+      idle: idleGaps(doc, c.dayEnds).map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
         ...errors.map((v) => `${v.day}: ${v.message}`),

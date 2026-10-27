@@ -43,12 +43,25 @@ const goodPlan = (): RefPlan => ({
       day: 1,
       theme: "Up the Military Road",
       stayRef: ref(P.roomsGudauri),
+      // Arrives at two and runs until dinner: a full afternoon and evening.
       stops: [
         {
           ref: ref(P.friendship),
           slot: "afternoon",
           kind: "visit",
           durationMin: 40,
+        },
+        {
+          ref: ref(P.museum),
+          slot: "afternoon",
+          kind: "visit",
+          durationMin: 90,
+        },
+        {
+          ref: ref(P.cafe5047),
+          slot: "evening",
+          kind: "meal",
+          durationMin: 90,
         },
       ],
     },
@@ -150,7 +163,7 @@ describe("generate", () => {
     assert.ok(cache.calls.includes("put"));
     assert.equal(
       Object.values(result.doc.nodes).filter((n) => n.kind === "visit").length,
-      3,
+      4,
     );
   });
 
