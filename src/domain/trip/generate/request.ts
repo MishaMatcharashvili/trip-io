@@ -6,6 +6,7 @@ import {
 import type { Pace } from "../document.ts";
 import {
   type Constraints,
+  DEFAULT_DAY_ENDS,
   DEFAULT_ENDPOINT,
   type Interest,
 } from "./constraints.ts";
@@ -336,6 +337,7 @@ export function understand(text: string, today: string): Understood {
     start,
     finish,
     pace,
+    dayEnds: DEFAULT_DAY_ENDS,
     interests: pick(
       "interests",
       interestsSaid.length ? interestsSaid : null,

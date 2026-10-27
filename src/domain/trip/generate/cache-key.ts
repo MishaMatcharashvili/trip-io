@@ -33,6 +33,7 @@ export function cacheKey(c: Constraints): string {
     finish: c.finish,
     days: c.days,
     pace: c.pace,
+    dayEnds: c.dayEnds,
     interests: [...c.interests].sort(),
     party: partyKind(c.party),
     mobility: c.mobility,

@@ -22,6 +22,7 @@ const constraints: Constraints = {
   start: "kazbegi",
   finish: "kazbegi",
   pace: "moderate",
+  dayEnds: "20:00",
   interests: [],
   party: { adults: 2, children: 0 },
   mobility: "moderate",

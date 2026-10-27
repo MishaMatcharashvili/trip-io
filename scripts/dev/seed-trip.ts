@@ -71,6 +71,7 @@ const result = await generateTrip(
     start: values.from,
     finish: values.to,
     pace: "moderate",
+    dayEnds: "20:00",
     interests: ["heritage", "nature", "food"],
     party: { adults: 2, children: 0 },
     mobility: "moderate",
