@@ -9,6 +9,7 @@ import {
   type Constraints,
   constraints,
   DEFAULT_ENDPOINT,
+  dayEnds,
   interests,
   NOTES_MAX_CHARS,
   routeOf,
@@ -41,6 +42,14 @@ export const INTAKE_MAX_QUESTIONS = 4;
 /** Suggested answers offered under a question, and how long each may be. */
 const SUGGESTIONS_MAX = 4;
 const SUGGESTION_MAX_CHARS = 40;
+/**
+ * Ways the trip could go, offered as cards to take with one tap: "Kazbegi as
+ * a day trip", "Two nights in Sighnaghi instead". Few, short, and only when
+ * there is a real choice to make.
+ */
+export const OPTIONS_MAX = 3;
+const OPTION_TITLE_MAX_CHARS = 48;
+const OPTION_DETAIL_MAX_CHARS = 160;
 
 export const intakeMessage = z.discriminatedUnion("role", [
   z.object({
@@ -76,6 +85,34 @@ export const intakeState = z.object({
 });
 export type IntakeState = z.infer<typeof intakeState>;
 
+/**
+ * A proposal as the model writes it: the change it would make, in the same
+ * fields as the reply, null for what it leaves alone.
+ */
+const optionReply = z.object({
+  /** A few words: "Kazbegi as a day trip". */
+  title: z.string(),
+  /** One sentence with the numbers that matter: "3 h each way, back by 21:00". */
+  detail: z.string(),
+  days: z.number().nullable(),
+  places: z.array(z.enum(destinationSlugs)).nullable(),
+  pace: z.enum(paces).nullable(),
+  interests: z.array(z.enum(interests)).nullable(),
+  dayEnds: z.string().nullable(),
+});
+type OptionReply = z.infer<typeof optionReply>;
+
+/** A proposal as the page gets it: checked, with its change as a patch. */
+export const intakeOption = z.object({
+  title: z.string().min(1).max(OPTION_TITLE_MAX_CHARS),
+  detail: z.string().max(OPTION_DETAIL_MAX_CHARS),
+  patch: constraints
+    .pick({ days: true, places: true, pace: true, interests: true })
+    .extend({ dayEnds })
+    .partial(),
+});
+export type IntakeOption = z.infer<typeof intakeOption>;
+
 /** What the planner answers with. Null leaves a field as it was. */
 export const intakeReply = z.object({
   reply: z.string().min(1).max(REPLY_MAX_CHARS),
@@ -87,6 +124,8 @@ export const intakeReply = z.object({
   start: z.enum(destinationSlugs).nullable(),
   finish: z.enum(destinationSlugs).nullable(),
   pace: z.enum(paces).nullable(),
+  /** "HH:MM": when the traveller wants their days to end ("back by six"). */
+  dayEnds: z.string().nullable(),
   interests: z.array(z.enum(interests)).nullable(),
   adults: z.number().nullable(),
   children: z.number().nullable(),
@@ -100,6 +139,8 @@ export const intakeReply = z.object({
   ready: z.boolean(),
   /** Two to four short answers to the question the reply ends on; none when it asks nothing. */
   suggestions: z.array(z.string()),
+  /** Up to three ways the trip could go, each a change to take with one tap. */
+  options: z.array(optionReply),
 });
 
 export type IntakeInput = {
@@ -119,6 +160,8 @@ export type IntakeTurn = {
   ready: boolean;
   /** Answers to offer as one-tap replies. Empty once the planner has nothing to ask. */
   suggestions: string[];
+  /** Proposals to offer as cards. When there are any, there are no suggestions. */
+  options: IntakeOption[];
 };
 
 const clamp = (n: number, min: number, max: number) =>
@@ -193,22 +236,12 @@ export function readIntake(
   const r = parsed.data;
   const c = state.constraints;
 
-  const patch: Partial<Constraints> = {};
+  const patch = patchOf(r);
   if (r.startDate !== null && realDate(r.startDate) && r.startDate >= today) {
     patch.startDate = r.startDate;
   }
-  if (r.days !== null) patch.days = clamp(r.days, 1, 21);
-  // In order, and a round trip names its start twice: only a name said twice
-  // running is dropped.
-  if (r.places?.length) {
-    patch.places = r.places
-      .filter((slug, i, all) => slug !== all[i - 1])
-      .slice(0, MAX_PLACES);
-  }
   if (r.start !== null) patch.start = r.start;
   if (r.finish !== null) patch.finish = r.finish;
-  if (r.pace !== null) patch.pace = r.pace;
-  if (r.interests !== null) patch.interests = [...new Set(r.interests)];
   if (r.adults !== null || r.children !== null) {
     patch.party = {
       adults: clamp(r.adults ?? c.party.adults, 1, 12),
@@ -235,13 +268,74 @@ export function readIntake(
     ((r.ready && next.said.includes("interests")) ||
       asked + 1 >= INTAKE_MAX_QUESTIONS);
 
+  // Cards or chips, never both: one thing to choose from at a time.
+  const options = ready ? [] : cleanOptions(r.options, next);
   return {
     reply: r.reply,
     state: next,
     unsupported: r.unsupported.slice(0, 5),
     ready,
-    suggestions: ready ? [] : cleanSuggestions(r.suggestions),
+    suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
+    options,
   };
+}
+
+/**
+ * The fields a reply and a proposal share, as a patch: the length clamped, a
+ * route that names a place twice running named once, and an hour no day can
+ * end at left out.
+ */
+function patchOf(
+  r: Omit<OptionReply, "title" | "detail">,
+): Partial<Constraints> {
+  const patch: Partial<Constraints> = {};
+  if (r.days !== null) patch.days = clamp(r.days, 1, 21);
+  // In order, and a round trip names its start twice: only a name said twice
+  // running is dropped.
+  if (r.places?.length) {
+    patch.places = r.places
+      .filter((slug, i, all) => slug !== all[i - 1])
+      .slice(0, MAX_PLACES);
+  }
+  if (r.pace !== null) patch.pace = r.pace;
+  if (r.interests !== null) patch.interests = [...new Set(r.interests)];
+  if (r.dayEnds !== null && dayEnds.safeParse(r.dayEnds).success) {
+    patch.dayEnds = r.dayEnds;
+  }
+  return patch;
+}
+
+/**
+ * The model's proposals, kept only when each is a real and possible change:
+ * it changes something, the request it leads to is valid, and no other card
+ * says the same. Few, and short enough to be a card.
+ */
+export function cleanOptions(
+  raw: readonly OptionReply[],
+  state: IntakeState,
+): IntakeOption[] {
+  const seen = new Set<string>();
+  const out: IntakeOption[] = [];
+  for (const o of raw) {
+    const title = o.title.trim().replace(/\s+/g, " ");
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    const patch = patchOf(o);
+    const changes = (Object.keys(patch) as (keyof Constraints)[]).some(
+      (k) => JSON.stringify(patch[k]) !== JSON.stringify(state.constraints[k]),
+    );
+    if (!changes) continue;
+    const after = applyEdit(state, patch).constraints;
+    const option = intakeOption.safeParse({
+      title,
+      detail: o.detail.trim().replace(/\s+/g, " "),
+      patch,
+    });
+    if (!option.success || !constraints.safeParse(after).success) continue;
+    seen.add(key);
+    out.push(option.data);
+  }
+  return out.slice(0, OPTIONS_MAX);
 }
 
 /** Short, distinct and few: a row of buttons, not a menu. */
@@ -365,5 +459,6 @@ export function fallbackTurn(
     unsupported: read.refused.map((r) => r.name),
     ready: essentials && !follow,
     suggestions: follow?.suggestions ?? [],
+    options: [],
   };
 }
