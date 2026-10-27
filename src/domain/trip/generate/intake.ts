@@ -61,6 +61,7 @@ const stated = [
   "start",
   "finish",
   "pace",
+  "dayEnds",
   "interests",
   "party",
   "mobility",
@@ -223,11 +224,16 @@ export function readIntake(
   }
   if (!constraints.safeParse(next.constraints).success) return null;
 
-  // The budget for questions is the code's, not the model's: past it the
-  // conversation is ready whatever the model thinks is left to ask, provided
-  // the two things a trip cannot be built without were said.
+  // Readiness is the code's, not the model's. A trip is not ready while the
+  // two things it cannot be built without are unsaid, nor while nobody knows
+  // what the traveller enjoys: a plan made without that is a plan of museums.
+  // Past the budget for questions it is ready whatever is left to ask, so the
+  // traveller is never interrogated.
   const essentials = next.said.includes("places") && next.said.includes("days");
-  const ready = r.ready || (essentials && asked + 1 >= INTAKE_MAX_QUESTIONS);
+  const ready =
+    essentials &&
+    ((r.ready && next.said.includes("interests")) ||
+      asked + 1 >= INTAKE_MAX_QUESTIONS);
 
   return {
     reply: r.reply,
@@ -255,26 +261,29 @@ export function cleanSuggestions(raw: readonly string[]): string[] {
 
 /**
  * What to ask next, when no model is there to choose: the first detail the
- * traveller has not given, in the order that changes a plan most, with answers
- * `understand` can read back. Null once none is left.
+ * traveller has not given, in the order that changes a plan most (what they
+ * enjoy first: it decides every stop), with answers `understand` can read
+ * back. Null once none is left.
  */
 export function nextQuestion(
   said: readonly string[],
 ): { question: string; suggestions: string[] } | null {
-  if (!said.includes("party")) {
-    return {
-      question: "Who is travelling?",
-      suggestions: ["Solo", "Couple", "Family with kids", "4 friends"],
-    };
-  }
   if (!said.includes("interests")) {
     return {
-      question: "What do you like most: food and wine, hiking, or history?",
+      question:
+        "What do you like most: food and wine, hiking, history, or museums?",
       suggestions: [
         "Food and wine",
         "Hiking and nature",
         "Monasteries and history",
+        "Museums and art",
       ],
+    };
+  }
+  if (!said.includes("party")) {
+    return {
+      question: "Who is travelling?",
+      suggestions: ["Solo", "Couple", "Family with kids", "4 friends"],
     };
   }
   if (!said.includes("pace")) {

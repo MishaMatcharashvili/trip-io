@@ -221,7 +221,10 @@ describe("suggestions from the model", () => {
   });
 
   test("are dropped when the planner has nothing left to ask", () => {
-    assert.deepEqual(ask(["Couple"], true)?.suggestions, []);
+    assert.deepEqual(
+      ask(["Couple"], false, INTAKE_MAX_QUESTIONS - 1)?.suggestions,
+      [],
+    );
   });
 
   test("the question budget makes it ready, once the essentials are said", () => {
@@ -232,6 +235,35 @@ describe("suggestions from the model", () => {
     const last = ask(["Couple"], false, INTAKE_MAX_QUESTIONS - 1);
     assert.equal(last?.ready, true);
     assert.deepEqual(last?.suggestions, []);
+  });
+
+  test("the model cannot call a trip ready before it knows what the traveller enjoys", () => {
+    assert.equal(ask([], true)?.ready, false);
+    const told = readIntake(
+      {
+        ...unchanged,
+        days: 3,
+        places: ["kakheti"],
+        interests: ["food", "nature"],
+        ready: true,
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(told?.ready, true);
+    // "Anything" is an answer: no interests, said.
+    const anything = readIntake(
+      {
+        ...unchanged,
+        days: 3,
+        places: ["kakheti"],
+        interests: [],
+        ready: true,
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(anything?.ready, true);
   });
 
   test("the budget does not declare a trip ready that has no places", () => {
@@ -248,10 +280,12 @@ describe("suggestions from the model", () => {
 describe("fallbackTurn", () => {
   test("reads the latest message onto the state", () => {
     const turn = fallbackTurn(
-      said("Long weekend in Kakheti with my partner"),
+      said("Long weekend in Kakheti with my partner, back by 7"),
       initialState(TODAY),
       TODAY,
     );
+    assert.equal(turn.state.constraints.dayEnds, "19:00");
+    assert.ok(turn.state.said.includes("dayEnds"));
     assert.equal(turn.state.constraints.days, 3);
     assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
     assert.ok(constraints.safeParse(turn.state.constraints).success);
@@ -270,6 +304,7 @@ describe("fallbackTurn", () => {
       "Food and wine",
       "Hiking and nature",
       "Monasteries and history",
+      "Museums and art",
     ]);
 
     const all = fallbackTurn(
