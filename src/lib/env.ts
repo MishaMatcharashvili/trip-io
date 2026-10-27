@@ -72,6 +72,16 @@ export const env = createEnv({
      * every visit.
      */
     GOOGLE_PLACES_CONTENT_TTL_S: z.coerce.number().int().min(0).optional(),
+    /**
+     * The operator panel's login (src/app/admin). One username and password,
+     * compared in constant time; there is no account behind them. Unset, the
+     * panel stays shut and says so. Choose a long password: it is the only
+     * thing between the internet and every traveller's email and trips.
+     */
+    ADMIN_USERNAME: z.string().min(1).optional(),
+    ADMIN_PASSWORD: z.string().min(12).optional(),
+    /** Better Auth's secret, which also signs the panel's cookie (src/lib/admin-session.ts). */
+    BETTER_AUTH_SECRET: z.string().min(16).optional(),
   },
   client: {
     /**
