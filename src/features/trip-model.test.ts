@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { TripScreen } from "../bll/trip-screen.ts";
+import type { LonLat } from "../domain/geo.ts";
+import type { TripDoc, TripNode } from "../domain/trip/document.ts";
 import {
   at,
   DAY,
   kazbegiDoc,
   N,
+  nodeId,
   P,
   places,
 } from "../domain/trip/test-fixtures.ts";
 import {
+  centroid,
   changeRows,
   dateRange,
   mapStops,
+  overviewStops,
   partyLine,
   stopDetail,
   stopWeight,
@@ -254,5 +259,129 @@ describe("stopWeight", () => {
     const w = (min: number) => stopWeight({ kind: "visit", durationMin: min });
     assert.ok(w(180) > w(30));
     assert.equal(w(600), w(1200));
+  });
+});
+
+// Tbilisi → Sighnaghi and back, over two days, with a bed in Sighnaghi.
+const TBILISI: LonLat = [44.8, 41.695];
+const SIGHNAGHI: LonLat = [45.724, 41.484];
+function roundTrip() {
+  const node = (
+    kind: TripNode["kind"],
+    title: string,
+    startsAt: string,
+    lonLat: LonLat,
+    durationMin: number,
+  ): [TripNode, LonLat] => [
+    {
+      kind,
+      placeId: null,
+      lonLat,
+      startsAt,
+      durationMin,
+      indoor: false,
+      meta: { title, urban: false },
+    },
+    lonLat,
+  ];
+  const nodes = {
+    [nodeId(1)]: node(
+      "transfer",
+      "Drive to Sighnaghi",
+      at("2026-09-15", "09:00"),
+      SIGHNAGHI,
+      125,
+    ),
+    [nodeId(2)]: node(
+      "visit",
+      "Sighnaghi old town",
+      at("2026-09-15", "11:30"),
+      SIGHNAGHI,
+      90,
+    ),
+    [nodeId(3)]: node(
+      "stay",
+      "Check in · Pheasant's Tears",
+      at("2026-09-15", "17:00"),
+      SIGHNAGHI,
+      15,
+    ),
+    [nodeId(4)]: node(
+      "visit",
+      "Bodbe monastery",
+      at("2026-09-16", "09:00"),
+      SIGHNAGHI,
+      60,
+    ),
+    [nodeId(5)]: node(
+      "transfer",
+      "Drive to Tbilisi",
+      at("2026-09-16", "13:00"),
+      TBILISI,
+      125,
+    ),
+  };
+  const doc: TripDoc = {
+    trip: {
+      title: "2 days in Georgia",
+      startsAt: at("2026-09-15", "00:00"),
+      endsAt: at("2026-09-16", "23:59"),
+      party: {},
+      pace: "moderate",
+      budget: "€300",
+      prefs: { places: ["signagi"], start: "tbilisi", finish: "tbilisi" },
+    },
+    nodes: Object.fromEntries(
+      Object.entries(nodes).map(([id, [n]]) => [id, n]),
+    ),
+  };
+  return screen({
+    doc,
+    positions: Object.fromEntries(
+      Object.entries(nodes).map(([id, [, at]]) => [id, at]),
+    ),
+  });
+}
+
+describe("the road of a day that opens with a drive", () => {
+  const trip = tripModel(roundTrip(), new Date(at("2026-09-10", "12:00")));
+
+  test("starts from where the traveller arrives", () => {
+    const [from, ...rest] = mapStops(trip.days[0]);
+    assert.equal(from.label, "Tbilisi");
+    assert.ok(from.origin);
+    assert.deepEqual(from.lonLat, TBILISI);
+    assert.equal(rest.length, 3);
+    assert.ok(rest.every((s) => !s.origin));
+  });
+
+  test("a day that opens with a visit has no origin, and needs none", () => {
+    assert.ok(mapStops(trip.days[1]).every((s) => !s.origin));
+  });
+
+  test("the origin is not where the day is, for the forecast", () => {
+    assert.deepEqual(centroid(mapStops(trip.days[0])), SIGHNAGHI);
+  });
+});
+
+describe("overviewStops", () => {
+  test("a round trip is where it starts, where it is spent, and where it ends", () => {
+    const trip = tripModel(roundTrip(), new Date(at("2026-09-10", "12:00")));
+    assert.deepEqual(
+      overviewStops(trip).map((s) => s.label),
+      ["Tbilisi", "Pheasant's Tears", "Tbilisi"],
+    );
+  });
+
+  test("a place stayed in for days, or one stop away from the start, is one point", () => {
+    const trip = tripModel(roundTrip(), new Date(at("2026-09-10", "12:00")));
+    const days = [trip.days[0], trip.days[0], trip.days[1]];
+    assert.equal(overviewStops({ ...trip, days }).length, 3);
+  });
+
+  test("a trip that does not say where it starts is its days", () => {
+    const trip = tripModel(roundTrip(), new Date(at("2026-09-10", "12:00")));
+    const { start: _s, finish: _f, ...bare } = trip;
+    assert.equal(overviewStops(bare).length, 1);
   });
 });

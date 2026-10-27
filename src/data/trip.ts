@@ -42,6 +42,9 @@ export type Checkpoint = {
   };
 };
 
+/** A point on the road a day or a trip travels: where it starts from, where it ends. */
+export type Waypoint = { lonLat: [number, number]; label: string };
+
 export type Day = {
   id: string;
   index: number;
@@ -58,6 +61,12 @@ export type Day = {
   state: "past" | "today" | "future";
   /** Real trips only: YYYY-MM-DD, Tbilisi. */
   date?: string;
+  /**
+   * Real trips only: where the day's first drive starts from, when it starts
+   * with one — the end of the day before, or where the traveller arrives. The
+   * road that drive takes has no stop of the day at its start.
+   */
+  from?: Waypoint;
 };
 
 export type Source = {
@@ -78,6 +87,9 @@ export type Trip = {
   lastCheck: string;
   days: Day[];
   sources: Source[];
+  /** Real trips only: where the traveller arrives and where they leave from. */
+  start?: Waypoint;
+  finish?: Waypoint;
 };
 
 export type Advisory = {

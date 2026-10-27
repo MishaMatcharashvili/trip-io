@@ -54,6 +54,11 @@ export type MapStop = {
   /** The place's own logo, drawn in the pin instead of a glyph when it loads. */
   logo?: string;
   /**
+   * Where the day's road starts from, not one of its stops: the end of the
+   * day before. It is drawn and routed from, and is nothing to open.
+   */
+  origin?: boolean;
+  /**
    * How much it matters, for the one that stands for a group when pins are too
    * close to draw apart. Higher wins; nothing, 0.
    */

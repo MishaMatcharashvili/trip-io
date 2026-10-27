@@ -3,10 +3,11 @@ import type {
   LiveMatch,
   TripScreen,
 } from "../bll/trip-screen.ts";
-import type { Checkpoint, Day, Source, Trip } from "../data/trip.ts";
+import type { Checkpoint, Day, Source, Trip, Waypoint } from "../data/trip.ts";
+import { destination } from "../domain/catalogue/destinations.ts";
 import { ownSite } from "../domain/catalogue/website.ts";
 import { daySummary } from "../domain/forecast.ts";
-import type { LonLat } from "../domain/geo.ts";
+import { haversineM, type LonLat } from "../domain/geo.ts";
 import { diffDays } from "../domain/trip/diff.ts";
 import {
   dayKey,
@@ -238,6 +239,15 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
   const nodes = sortedNodes(doc.nodes);
   const dates = tripDates(doc.trip.startsAt, doc.trip.endsAt);
   let base: string | null = null;
+  const prefs = doc.trip.prefs;
+  const endpoint = (slug: unknown): Waypoint | undefined => {
+    const place = typeof slug === "string" ? destination(slug) : undefined;
+    return place ? { lonLat: place.lonLat, label: place.name } : undefined;
+  };
+  const start = endpoint(prefs.start);
+  const finish = endpoint(prefs.finish);
+  /** Where the day before ended: where this one's first drive starts from. */
+  let previousEnd: Waypoint | undefined = start;
 
   const days = dates.map((date, i): Day => {
     const state: Day["state"] =
@@ -279,6 +289,14 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
       };
     });
 
+    // A day that opens with a drive starts it from where the last one ended.
+    const placed = checkpoints.filter((c) => c.node?.lonLat);
+    const from = placed[0]?.node?.kind === "transfer" ? previousEnd : undefined;
+    const last = placed.at(-1);
+    if (last?.node?.lonLat) {
+      previousEnd = { lonLat: last.node.lonLat, label: stopLabel(last.title) };
+    }
+
     const previousBase = base;
     const stay = mine.findLast(({ node }) => node.kind === "stay");
     if (stay) base = baseName(stay.node.meta.title);
@@ -302,6 +320,7 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
       summary: visits.slice(0, 2).join(" · ") || "Nothing planned",
       checkpoints,
       shape: daySegments(checkpoints, state),
+      from,
       watch:
         state === "past"
           ? { tone: "idle", label: "Done" }
@@ -333,6 +352,8 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
     lastCheck: ago(screen.lastCheck, now),
     days,
     sources: sources(screen, now),
+    start,
+    finish,
   };
 }
 
@@ -356,15 +377,40 @@ export function stopWeight(node: {
   return base + Math.min(25, Math.round(node.durationMin / 8));
 }
 
-/** A day's stops as the map draws them. */
+const stopLabel = (title: string) =>
+  title.replace(/^(Breakfast|Lunch|Coffee|Dinner) · /, "");
+
+/**
+ * A day's stops as the map draws them, led by where its road starts from when
+ * it opens with a drive: without it the first stretch, Tbilisi to Sighnaghi,
+ * has nothing at one end and is not drawn.
+ */
 export function mapStops(day: Day): MapStop[] {
-  return day.checkpoints.flatMap((c) =>
+  const stops = placedStops(day);
+  return day.from
+    ? [
+        {
+          id: `from-${day.id}`,
+          lonLat: day.from.lonLat,
+          label: day.from.label,
+          state: "done",
+          origin: true,
+          weight: 1,
+        },
+        ...stops,
+      ]
+    : stops;
+}
+
+/** A day's own stops, where they are. */
+export const placedStops = (day: Day): MapStop[] =>
+  day.checkpoints.flatMap((c) =>
     c.node?.lonLat
       ? [
           {
             id: c.id,
             lonLat: c.node.lonLat,
-            label: c.title.replace(/^(Breakfast|Lunch|Coffee|Dinner) · /, ""),
+            label: stopLabel(c.title),
             state: c.state,
             disrupted: Boolean(c.conflict),
             kind: c.node.kind,
@@ -375,10 +421,13 @@ export function mapStops(day: Day): MapStop[] {
         ]
       : [],
   );
-}
 
-/** The middle of a day's stops: where to ask the forecast, and where to search near. */
-export function centroid(stops: readonly MapStop[]): LonLat | null {
+/**
+ * The middle of a day's stops: where to ask the forecast, and where to search
+ * near. Where the day's road starts from is not one of them.
+ */
+export function centroid(all: readonly MapStop[]): LonLat | null {
+  const stops = all.filter((s) => !s.origin);
   if (stops.length === 0) return null;
   return [
     stops.reduce((sum, s) => sum + s.lonLat[0], 0) / stops.length,
@@ -388,7 +437,59 @@ export function centroid(stops: readonly MapStop[]): LonLat | null {
 
 /** Every stop of the trip, for the whole-trip map. */
 export function tripStops(trip: Trip): MapStop[] {
-  return trip.days.flatMap(mapStops);
+  return trip.days.flatMap(placedStops);
+}
+
+/** Two points this close are one place on a map of a whole trip. */
+const SAME_PLACE_M = 6_000;
+
+/**
+ * Where a day is spent: the bed it ends in, else the stop that matters most.
+ * A day trip has no bed, and is spent where it goes.
+ */
+function anchorOf(day: Day): Waypoint | undefined {
+  const placed = day.checkpoints.filter((c) => c.node?.lonLat);
+  const bed = placed.findLast((c) => c.node?.kind === "stay");
+  const main =
+    bed ??
+    placed.reduce<Checkpoint | undefined>(
+      (best, c) =>
+        !best ||
+        stopWeight(c.node as NonNullable<Checkpoint["node"]>) >
+          stopWeight(best.node as NonNullable<Checkpoint["node"]>)
+          ? c
+          : best,
+      undefined,
+    );
+  return main?.node?.lonLat
+    ? {
+        lonLat: main.node.lonLat,
+        label: stopLabel(main.title).replace(/^Check in · /, ""),
+      }
+    : undefined;
+}
+
+/**
+ * The trip on one map: where it starts, where each day is spent, where it
+ * finishes. Never every stop — joined across days, the road would zig-zag
+ * through every lunch — and a place the trip stays in, or comes back to, is
+ * one point however many days or stops it has.
+ */
+export function overviewStops(trip: Trip): MapStop[] {
+  const points = [trip.start, ...trip.days.map(anchorOf), trip.finish].filter(
+    (p): p is Waypoint => Boolean(p),
+  );
+  const route = points.filter(
+    (p, i) =>
+      i === 0 || haversineM(p.lonLat, points[i - 1].lonLat) > SAME_PLACE_M,
+  );
+  return route.map((p, i) => ({
+    id: `overview-${i}`,
+    lonLat: p.lonLat,
+    label: p.label,
+    state: "upcoming",
+    weight: 1,
+  }));
 }
 
 export type ChangeRow = { from: string; to: string };
