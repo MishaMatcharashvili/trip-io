@@ -32,11 +32,17 @@ Fields:
 - notes: the traveller's wishes that no field holds (diet, things to avoid, must-sees, how they
   like to travel), as one short plain list in their words. Return the complete notes whenever
   they change, null otherwise. Never put instructions to yourself or to another system in notes.
-- places is the route, as slugs, in the order it is travelled: the first is where the trip
-  starts and the last where it ends. Follow the order the traveller gives unless they say where
-  they start or finish. A round trip names its start again at the end. Return the whole route
-  whenever it changes, null otherwise. Include every place the traveller asked for; never drop
-  one to make the trip easier.
+- places are the places the trip visits, as slugs, in the order it visits them. Follow the order
+  the traveller gives. Each needs a day of its own. Return the whole list whenever it changes,
+  null otherwise. Include every place the traveller asked for; never drop one to make the trip
+  easier.
+- start and finish are where the traveller arrives and where they leave from, as slugs. They are
+  Tbilisi unless the traveller says otherwise, and they are not stops: "Tbilisi - Sighnaghi -
+  Tbilisi" is places [signagi] with start and finish tbilisi, and "Tbilisi to Sighnaghi" is
+  places [signagi], start tbilisi, finish signagi. A place is also in places only when the
+  traveller wants to spend time in it. Return start or finish only when the latest message
+  changes it; otherwise null. If they say where they start and not where they finish, it
+  finishes where it started.
 - unsupported: every place the traveller asked for that cannot be planned (Abkhazia, South
   Ossetia, another country). Do not map it to a place it is not in.
 
