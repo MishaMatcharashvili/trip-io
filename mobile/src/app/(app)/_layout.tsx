@@ -59,10 +59,27 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="trips/[id]/index" options={{ title: "" }} />
+      {/* A trip: its four tabs, then the screens pushed over them. */}
+      <Stack.Screen name="trips/[id]/(tabs)" options={{ title: "" }} />
+      <Stack.Screen name="trips/[id]/day/[date]" options={{ title: "" }} />
+      <Stack.Screen name="trips/[id]/stop/[nodeId]" options={{ title: "" }} />
       <Stack.Screen
         name="trips/[id]/watch"
-        options={{ title: "Notifications" }}
+        options={{ title: "What I watch" }}
+      />
+      <Stack.Screen
+        name="trips/[id]/versions"
+        options={{ title: "Versions of your trip" }}
+      />
+      <Stack.Screen
+        name="trips/[id]/pass"
+        options={{ title: "", presentation: "modal" }}
+      />
+      <Stack.Screen name="new/index" options={{ title: "New trip" }} />
+      <Stack.Screen
+        name="new/building"
+        // The build is left with Cancel, which also calls it off.
+        options={{ headerShown: false, gestureEnabled: false }}
       />
       <Stack.Screen name="alerts/[id]" options={{ title: "A change" }} />
       <Stack.Screen

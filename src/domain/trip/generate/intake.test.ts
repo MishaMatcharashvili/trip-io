@@ -4,6 +4,7 @@ import { constraints } from "./constraints.ts";
 import {
   applyEdit,
   fallbackTurn,
+  INTAKE_MAX_QUESTIONS,
   type IntakeMessage,
   initialState,
   readIntake,
@@ -16,6 +17,8 @@ const unchanged = {
   startDate: null,
   days: null,
   places: null,
+  start: null,
+  finish: null,
   pace: null,
   interests: null,
   adults: null,
@@ -25,6 +28,7 @@ const unchanged = {
   notes: null,
   unsupported: [],
   ready: false,
+  suggestions: [],
 };
 
 const said = (text: string): IntakeMessage[] => [{ role: "traveller", text }];
@@ -49,6 +53,35 @@ describe("readIntake", () => {
     assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
     assert.deepEqual(turn.state.constraints.party, { adults: 2, children: 0 });
     assert.deepEqual(turn.state.said.sort(), ["days", "party", "places"]);
+  });
+
+  test("a trip starts and finishes in Tbilisi until the planner says otherwise", () => {
+    const first = readIntake(
+      { ...unchanged, places: ["signagi"] },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(first?.state.constraints.start, "tbilisi");
+    assert.equal(first?.state.constraints.finish, "tbilisi");
+    assert.ok(!first?.state.said.includes("start"));
+
+    // Said where it starts and not where it ends: it ends where it began.
+    const second = readIntake(
+      { ...unchanged, start: "kutaisi" },
+      first?.state ?? initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(second?.state.constraints.start, "kutaisi");
+    assert.equal(second?.state.constraints.finish, "kutaisi");
+    assert.deepEqual(second?.state.said.sort(), ["places", "start"]);
+
+    const third = readIntake(
+      { ...unchanged, finish: "batumi" },
+      second?.state ?? initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(third?.state.constraints.start, "kutaisi");
+    assert.equal(third?.state.constraints.finish, "batumi");
   });
 
   test("an unsaid budget follows the days and the party", () => {
@@ -159,6 +192,59 @@ describe("applyEdit", () => {
   });
 });
 
+describe("suggestions from the model", () => {
+  const ask = (suggestions: string[], ready = false, asked = 0) =>
+    readIntake(
+      { ...unchanged, days: 3, places: ["kakheti"], ready, suggestions },
+      initialState(TODAY),
+      TODAY,
+      asked,
+    );
+
+  test("are trimmed, distinct, short and at most four", () => {
+    const turn = ask([
+      "  Couple ",
+      "couple",
+      "",
+      "x".repeat(41),
+      "Family with kids",
+      "Solo",
+      "Friends",
+      "Parents",
+    ]);
+    assert.deepEqual(turn?.suggestions, [
+      "Couple",
+      "Family with kids",
+      "Solo",
+      "Friends",
+    ]);
+  });
+
+  test("are dropped when the planner has nothing left to ask", () => {
+    assert.deepEqual(ask(["Couple"], true)?.suggestions, []);
+  });
+
+  test("the question budget makes it ready, once the essentials are said", () => {
+    assert.equal(
+      ask(["Couple"], false, INTAKE_MAX_QUESTIONS - 2)?.ready,
+      false,
+    );
+    const last = ask(["Couple"], false, INTAKE_MAX_QUESTIONS - 1);
+    assert.equal(last?.ready, true);
+    assert.deepEqual(last?.suggestions, []);
+  });
+
+  test("the budget does not declare a trip ready that has no places", () => {
+    const turn = readIntake(
+      { ...unchanged, suggestions: ["Couple"] },
+      initialState(TODAY),
+      TODAY,
+      INTAKE_MAX_QUESTIONS,
+    );
+    assert.equal(turn?.ready, false);
+  });
+});
+
 describe("fallbackTurn", () => {
   test("reads the latest message onto the state", () => {
     const turn = fallbackTurn(
@@ -168,8 +254,57 @@ describe("fallbackTurn", () => {
     );
     assert.equal(turn.state.constraints.days, 3);
     assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
-    assert.ok(turn.ready);
     assert.ok(constraints.safeParse(turn.state.constraints).success);
+  });
+
+  test("asks the next detail it lacks, with answers to tap, then stops asking", () => {
+    // The places, the length and who is coming are said; interests are not.
+    const first = fallbackTurn(
+      said("Long weekend in Kakheti with my partner"),
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.ok(!first.ready);
+    assert.match(first.reply, /What do you like most/);
+    assert.deepEqual(first.suggestions, [
+      "Food and wine",
+      "Hiking and nature",
+      "Monasteries and history",
+    ]);
+
+    const all = fallbackTurn(
+      said("Long weekend in Kakheti with my partner, relaxed, wine and hiking"),
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.ok(all.ready);
+    assert.deepEqual(all.suggestions, []);
+  });
+
+  test("no question is asked before the places and the length are known", () => {
+    const turn = fallbackTurn(
+      said("somewhere nice"),
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.deepEqual(turn.suggestions, []);
+  });
+
+  test("it stops asking after its budget of replies", () => {
+    const talk: IntakeMessage[] = Array.from(
+      { length: INTAKE_MAX_QUESTIONS - 1 },
+      () => [
+        { role: "traveller" as const, text: "ok" },
+        { role: "planner" as const, text: "Which?" },
+      ],
+    ).flat();
+    const turn = fallbackTurn(
+      [...talk, { role: "traveller", text: "3 days in Kakheti" }],
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.ok(turn.ready);
+    assert.deepEqual(turn.suggestions, []);
   });
 
   test("says what it assumed, and what cannot be part of the trip", () => {
@@ -182,6 +317,16 @@ describe("fallbackTurn", () => {
     assert.match(turn.reply, /Sukhumi can’t be part of it/);
     assert.deepEqual(turn.unsupported, ["Sukhumi"]);
     assert.ok(!turn.ready);
+  });
+
+  test("the words say where it starts, and the reply says the whole route", () => {
+    const turn = fallbackTurn(
+      said("Tbilisi - Sighnaghi - Tbilisi, 2 days"),
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.deepEqual(turn.state.constraints.places, ["signagi"]);
+    assert.match(turn.reply, /Tbilisi → Sighnaghi → Tbilisi/);
   });
 
   test("a later message does not undo an earlier one", () => {

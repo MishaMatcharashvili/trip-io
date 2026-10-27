@@ -1,5 +1,6 @@
 import type { GeoJSONSource, Map as MapboxMap, MapMouseEvent } from "mapbox-gl";
 import type { LonLat } from "../../domain/geo.ts";
+import { type LegState, routeEnds } from "./route-states.ts";
 import type { MapEvent } from "./trip-map.tsx";
 
 // What the trip draws over the basemap besides its stops: the road route, the
@@ -14,8 +15,8 @@ import type { MapEvent } from "./trip-map.tsx";
 const token = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-/** One stretch of the route: the road, and whether you are past it. */
-export type DrawnLeg = { path: readonly LonLat[]; done: boolean };
+/** One stretch of the route: the road, and whether it is covered, being driven or still ahead. */
+export type DrawnLeg = { path: readonly LonLat[]; state: LegState };
 
 export type RouteDraw = {
   legs: readonly DrawnLeg[];
@@ -41,8 +42,8 @@ export type Overlays = {
 
 const SRC = {
   alternatives: "trip-alternatives",
-  done: "trip-route-done",
-  ahead: "trip-route-ahead",
+  route: "trip-route",
+  ends: "trip-route-ends",
   events: "trip-events",
   traffic: "trip-traffic",
 } as const;
@@ -53,14 +54,41 @@ const LAYER = {
   eventPoint: "trip-events-point",
   alternatives: "trip-alternatives",
   casing: "trip-route-casing",
-  done: "trip-route-done",
   ahead: "trip-route-ahead",
+  done: "trip-route-done",
+  current: "trip-route-current",
+  arrows: "trip-route-arrows",
+  endRing: "trip-route-end-ring",
+  endTag: "trip-route-end-tag",
 } as const;
+
+/** The chevron laid along the road, in the map's image store. */
+const ARROW = "trip-route-arrow";
+
+/**
+ * A chevron pointing right (the direction a line runs), drawn once and
+ * recoloured per layer: an SDF image takes `icon-color`. Images are dropped
+ * with the style, so `install` puts it back each time.
+ */
+function arrowImage(): ImageData {
+  const size = 32;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const g = canvas.getContext("2d") as CanvasRenderingContext2D;
+  g.lineWidth = 6;
+  g.lineCap = "round";
+  g.lineJoin = "round";
+  g.strokeStyle = "#000";
+  g.beginPath();
+  g.moveTo(11, 7);
+  g.lineTo(21, 16);
+  g.lineTo(11, 25);
+  g.stroke();
+  return g.getImageData(0, 0, size, size);
+}
 
 /** Mapbox's own live-and-historical traffic tileset, read by the browser token. */
 const TRAFFIC_TILESET = "mapbox://mapbox.mapbox-traffic-v1";
-
-const AHEAD_CASING = "trip-route-ahead-casing";
 
 const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
@@ -86,16 +114,20 @@ export function mountOverlays(map: MapboxMap): Overlays {
     const fade = route?.stale ? 0.45 : 1;
     const visible = Boolean(route?.visible);
     const legs = route?.legs ?? [];
-    source(SRC.done)?.setData({
+    source(SRC.route)?.setData({
       type: "FeatureCollection",
       features: visible
-        ? legs.filter((l) => l.done).map((l) => line(l.path))
+        ? legs.map((l) => line(l.path, { state: l.state }))
         : [],
     });
-    source(SRC.ahead)?.setData({
+    source(SRC.ends)?.setData({
       type: "FeatureCollection",
       features: visible
-        ? legs.filter((l) => !l.done).map((l) => line(l.path))
+        ? routeEnds(legs.map((l) => l.path)).map((end) => ({
+            type: "Feature" as const,
+            properties: { kind: end.kind, label: end.label },
+            geometry: { type: "Point" as const, coordinates: end.at },
+          }))
         : [],
     });
     source(SRC.alternatives)?.setData({
@@ -108,13 +140,21 @@ export function mountOverlays(map: MapboxMap): Overlays {
     });
     for (const [id, base] of [
       [LAYER.alternatives, 0.75],
-      [LAYER.casing, 0.85],
-      [LAYER.done, 0.95],
-      [AHEAD_CASING, 0.85],
+      [LAYER.casing, 0.9],
       [LAYER.ahead, 1],
+      [LAYER.done, 1],
+      [LAYER.current, 1],
     ] as const) {
       if (map.getLayer(id))
         map.setPaintProperty(id, "line-opacity", base * fade);
+    }
+    // Everything else on the route fades with it.
+    for (const [id, prop] of [
+      [LAYER.arrows, "icon-opacity"],
+      [LAYER.endRing, "circle-stroke-opacity"],
+      [LAYER.endTag, "text-opacity"],
+    ] as const) {
+      if (map.getLayer(id)) map.setPaintProperty(id, prop, fade);
     }
   };
 
@@ -158,13 +198,14 @@ export function mountOverlays(map: MapboxMap): Overlays {
   };
 
   const install = () => {
-    if (removed || map.getSource(SRC.done)) return;
+    if (removed || map.getSource(SRC.route)) return;
     const agent = token("--color-agent");
-    const ground = token("--color-map-ground");
     const quiet = token("--color-ink-faint");
     const muted = token("--color-ink-muted");
     const ink = token("--color-ink");
     const alert = token("--color-alert-bright");
+    const ok = token("--color-ok");
+    const surface = token("--color-surface");
 
     // Traffic first, so everything below sits on top of it.
     map.addSource(SRC.traffic, { type: "vector", url: TRAFFIC_TILESET });
@@ -237,8 +278,11 @@ export function mountOverlays(map: MapboxMap): Overlays {
       },
     });
 
-    for (const id of [SRC.alternatives, SRC.done, SRC.ahead]) {
+    for (const id of [SRC.alternatives, SRC.route, SRC.ends]) {
       map.addSource(id, { type: "geojson", data: EMPTY });
+    }
+    if (!map.hasImage(ARROW)) {
+      map.addImage(ARROW, arrowImage(), { sdf: true, pixelRatio: 2 });
     }
     // Alternatives first, so the chosen route sits on top of them.
     map.addLayer({
@@ -248,39 +292,82 @@ export function mountOverlays(map: MapboxMap): Overlays {
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": quiet, "line-opacity": 0.75, "line-width": 6 },
     });
-    // The casing lifts the route off the roads it follows.
+    // One road, three states, each its own layer over one casing that lifts it
+    // off the roads it follows. Not yet covered is grey, covered is green, the
+    // stretch being driven is the agent's periwinkle: colour here says how far
+    // along the traveller is, and the arrows say which way.
+    const along = (state: LegState) => ["==", ["get", "state"], state] as never;
     map.addLayer({
       id: LAYER.casing,
       type: "line",
-      source: SRC.done,
+      source: SRC.route,
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ground, "line-opacity": 0.85, "line-width": 9 },
+      paint: { "line-color": surface, "line-opacity": 0.9, "line-width": 10 },
     });
+    for (const [id, state, color] of [
+      [LAYER.ahead, "ahead", quiet],
+      [LAYER.done, "done", ok],
+      [LAYER.current, "current", agent],
+    ] as const) {
+      map.addLayer({
+        id,
+        type: "line",
+        source: SRC.route,
+        filter: along(state),
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": color, "line-opacity": 1, "line-width": 6 },
+      });
+    }
+    // Direction, along the line of every leg and so on top of all three states.
+    // Overlap is allowed: a road driven out and back must show both ways.
     map.addLayer({
-      id: LAYER.done,
-      type: "line",
-      source: SRC.done,
-      layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": agent, "line-opacity": 0.95, "line-width": 5 },
+      id: LAYER.arrows,
+      type: "symbol",
+      source: SRC.route,
+      layout: {
+        "symbol-placement": "line",
+        "symbol-spacing": 64,
+        "icon-image": ARROW,
+        "icon-size": 0.5,
+        "icon-rotation-alignment": "map",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+      },
+      paint: { "icon-color": surface, "icon-opacity": 1 },
     });
-    // The stretches still ahead are dashed and lighter, with their own casing.
+    // Where it begins and where it ends: a ring round the first and last stop's
+    // pin, and the word for it above.
     map.addLayer({
-      id: AHEAD_CASING,
-      type: "line",
-      source: SRC.ahead,
-      layout: { "line-cap": "butt", "line-join": "round" },
-      paint: { "line-color": ground, "line-opacity": 0.85, "line-width": 9 },
-    });
-    map.addLayer({
-      id: LAYER.ahead,
-      type: "line",
-      source: SRC.ahead,
-      layout: { "line-join": "round" },
+      id: LAYER.endRing,
+      type: "circle",
+      source: SRC.ends,
       paint: {
-        "line-color": agent,
-        "line-opacity": 1,
-        "line-width": 4,
-        "line-dasharray": [1.5, 1.5],
+        "circle-radius": 22,
+        "circle-color": surface,
+        "circle-opacity": 0,
+        "circle-stroke-color": ink,
+        "circle-stroke-width": 2.5,
+        "circle-stroke-opacity": 1,
+      },
+    });
+    map.addLayer({
+      id: LAYER.endTag,
+      type: "symbol",
+      source: SRC.ends,
+      layout: {
+        "text-field": ["get", "label"],
+        "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
+        "text-size": 10.5,
+        "text-letter-spacing": 0.08,
+        "text-transform": "uppercase",
+        "text-offset": [0, -2.5],
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+      },
+      paint: {
+        "text-color": ink,
+        "text-halo-color": surface,
+        "text-halo-width": 2,
       },
     });
     drawRoute();
@@ -337,7 +424,7 @@ export function mountOverlays(map: MapboxMap): Overlays {
       map.off("mousemove", onMove);
       try {
         map.getCanvas().style.cursor = "";
-        for (const id of [...Object.values(LAYER), AHEAD_CASING]) {
+        for (const id of Object.values(LAYER)) {
           if (map.getLayer(id)) map.removeLayer(id);
         }
         for (const id of Object.values(SRC)) {

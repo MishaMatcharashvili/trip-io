@@ -2,10 +2,11 @@ import {
   type Destination,
   destination,
   destinationName,
+  unreachable,
 } from "../../catalogue/destinations.ts";
 import { haversineM } from "../../geo.ts";
 import { straightLineTravel } from "../travel.ts";
-import type { Constraints } from "./constraints.ts";
+import { type Constraints, routeOf } from "./constraints.ts";
 import { addDays } from "./schedule.ts";
 
 // Can this trip be done at all? Judged before a plan is attempted, from the
@@ -115,7 +116,7 @@ function judgePlaces(
       Number(addDays(c.startDate, i).slice(5, 7)),
     ),
   );
-  const shut = [...new Set(c.places)]
+  const shut = [...new Set(routeOf(c))]
     .map(destination)
     .filter(
       (d): d is Destination & { closed: NonNullable<Destination["closed"]> } =>
@@ -133,8 +134,10 @@ function judgePlaces(
 }
 
 function judgeDays(c: Constraints): Judgement {
+  // Only the places visited need a day each: the start and the finish are the
+  // drive in and the drive out.
   const stops = c.places.length;
-  const names = c.places.map(destinationName).join(" → ");
+  const names = routeOf(c).map(destinationName).join(" → ");
   if (stops > c.days) {
     return {
       level: "impossible",
@@ -143,7 +146,7 @@ function judgeDays(c: Constraints): Judgement {
     };
   }
 
-  const legs = routeLegs(c.places);
+  const legs = routeLegs(routeOf(c));
   // A drive too long to see anything after it takes a day to itself.
   const long = legs.filter((l) => l.minutes > LONGEST_DRIVE_WITH_A_VISIT_MIN);
   const needed = stops + long.length;
@@ -170,7 +173,7 @@ function judgeBudget(c: Constraints): Judgement {
   const { adults, children } = c.party;
   const people = adults + children;
   const shares = adults + children * CHILD_SHARE;
-  const km = routeLegs(c.places).reduce((sum, l) => sum + l.km, 0);
+  const km = routeLegs(routeOf(c)).reduce((sum, l) => sum + l.km, 0);
   const transport = km * TRANSPORT_EUR_PER_KM * people;
   const daily = (c.budgetEur - transport) / c.days / shares;
 
@@ -211,6 +214,25 @@ export function assess(
     budget,
     possible: [places, days, budget].every((j) => j.level !== "impossible"),
   };
+}
+
+/**
+ * `assess`, with the places the planner could not take. Each is a reason the
+ * trip cannot be done as asked, and the reason is said when it is a known one.
+ */
+export function assessAsked(
+  c: Constraints,
+  unsupported: readonly string[] = [],
+): Assessment {
+  return assess(
+    c,
+    unsupported.map((name) => ({
+      name,
+      why:
+        unreachable(name)[0]?.why ??
+        "it is not somewhere a trip inside Georgia can go",
+    })),
+  );
 }
 
 /** Every reason a request cannot work, in the order the cards are shown. */

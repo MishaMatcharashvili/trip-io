@@ -63,6 +63,7 @@ export function TripMapScreen({
   events = [],
   cards,
   routed = true,
+  overview,
   dimmed = false,
 }: {
   stops: MapStop[];
@@ -70,6 +71,12 @@ export function TripMapScreen({
   cards: StopCard[];
   /** Draw the road between the stops: only for one day's, never several days'. */
   routed?: boolean;
+  /**
+   * The places a whole trip's road runs through, for the view of every day at
+   * once: the road goes between where the days are spent, and the pins stay
+   * the stops.
+   */
+  overview?: MapStop[];
   dimmed?: boolean;
 }) {
   const router = useRouter();
@@ -89,12 +96,14 @@ export function TripMapScreen({
     selected: chosen,
     select: pickRoute,
     refresh,
-  } = useTripRoute(routed ? stops : [], {
-    alternatives: routed && stops.length === 2,
+  } = useTripRoute(overview ?? (routed ? stops : []), {
+    alternatives: !overview && routed && stops.length === 2,
   });
-  const view = describeRoute(route, chosen, stops, new Date());
-  const mapsUrl = googleMapsDirectionsUrl(stops.map((s) => s.lonLat));
-  const drawn = drawnRoute(route, chosen, pickRoute);
+  // What the road runs through: the overview's points, else the stops.
+  const roadStops = overview ?? stops;
+  const view = describeRoute(route, chosen, roadStops, new Date());
+  const mapsUrl = googleMapsDirectionsUrl(roadStops.map((s) => s.lonLat));
+  const drawn = drawnRoute(route, chosen, pickRoute, Boolean(overview));
 
   // The layout decides the map's padding, which it reads once when it is
   // built, so the map waits for it rather than fitting twice.
@@ -172,7 +181,7 @@ export function TripMapScreen({
       {layout === "mobile" ? (
         <div className="absolute bottom-[calc(var(--sheet-h)+26px)] right-3 z-20 flex max-w-[calc(100%-24px)] flex-col items-end gap-2 lg:hidden">
           <MapStyleSwitch variant="step" />
-          {stops.length >= 2 && routeOpen ? (
+          {roadStops.length >= 2 && routeOpen ? (
             <Panel className="w-[264px] p-3">
               <RouteSection
                 view={view}
@@ -182,7 +191,7 @@ export function TripMapScreen({
               />
             </Panel>
           ) : null}
-          {stops.length >= 2 ? (
+          {roadStops.length >= 2 ? (
             <button
               type="button"
               aria-expanded={routeOpen}
@@ -408,6 +417,7 @@ function drawnRoute(
   route: ReturnType<typeof useTripRoute>["route"],
   chosen: number,
   pick: (index: number) => void,
+  whole: boolean,
 ): MapRoute | null {
   if (route.status !== "ready") return null;
   const routes = route.answer.routes;
@@ -415,6 +425,8 @@ function drawnRoute(
   const others = routes.map((_, i) => i).filter((i) => routes[i] !== main);
   return {
     legs: main.legs.map((leg) => leg.path),
+    // The whole trip's road is the plan, drawn in full.
+    done: whole ? main.legs.map(() => true) : undefined,
     alternatives: others.map((i) => routes[i].path),
     stale: route.refreshing,
     onPickAlternative: (index) => pick(others[index]),

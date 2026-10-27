@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // src/trip-model.ts imports with the extension, so that Node can run it in
+    // the root package's tests.
+    "allowImportingTsExtensions": true,
     // "@/" is the web package's alias. It must resolve here because AppType's
     // declarations import each other through it; the app's own code uses "~/".
     "paths": {

@@ -109,7 +109,7 @@ function ItineraryPanel({ view }: { view: OverviewView }) {
       />
 
       {!all && weather ? (
-        <div className="px-4 pb-3">
+        <div className="shrink-0 px-4 pb-3">
           <WeatherRibbon
             hours={weather.hours}
             caption={weather.caption}

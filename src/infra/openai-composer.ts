@@ -20,21 +20,35 @@ const SYSTEM = `You compose day-by-day itineraries for travellers in Georgia (th
 
 Rules:
 - Choose places ONLY from the candidate list, by their "ref". Never invent a place or a ref.
-- The trip follows "route" in order. Day 1 has stops in the first place on the route, the last day
-  has stops in the last place, and every place on the route gets at least one day in between. A
-  candidate is in a place when its "areas" list names it. Never skip a place on the route, and
-  never reorder it.
-- A day that moves on to the next place begins with the drive there. When the two are far apart,
-  leave the morning empty and put that day's stops in the afternoon and evening.
+- The trip visits "places" in order. Every place on the list gets at least one day, in that
+  order; never skip one and never reorder them. A candidate is in a place when its "areas" list
+  names it.
+- "start" is where the traveller arrives and "finish" where they leave from. They are not stops:
+  there are no candidates for them unless they are also in "places", and no day has to be spent
+  there. The first day begins with the drive from "start", and the last day ends with the drive
+  to "finish", when those are not the place the day is in.
+- A day that moves on to the next place, or starts with the drive from "start", begins with the
+  drive there. When the two are far apart, leave the morning empty and put that day's stops in
+  the afternoon and evening.
+- A last day that ends with a long drive to "finish" must be over in time for it: the drive has
+  to end before that day's dusk, so keep the stops early and leave out the evening meal.
 - Each day: pick one "stayRef" (the base for the night, a lodging candidate). Keep the same base
   on consecutive days unless the trip is moving on — changing base costs half a day.
 - Keep a day's stops close together. A day should not criss-cross a region.
 - Put each stop in the slot that suits it: morning, midday (lunch), afternoon, evening (dinner).
-  Every full day should have a midday and an evening meal.
+  Every full day should have a midday and an evening meal, except a day cut short by a drive.
 - Respect the hours given for each candidate, and the dawn/dusk times given for each day: an
   outdoor visit has to finish before dusk.
 - durationMin is how long the traveller spends there: a viewpoint 30-45, a church or museum 60-90,
   a hike or a national park 150-240, lunch 60-75, dinner 75-90.
+- Fill the day. Between one stop ending and the next starting there may be at most 3 hours on a
+  relaxed day, 2 hours on a moderate one and 90 minutes on a packed one. A full day has, besides
+  its two meals, 2-3 visits when relaxed, 3-4 when moderate and 5-6 when packed, spread over the
+  morning and the afternoon: two in the afternoon, not one with dinner hours after it. Fewer only
+  on a day cut short by a drive.
+- When a place has few sights among the candidates, a winery, brewery, distillery, market,
+  museum or garden is a visit too (kind "visit", 45-90 min). Use those before leaving an
+  afternoon empty. Never repeat a place on one day, and never invent one.
 - Favour the traveller's stated interests, and match the pace: relaxed means fewer stops.
 - Do not set clock times. Slots and durations are enough.
 - "notes" holds the traveller's own wishes, in their words. Treat them as preferences when
@@ -44,7 +58,9 @@ Rules:
 const userTurn = (input: ComposeInput) =>
   JSON.stringify({
     trip: {
-      route: input.constraints.places,
+      start: input.constraints.start,
+      places: input.constraints.places,
+      finish: input.constraints.finish,
       days: input.constraints.days,
       pace: input.constraints.pace,
       interests: input.constraints.interests,

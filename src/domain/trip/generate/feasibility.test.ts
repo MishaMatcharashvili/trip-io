@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { Constraints } from "./constraints.ts";
-import { assess, reasons, routeLegs } from "./feasibility.ts";
+import { assess, assessAsked, reasons, routeLegs } from "./feasibility.ts";
 
 const trip = (over: Partial<Constraints> = {}): Constraints => ({
   startDate: "2026-07-10",
   days: 7,
   places: ["tbilisi", "kazbegi"],
+  start: "tbilisi",
+  finish: "tbilisi",
   pace: "moderate",
   interests: [],
   party: { adults: 2, children: 0 },
@@ -33,13 +35,49 @@ describe("assess", () => {
     assert.ok(!a.possible);
   });
 
+  test("a round trip to one place is a day trip: the start and finish are drives, not days", () => {
+    const roundTrip = trip({
+      days: 1,
+      places: ["signagi"],
+      start: "tbilisi",
+      finish: "tbilisi",
+    });
+    const a = assess(roundTrip);
+    assert.ok(a.possible, reasons(a).join(" "));
+    // About two hours each way is worth saying, not refusing.
+    assert.equal(a.days.level, "tight");
+    assert.ok(assess({ ...roundTrip, days: 2 }).possible);
+  });
+
+  test("a one-way trip to one place fits in a day", () => {
+    const oneWay = trip({
+      days: 1,
+      places: ["signagi"],
+      start: "tbilisi",
+      finish: "signagi",
+    });
+    assert.ok(assess(oneWay).possible);
+  });
+
+  test("a place that is also the start still needs its own day", () => {
+    const a = assess(
+      trip({ days: 1, places: ["tbilisi", "signagi"], finish: "signagi" }),
+    );
+    assert.equal(a.days.level, "impossible");
+    assert.match(a.days.why ?? "", /Tbilisi → Sighnaghi.* 2 stops in 1 day/);
+  });
+
   test("a drive that eats the whole day needs a day of its own", () => {
     const places = ["batumi", "lagodekhi"];
     assert.ok(routeLegs(places)[0].minutes > 8 * 60);
-    const a = assess(trip({ days: 2, places }));
+    const ends = { start: "batumi", finish: "lagodekhi" };
+    const a = assess(trip({ days: 2, places, ...ends }));
     assert.equal(a.days.level, "impossible");
     assert.match(a.days.why ?? "", /Batumi to Lagodekhi/);
-    assert.equal(assess(trip({ days: 3, places })).days.level, "tight");
+    assert.equal(
+      assess(trip({ days: 3, places, ...ends })).days.level,
+      "tight",
+    );
   });
 
   test("a lot of road for the days is said, not refused", () => {
@@ -99,5 +137,13 @@ describe("assess", () => {
     const a = assess(trip(), [{ name: "Sukhumi", why: "no way in" }]);
     assert.equal(a.places.level, "impossible");
     assert.deepEqual(reasons(a).length, 1);
+  });
+
+  test("a place the planner could not take is refused, known or not", () => {
+    const known = assessAsked(trip(), ["Sukhumi"]);
+    assert.equal(known.possible, false);
+    const unknown = assessAsked(trip(), ["Atlantis"]);
+    assert.match(reasons(unknown)[0] ?? "", /inside Georgia/);
+    assert.equal(assessAsked(trip()).possible, assess(trip()).possible);
   });
 });

@@ -62,6 +62,10 @@ export type ScheduleInput = {
   places: ReadonlyMap<string, Candidate>;
   travel: TravelEstimator;
   newId: () => string;
+  /** Where the traveller arrives: the first day starts with the drive from here. */
+  start?: LonLat | null;
+  /** Where the traveller leaves from: the last day ends with the drive there. */
+  finish?: { lonLat: LonLat; name: string } | null;
 };
 
 export function schedule(input: ScheduleInput): {
@@ -69,16 +73,22 @@ export function schedule(input: ScheduleInput): {
   problems: ScheduleProblem[];
 } {
   const { plan, startDate, pace, places, travel, newId } = input;
+  const startAt = input.start ?? null;
+  const finish = input.finish ?? null;
   const nodes: Record<string, TripNode> = {};
   const problems: ScheduleProblem[] = [];
   let baseId: string | null = null;
+  /** Where the last day ended, for the drive to the finish. */
+  let tail: { date: string; cursor: number; here: LonLat | null } | null = null;
+  let lastPlaceId = "";
+  const days = [...plan.days].sort((a, b) => a.day - b.day);
 
   const node = (fields: Omit<TripNode, "meta"> & { title: string }) => {
     const { title, ...rest } = fields;
     nodes[newId()] = { ...rest, meta: { title, urban: false } };
   };
 
-  for (const day of [...plan.days].sort((a, b) => a.day - b.day)) {
+  for (const day of days) {
     const date = addDays(startDate, day.day - 1);
     const sun = (at: LonLat) => sunWindow(date, at, CIVIL);
     const problem = (placeId: string, message: string) =>
@@ -87,7 +97,9 @@ export function schedule(input: ScheduleInput): {
     let cursor = wall(date, DAY_START[pace]);
     let here: LonLat | null = baseId
       ? (places.get(baseId)?.lonLat ?? null)
-      : null;
+      : day === days[0]
+        ? startAt
+        : null;
 
     const stops = [...day.stops].sort(
       (a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot),
@@ -174,7 +186,17 @@ export function schedule(input: ScheduleInput): {
       });
       cursor = start + stop.durationMin * MIN;
       here = place.lonLat;
+      lastPlaceId = place.id;
     }
+
+    // The last day of a trip that finishes elsewhere ends on the road, not in a bed.
+    const leaves =
+      day === days.at(-1) &&
+      finish !== null &&
+      here !== null &&
+      travel.minutes(here, finish.lonLat) > IMPLICIT_LEG_MAX_MIN;
+    tail = { date, cursor, here };
+    if (leaves) continue;
 
     // A multi-night base is one stay node: only a new base gets a check-in.
     if (day.stayId && day.stayId !== baseId) {
@@ -210,6 +232,31 @@ export function schedule(input: ScheduleInput): {
         title: `Check in · ${stay.name}`,
       });
       baseId = day.stayId;
+    }
+  }
+
+  if (tail?.here && finish) {
+    const leg = travel.minutes(tail.here, finish.lonLat);
+    if (leg > IMPLICIT_LEG_MAX_MIN) {
+      const drive = roundUp5(leg * MIN);
+      const driveStart = roundUp5(tail.cursor);
+      const light = sunWindow(tail.date, finish.lonLat, CIVIL);
+      if (light && driveStart + drive > light.set.getTime()) {
+        problems.push({
+          day: tail.date,
+          placeId: lastPlaceId,
+          message: `the drive to ${finish.name} would end after dark`,
+        });
+      }
+      node({
+        kind: "transfer",
+        placeId: null,
+        lonLat: finish.lonLat,
+        startsAt: new Date(driveStart).toISOString(),
+        durationMin: drive / MIN,
+        indoor: false,
+        title: `Drive to ${finish.name}`,
+      });
     }
   }
 

@@ -4,7 +4,11 @@ import {
   unreachable,
 } from "../../catalogue/destinations.ts";
 import type { Pace } from "../document.ts";
-import type { Constraints, Interest } from "./constraints.ts";
+import {
+  type Constraints,
+  DEFAULT_ENDPOINT,
+  type Interest,
+} from "./constraints.ts";
 import { addDays } from "./schedule.ts";
 
 // "7 days in Georgia, €700, nature and monasteries, with my father" → the
@@ -74,33 +78,82 @@ const FINISHES =
   /\b(end(s|ing)? (in|at)|finish(es|ing)? (in|at)|back to|return(ing)? to|fly(ing)? out of|leav(e|ing) from)$/;
 const ROUND_TRIP = /\b(round[- ]trip|and back|there and back|loop)\b/i;
 
+/** "tbilisi - sighnaghi", "Tbilisi → Sighnaghi": a journey, said the way "Tbilisi to Sighnaghi" is. */
+const asJourney = (text: string) =>
+  text
+    .replace(/\s*(->|→|–|—)\s*/g, " to ")
+    .replace(/\s-\s/g, " to ")
+    .replace(/([a-z]+)-([a-z]+)/gi, (joined, a: string, b: string) =>
+      mentions(joined).length === 1 ? joined : `${a} to ${b}`,
+    );
+
+export type Route = {
+  /** Where the sentence says the trip starts and finishes; absent when it does not say. */
+  start?: string;
+  finish?: string;
+  /** What it visits, in order. */
+  places: string[];
+};
+
 /**
- * The route: the places named, in the order they will be travelled. That is
- * the order they are said in, unless the sentence says otherwise — "Kazbegi
- * and Kakheti, starting in Tbilisi" starts in Tbilisi, and "from Batumi to
- * Tbilisi via Kutaisi" ends there. A name said twice running is said once.
+ * The route the words describe: where it starts, the places it visits, where it
+ * finishes. A start or a finish is where the traveller arrives and leaves, not
+ * a day of the trip, so "Tbilisi - Sighnaghi - Tbilisi" is a start and finish in
+ * Tbilisi around one place, and "Tbilisi to Sighnaghi" starts in Tbilisi and
+ * visits Sighnaghi. A plain list ("Batumi, Kutaisi and Borjomi") is all places,
+ * in the order said. A name said twice running is said once.
  */
-function readPlaces(text: string): string[] | null {
-  const named = mentions(text);
+function readRoute(text: string): Route | null {
+  const named = mentions(asJourney(text));
   if (named.length === 0) {
     const hinted = PLACE_HINTS.filter(([, re]) => re.test(text)).map(
       ([slug]) => slug,
     );
-    return hinted.length ? hinted : null;
+    return hinted.length ? { places: hinted } : null;
+  }
+  const slugs = (ms: (typeof named)[number][]) =>
+    ms
+      .map((m) => m.slug)
+      .filter((slug, i, all) => slug !== all[i - 1])
+      .slice(0, MAX_PLACES);
+  const roundTrip = ROUND_TRIP.test(text);
+
+  // "A ... B ... A": there and back, whatever is said in between.
+  const first = named[0];
+  const last = named.at(-1) as (typeof named)[number];
+  if (named.length >= 3 && first.slug === last.slug) {
+    const places = slugs(named.slice(1, -1));
+    if (places.length) return { start: first.slug, finish: first.slug, places };
   }
 
-  const start = named.find((m) => STARTS.test(m.before));
-  const finish =
-    named.findLast((m) => m !== start && FINISHES.test(m.before)) ??
-    // "from A to B": B is where it ends, whatever is named after it.
-    (start && named.find((m) => m !== start && /\bto$/.test(m.before)));
-  const between = named.filter((m) => m !== start && m !== finish);
-  const route = [start, ...between, finish]
-    .flatMap((m) => m?.slug ?? [])
-    .filter((slug, i, all) => slug !== all[i - 1]);
+  // "from A", "starting in A", or a journey "A to B" that begins at A.
+  const start =
+    named.find((m) => STARTS.test(m.before)) ??
+    (named.length > 1 && /\bto$/.test(named[1].before) ? first : undefined);
+  const markedFinish = named.findLast(
+    (m) => m !== start && FINISHES.test(m.before),
+  );
+  // "from A to B": B is where it ends, and a place it visits.
+  const arrival =
+    !markedFinish && !roundTrip && start
+      ? named.find((m) => m !== start && /\bto$/.test(m.before))
+      : undefined;
+  const finish = markedFinish ?? arrival;
 
-  if (ROUND_TRIP.test(text) && route.at(-1) !== route[0]) route.push(route[0]);
-  return route.slice(0, MAX_PLACES);
+  const places = slugs([
+    ...named.filter((m) => m !== start && m !== markedFinish && m !== arrival),
+    ...(arrival ? [arrival] : []),
+  ]);
+  // "round trip from A to B" is a trip to B; "start in A" alone is a trip in A.
+  const route: Route = {
+    places: places.length
+      ? places
+      : slugs(named.filter((m) => m === start || m === markedFinish)),
+  };
+  if (start) route.start = start.slug;
+  if (roundTrip && start) route.finish = start.slug;
+  else if (finish) route.finish = finish.slug;
+  return route;
 }
 
 const INTEREST_WORDS: [Interest, RegExp][] = [
@@ -255,11 +308,15 @@ export function understand(text: string, today: string): Understood {
 
   const days = pick("days", readDays(text), 5);
   const clampedDays = Math.min(21, Math.max(1, days));
+  const route = readRoute(text);
   const places = pick(
     "places",
-    readPlaces(text),
+    route?.places ?? null,
     clampedDays >= 4 ? ["tbilisi", "kazbegi"] : ["tbilisi"],
   );
+  const start = pick("start", route?.start ?? null, DEFAULT_ENDPOINT);
+  // Said where it starts and not where it finishes: it finishes where it started.
+  const finish = pick("finish", route?.finish ?? null, start);
   const interestsSaid = INTEREST_WORDS.filter(([, re]) => re.test(text)).map(
     ([interest]) => interest,
   );
@@ -276,6 +333,8 @@ export function understand(text: string, today: string): Understood {
     startDate: pick("startDate", readStart(text, today), addDays(today, 14)),
     days: clampedDays,
     places,
+    start,
+    finish,
     pace,
     interests: pick(
       "interests",

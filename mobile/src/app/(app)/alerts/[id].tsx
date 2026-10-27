@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { bodyOf, client, messageOf, read } from "~/api";
@@ -43,6 +43,7 @@ const REFUSALS: Record<string, string> = {
 
 export default function InterventionCard() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const {
     data: card,
     error,
@@ -120,9 +121,10 @@ export default function InterventionCard() {
       {error ? <Notice tone="alert">{error}</Notice> : null}
 
       <Card tone={disruption ? "alert" : "agent"} style={{ gap: 12 }}>
-        <Fact label="Changed" text={card.changed} />
+        {/* Good news is found and fits; a disruption changed and affects. */}
+        <Fact label={disruption ? "Changed" : "Found"} text={card.changed} />
         <Hairline />
-        <Fact label="Affects" text={card.affects} />
+        <Fact label={disruption ? "Affects" : "Fits"} text={card.affects} />
         <Hairline />
         <Fact
           label={answered === "accepted" ? "I did" : "I suggest"}
@@ -181,6 +183,18 @@ export default function InterventionCard() {
         </View>
       ) : null}
       {refusal ? <Notice tone="alert">{refusal}</Notice> : null}
+      {answered === "accepted" ? (
+        <Button
+          label="See your day, and undo if you need to"
+          variant="secondary"
+          onPress={() =>
+            router.push({
+              pathname: "/trips/[id]/map",
+              params: { id: card.tripId },
+            })
+          }
+        />
+      ) : null}
 
       <Body faint>{card.evidence}</Body>
     </Screen>

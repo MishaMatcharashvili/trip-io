@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@better-auth/expo": "1.7.4",
+    "@expo/vector-icons": "^15.1.1",
     "better-auth": "1.7.4",
     "expo": "~57.0.26",
     "expo-constants": "~57.0.20",

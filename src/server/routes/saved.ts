@@ -1,7 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { forgetPlace, keepPlace, savedPlaceIds } from "@/bll/saved";
+import {
+  forgetPlace,
+  keepPlace,
+  savedPlaceIds,
+  savedPlaces,
+} from "@/bll/saved";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
 // A traveller's kept places. Anonymous sessions may save too; the places move
@@ -13,6 +18,10 @@ export const saved = new Hono<SessionEnv>()
   .use(requireSession)
   .get("/", async (c) =>
     c.json({ placeIds: await savedPlaceIds(c.get("userId")) }),
+  )
+  // The same places as cards, newest first: the phone's Saved tab.
+  .get("/places", async (c) =>
+    c.json({ places: await savedPlaces(c.get("userId")) }),
   )
   .put("/places/:placeId", zValidator("param", params), async (c) => {
     const kept = await keepPlace(c.get("userId"), c.req.valid("param").placeId);

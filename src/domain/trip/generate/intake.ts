@@ -8,8 +8,10 @@ import { paces } from "../document.ts";
 import {
   type Constraints,
   constraints,
+  DEFAULT_ENDPOINT,
   interests,
   NOTES_MAX_CHARS,
+  routeOf,
 } from "./constraints.ts";
 import { understand } from "./request.ts";
 
@@ -29,6 +31,17 @@ export const INTAKE_MAX_TURNS = 12;
 export const INTAKE_MAX_CHARS = 500;
 const REPLY_MAX_CHARS = 900;
 
+/**
+ * Replies the planner may spend asking before it stops: the places and the
+ * length first, then the few details that change a plan most. A conversation
+ * that has not reached "ready" by then is declared ready, so the traveller is
+ * never interrogated; whatever is unsaid keeps its default.
+ */
+export const INTAKE_MAX_QUESTIONS = 4;
+/** Suggested answers offered under a question, and how long each may be. */
+const SUGGESTIONS_MAX = 4;
+const SUGGESTION_MAX_CHARS = 40;
+
 export const intakeMessage = z.discriminatedUnion("role", [
   z.object({
     role: z.literal("traveller"),
@@ -45,6 +58,8 @@ const stated = [
   "startDate",
   "days",
   "places",
+  "start",
+  "finish",
   "pace",
   "interests",
   "party",
@@ -67,6 +82,9 @@ export const intakeReply = z.object({
   days: z.number().nullable(),
   /** The whole route after this turn, in the order it is travelled. */
   places: z.array(z.enum(destinationSlugs)).nullable(),
+  /** Where the traveller arrives and leaves from; null leaves it as it was. */
+  start: z.enum(destinationSlugs).nullable(),
+  finish: z.enum(destinationSlugs).nullable(),
   pace: z.enum(paces).nullable(),
   interests: z.array(z.enum(interests)).nullable(),
   adults: z.number().nullable(),
@@ -79,6 +97,8 @@ export const intakeReply = z.object({
   unsupported: z.array(z.string()),
   /** Nothing left that the planner needs to ask. */
   ready: z.boolean(),
+  /** Two to four short answers to the question the reply ends on; none when it asks nothing. */
+  suggestions: z.array(z.string()),
 });
 
 export type IntakeInput = {
@@ -96,6 +116,8 @@ export type IntakeTurn = {
   state: IntakeState;
   unsupported: string[];
   ready: boolean;
+  /** Answers to offer as one-tap replies. Empty once the planner has nothing to ask. */
+  suggestions: string[];
 };
 
 const clamp = (n: number, min: number, max: number) =>
@@ -125,6 +147,13 @@ function withDefaults(c: Constraints, said: readonly Stated[]): Constraints {
       : c.days >= 4
         ? ["tbilisi", "kazbegi"]
         : ["tbilisi"],
+    start: has("start") ? c.start : DEFAULT_ENDPOINT,
+    // Said where it starts and not where it finishes: it finishes where it started.
+    finish: has("finish")
+      ? c.finish
+      : has("start")
+        ? c.start
+        : DEFAULT_ENDPOINT,
     pace: has("pace") ? c.pace : c.mobility === "low" ? "relaxed" : "moderate",
     budgetEur: has("budgetEur")
       ? c.budgetEur
@@ -155,6 +184,8 @@ export function readIntake(
   raw: unknown,
   state: IntakeState,
   today: string,
+  /** Replies the planner has already given in this conversation. */
+  asked = 0,
 ): IntakeTurn | null {
   const parsed = intakeReply.safeParse(raw);
   if (!parsed.success) return null;
@@ -173,6 +204,8 @@ export function readIntake(
       .filter((slug, i, all) => slug !== all[i - 1])
       .slice(0, MAX_PLACES);
   }
+  if (r.start !== null) patch.start = r.start;
+  if (r.finish !== null) patch.finish = r.finish;
   if (r.pace !== null) patch.pace = r.pace;
   if (r.interests !== null) patch.interests = [...new Set(r.interests)];
   if (r.adults !== null || r.children !== null) {
@@ -190,12 +223,67 @@ export function readIntake(
   }
   if (!constraints.safeParse(next.constraints).success) return null;
 
+  // The budget for questions is the code's, not the model's: past it the
+  // conversation is ready whatever the model thinks is left to ask, provided
+  // the two things a trip cannot be built without were said.
+  const essentials = next.said.includes("places") && next.said.includes("days");
+  const ready = r.ready || (essentials && asked + 1 >= INTAKE_MAX_QUESTIONS);
+
   return {
     reply: r.reply,
     state: next,
     unsupported: r.unsupported.slice(0, 5),
-    ready: r.ready,
+    ready,
+    suggestions: ready ? [] : cleanSuggestions(r.suggestions),
   };
+}
+
+/** Short, distinct and few: a row of buttons, not a menu. */
+export function cleanSuggestions(raw: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const text of raw) {
+    const clean = text.trim().replace(/\s+/g, " ");
+    const key = clean.toLowerCase();
+    if (!clean || clean.length > SUGGESTION_MAX_CHARS || seen.has(key))
+      continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out.slice(0, SUGGESTIONS_MAX);
+}
+
+/**
+ * What to ask next, when no model is there to choose: the first detail the
+ * traveller has not given, in the order that changes a plan most, with answers
+ * `understand` can read back. Null once none is left.
+ */
+export function nextQuestion(
+  said: readonly string[],
+): { question: string; suggestions: string[] } | null {
+  if (!said.includes("party")) {
+    return {
+      question: "Who is travelling?",
+      suggestions: ["Solo", "Couple", "Family with kids", "4 friends"],
+    };
+  }
+  if (!said.includes("interests")) {
+    return {
+      question: "What do you like most: food and wine, hiking, or history?",
+      suggestions: [
+        "Food and wine",
+        "Hiking and nature",
+        "Monasteries and history",
+      ],
+    };
+  }
+  if (!said.includes("pace")) {
+    return {
+      question: "Slow days, or as much as fits?",
+      suggestions: ["Relaxed", "Packed, as much as possible"],
+    };
+  }
+  return null;
 }
 
 const list = (words: string[]) =>
@@ -235,6 +323,7 @@ export function fallbackTurn(
     .slice(-NOTES_MAX_CHARS);
 
   const c = next.constraints;
+  const essentials = next.said.includes("places") && next.said.includes("days");
   const people = c.party.adults + c.party.children;
   const assumed = [
     !next.said.includes("places") && "the places",
@@ -244,13 +333,20 @@ export function fallbackTurn(
     !next.said.includes("budgetEur") && "the budget",
   ].filter((x): x is string => Boolean(x));
 
+  const asked = messages.filter((m) => m.role === "planner").length;
+  const follow =
+    essentials && asked + 1 < INTAKE_MAX_QUESTIONS
+      ? nextQuestion(next.said)
+      : null;
   const reply = [
-    `Here is what I have: ${c.days} ${c.days === 1 ? "day" : "days"} through ${c.places.map(destinationName).join(" → ")} from ${shortDate(c.startDate)}, for ${people} ${people === 1 ? "person" : "people"}, on about €${c.budgetEur}.`,
+    `Here is what I have: ${c.days} ${c.days === 1 ? "day" : "days"} through ${routeOf(c).map(destinationName).join(" → ")} from ${shortDate(c.startDate)}, for ${people} ${people === 1 ? "person" : "people"}, on about €${c.budgetEur}.`,
     assumed.length
       ? `I assumed ${list(assumed)} — tell me what is different, or correct a card.`
       : "Tell me if anything is off, or build it when it looks right.",
     ...read.refused.map((r) => `${r.name} can’t be part of it: ${r.why}.`),
+    follow?.question ?? "",
   ]
+    .filter(Boolean)
     .join(" ")
     .slice(0, REPLY_MAX_CHARS);
 
@@ -258,6 +354,7 @@ export function fallbackTurn(
     reply,
     state: next,
     unsupported: read.refused.map((r) => r.name),
-    ready: next.said.includes("places") && next.said.includes("days"),
+    ready: essentials && !follow,
+    suggestions: follow?.suggestions ?? [],
   };
 }

@@ -29,6 +29,8 @@ export function cacheKey(c: Constraints): string {
     v: PROMPT_VERSION,
     // In order: the same places the other way round is a different trip.
     places: c.places,
+    start: c.start,
+    finish: c.finish,
     days: c.days,
     pace: c.pace,
     interests: [...c.interests].sort(),

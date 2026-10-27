@@ -40,15 +40,33 @@ The app's API client is `hc<AppType>()` in `src/api.ts`, typed by the server's o
 
 Expo Router, with files under `src/app/`. `src/app/_layout.tsx` keeps the splash up until the stored
 session is read, then guards two groups with `Stack.Protected`: `(auth)` (sign in, sign up) when
-signed out, `(app)` when signed in. Inside `(app)`: the `(tabs)` group (Trips, Account), a trip
-(`trips/[id]`) and its watch settings (`trips/[id]/watch`), the intervention card (`alerts/[id]`),
-and the `push` prompt, a modal shown once. A tap on a notification opens `alerts/[id]` from
-`data.interventionId`. Typed routes are off on purpose: the generated types live under `.expo/`,
-which is gitignored, so they would make `pnpm typecheck` mean something different in CI.
+signed out, `(app)` when signed in. Inside `(app)`, one stack holds:
+
+- `(tabs)`: home. Trips (the first-run composer when there are none), Explore, Saved, Profile.
+- `new` and `new/building`: the planner conversation and the build it asks for.
+- `trips/[id]/(tabs)`: a trip. Today (the briefing), Map (the trip under way, in its watch states),
+  Trip (every day), AI (what the watch said, and a question box).
+- Pushed over a trip's tabs: `trips/[id]/day/[date]`, `trips/[id]/stop/[nodeId]`,
+  `trips/[id]/watch`, `trips/[id]/versions`, `trips/[id]/pass`.
+- `alerts/[id]`, the intervention card, and `push`, a modal shown once.
+
+A tap on a notification opens `alerts/[id]` from `data.interventionId`. Typed routes are off on
+purpose: the generated types live under `.expo/`, which is gitignored, so they would make
+`pnpm typecheck` mean something different in CI.
+
+Each screen is one in `design/mobile/` (the "trip.io Mobile" project in Claude Design). The phone
+reads and decides; editing a day's stops stays on the web, and those screens link out to it.
 
 Read through `client()` and `read()` in `src/api.ts` (`useLoad` in `src/use-load.ts` on a screen);
 `read` throws on anything but a 2xx, and `messageOf`/`bodyOf` turn that into words for the screen.
 Push is `src/push.ts`: register on every launch, unregister before signing out.
+
+A trip's screens read `/trips/:id/screen` through `loadScreen` in `src/trip.ts`, which also works
+out the days, stops and watch states from it. Build screens from the blocks in `src/ui.tsx`.
+
+The map (`src/map.tsx`) is a Mapbox static image, not a map view, so it needs no native module. It
+is drawn only when `EXPO_PUBLIC_MAPBOX_TOKEN` is set: a public token of the app's own, since the web
+app's is restricted to its URLs. Without one the maps are left out and every screen still works.
 
 ## Colours and dark mode
 

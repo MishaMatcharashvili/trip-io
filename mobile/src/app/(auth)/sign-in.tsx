@@ -69,9 +69,6 @@ export default function SignIn() {
           Create an account
         </Link>
       </Body>
-      <Body faint>
-        Plan a trip on trip.io in your browser, then sign in here to follow it.
-      </Body>
     </Screen>
   );
 }

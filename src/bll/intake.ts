@@ -54,6 +54,7 @@ export async function planningTurn(
       await deps.intake({ today, state, messages }),
       state,
       today,
+      messages.filter((m) => m.role === "planner").length,
     );
     if (turn) return { ok: true, source: "model", ...turn };
   } catch {

@@ -20,7 +20,7 @@ import { type Palette, usePalette } from "~/theme";
 // The shell's few building blocks, in Mist's sizes (design/mobile/foundations).
 // Every colour comes from usePalette.
 
-type Tone = "agent" | "alert" | "ok";
+export type Tone = "agent" | "alert" | "ok";
 
 const tones = (p: Palette, tone: Tone) =>
   ({
@@ -299,6 +299,309 @@ export function Hairline() {
   return <View style={[styles.hairline, { backgroundColor: p.hairline }]} />;
 }
 
+/** Children side by side, centred on the line. */
+export function Row({
+  children,
+  gap = 8,
+  top,
+  style,
+}: {
+  children: ReactNode;
+  gap?: number;
+  top?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View
+      style={[
+        styles.row,
+        { gap, alignItems: top ? "flex-start" : "center" },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+/** Small print: 12.5 by default, 11.5 when `mini`. */
+export function Small({
+  children,
+  mini,
+  bold,
+  tone,
+  muted,
+  faint,
+  strike,
+  style,
+}: {
+  children: ReactNode;
+  mini?: boolean;
+  bold?: boolean;
+  tone?: Tone;
+  muted?: boolean;
+  faint?: boolean;
+  strike?: boolean;
+  style?: StyleProp<TextStyle>;
+}) {
+  const p = usePalette();
+  const color = tone
+    ? tones(p, tone).ink
+    : faint
+      ? p.inkFaint
+      : muted
+        ? p.inkMuted
+        : p.ink;
+  return (
+    <Text
+      style={[
+        mini ? styles.mini : styles.small,
+        { color },
+        bold && styles.bold,
+        strike && styles.strike,
+        style,
+      ]}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** The six-point mark that says how a thing stands. No tone is idle. */
+export function Dot({ tone, ring }: { tone?: Tone; ring?: boolean }) {
+  const p = usePalette();
+  const ink = tone
+    ? tone === "alert"
+      ? p.alertBright
+      : tones(p, tone).ink
+    : p.inkIdle;
+  return (
+    <View
+      style={[
+        styles.dot,
+        ring
+          ? { backgroundColor: p.surface, borderWidth: 1.5, borderColor: ink }
+          : { backgroundColor: ink },
+      ]}
+    />
+  );
+}
+
+/** A section label with a hairline running to the edge. */
+export function Rule({ label, tone }: { label: string; tone?: Tone }) {
+  const p = usePalette();
+  return (
+    <View style={styles.rule}>
+      <Text
+        style={[
+          styles.eyebrow,
+          { color: tone ? tones(p, tone).ink : p.inkFaint },
+        ]}
+      >
+        {label}
+      </Text>
+      <View style={[styles.ruleLine, { backgroundColor: p.hairline }]} />
+    </View>
+  );
+}
+
+/** A pill: a fact when it has no `onPress`, a choice when it has. */
+export function Chip({
+  label,
+  tone,
+  on,
+  dot,
+  onPress,
+}: {
+  label: string;
+  tone?: Tone;
+  /** The chosen one of a set. */
+  on?: boolean;
+  dot?: Tone | "idle";
+  onPress?: () => void;
+}) {
+  const p = usePalette();
+  const t = tone ? tones(p, tone) : null;
+  const chip = (
+    <View
+      style={[
+        styles.chip,
+        {
+          backgroundColor: on ? p.ink : t ? t.tint : p.surface,
+          borderColor: on ? p.ink : t ? t.line : p.hairline,
+        },
+      ]}
+    >
+      {dot ? <Dot tone={dot === "idle" ? undefined : dot} /> : null}
+      <Text
+        style={[styles.mini, { color: on ? p.canvas : t ? t.ink : p.inkMuted }]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+  return onPress ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      onPress={onPress}
+      style={({ pressed }) => pressed && styles.pressed}
+    >
+      {chip}
+    </Pressable>
+  ) : (
+    chip
+  );
+}
+
+/** A card of rows with a hairline between each: every list in the app. */
+export function Group({
+  children,
+  tone,
+  style,
+}: {
+  children: ReactNode;
+  tone?: Tone;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const rows = (Array.isArray(children) ? children.flat() : [children]).filter(
+    (row) => row !== null && row !== undefined && row !== false,
+  );
+  return (
+    <Card tone={tone} style={[styles.group, style]}>
+      {rows.map((row, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional
+        <View key={i}>
+          {i > 0 ? <Hairline /> : null}
+          {row}
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+/** One row of a list: a title, a line under it, and something at each end. */
+export function Line({
+  title,
+  detail,
+  detailTone,
+  leading,
+  trailing,
+  onPress,
+  tint,
+  dim,
+  bold,
+}: {
+  title: string;
+  detail?: string | null;
+  detailTone?: Tone;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  onPress?: () => void;
+  /** The row the agent is pointing at. */
+  tint?: Tone;
+  /** A row that is over. */
+  dim?: boolean;
+  bold?: boolean;
+}) {
+  const p = usePalette();
+  const row = (
+    <View
+      style={[
+        styles.line,
+        tint ? { backgroundColor: tones(p, tint).tint } : null,
+        dim && styles.dim,
+      ]}
+    >
+      {leading}
+      <View style={styles.lineText}>
+        <Small bold={bold} style={styles.lineTitle}>
+          {title}
+        </Small>
+        {detail ? (
+          <Small mini tone={detailTone} faint={!detailTone}>
+            {detail}
+          </Small>
+        ) : null}
+      </View>
+      {trailing}
+    </View>
+  );
+  return onPress ? (
+    <Tap label={title} onPress={onPress}>
+      {row}
+    </Tap>
+  ) : (
+    row
+  );
+}
+
+/** Figures side by side under their labels. */
+export function Stats({
+  items,
+  tone,
+}: {
+  items: readonly (readonly [label: string, value: string])[];
+  /** Colours the value of the item at this index. */
+  tone?: { index: number; tone: Tone };
+}) {
+  const p = usePalette();
+  return (
+    <View style={styles.row}>
+      {items.map(([label, value], i) => (
+        <View key={label} style={styles.stat}>
+          <Text
+            style={[
+              styles.statValue,
+              {
+                color:
+                  tone && tone.index === i ? tones(p, tone.tone).ink : p.ink,
+              },
+            ]}
+          >
+            {value}
+          </Text>
+          <Eyebrow>{label}</Eyebrow>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Blocks of a day sized by weight: what is planned, and what the watch sees. */
+export function Shape({
+  segments,
+}: {
+  segments: readonly {
+    weight: number;
+    tone: "filled" | "empty" | "agent" | "agent-soft" | "alert";
+  }[];
+}) {
+  const p = usePalette();
+  const fill = {
+    filled: p.fillStrong,
+    empty: p.track,
+    agent: p.agent,
+    "agent-soft": p.agentSoft,
+    alert: p.alertBright,
+  };
+  return (
+    <View style={styles.shape}>
+      {segments.map((s, i) => (
+        <View
+          // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional
+          key={i}
+          style={{
+            flex: s.weight,
+            borderRadius: 2,
+            backgroundColor: fill[s.tone],
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { paddingHorizontal: 20, gap: 14 },
   eyebrow: {
@@ -356,4 +659,35 @@ const styles = StyleSheet.create({
   switchLabel: { fontSize: 14.5, fontWeight: "600" },
   loading: { paddingVertical: 48, alignItems: "center" },
   hairline: { height: StyleSheet.hairlineWidth },
+  row: { flexDirection: "row", alignItems: "center" },
+  small: { fontSize: 12.5, lineHeight: 18 },
+  mini: { fontSize: 11.5, lineHeight: 16 },
+  bold: { fontWeight: "600" },
+  strike: { textDecorationLine: "line-through" },
+  dot: { width: 6, height: 6, borderRadius: 99 },
+  rule: { flexDirection: "row", alignItems: "center", gap: 10 },
+  ruleLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 26,
+    paddingHorizontal: 10,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+  group: { padding: 0, gap: 0, overflow: "hidden" },
+  line: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  lineText: { flex: 1, gap: 1 },
+  lineTitle: { fontWeight: "500" },
+  dim: { opacity: 0.55 },
+  stat: { flex: 1, gap: 2 },
+  statValue: { fontSize: 16, fontWeight: "600", letterSpacing: -0.2 },
+  shape: { flexDirection: "row", gap: 2, height: 8 },
 });

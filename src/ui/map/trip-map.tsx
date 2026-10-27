@@ -22,6 +22,7 @@ import {
   type Lease,
   setInteractive,
 } from "./pool.ts";
+import { legStates } from "./route-states.ts";
 import { mountStops, type StopsLayer } from "./stops.tsx";
 import { useMapStyle } from "./use-map-style.ts";
 
@@ -54,6 +55,11 @@ export type MapStop = {
   /** The place's own logo, drawn in the pin instead of a glyph when it loads. */
   logo?: string;
   /**
+   * Where the day's road starts from, not one of its stops: the end of the
+   * day before. It is drawn and routed from, and is nothing to open.
+   */
+  origin?: boolean;
+  /**
    * How much it matters, for the one that stands for a group when pins are too
    * close to draw apart. Higher wins; nothing, 0.
    */
@@ -68,6 +74,12 @@ export type MapStop = {
 export type MapRoute = {
   /** Leg i runs from stop i to stop i + 1. */
   legs: readonly (readonly LonLat[])[];
+  /**
+   * Whether each leg is behind the traveller, when the legs are not the pins'
+   * own: the whole-trip road runs between the places the days are spent in,
+   * not through every stop, so a stop's state cannot say.
+   */
+  done?: readonly boolean[];
   /** Other ways between the same two stops, drawn beside the chosen one. */
   alternatives?: readonly (readonly LonLat[])[];
   /** Being replaced: drawn faded so it does not pass for current. */
@@ -256,15 +268,24 @@ export function TripMap({
 
   useEffect(() => {
     if (!overlays) return;
-    // Legs that no longer match the stops (one added since) are not drawn.
-    const matches = route && route.legs.length === stops.length - 1;
+    // Legs that no longer match the stops (one added since) are not drawn,
+    // unless the route says they were never the stops' own.
+    const matches =
+      route && (route.done || route.legs.length === stops.length - 1);
+    const covered = matches
+      ? route.legs.map((_, i) =>
+          route.done
+            ? (route.done[i] ?? false)
+            : stops[i + 1].state !== "upcoming",
+        )
+      : [];
+    // Underway: something is behind the traveller, or they are at a stop.
+    const underway = stops.some((s) => s.state !== "upcoming");
+    const states = legStates(covered, underway);
     overlays.setRoute(
       {
         legs: matches
-          ? route.legs.map((path, i) => ({
-              path,
-              done: stops[i + 1].state !== "upcoming",
-            }))
+          ? route.legs.map((path, i) => ({ path, state: states[i] }))
           : [],
         alternatives: matches ? (route.alternatives ?? []) : [],
         stale: Boolean(route?.stale),

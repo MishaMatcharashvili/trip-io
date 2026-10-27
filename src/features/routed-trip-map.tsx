@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { TripMap } from "@/ui/map/trip-map";
+import { type MapStop, TripMap } from "@/ui/map/trip-map";
 import { useTripRoute } from "@/ui/map/use-trip-route";
 
 /**
@@ -14,12 +14,19 @@ import { useTripRoute } from "@/ui/map/use-trip-route";
  */
 export function RoutedTripMap({
   routing,
+  road,
   ...props
 }: Omit<ComponentProps<typeof TripMap>, "route"> & {
   /** False where asking would be pointless or a waste (an example trip). */
   routing?: { enabled?: boolean };
+  /**
+   * The places the road runs through, when that is not the pins: a whole
+   * trip's road goes between the places its days are spent in, while the pins
+   * are every stop. Drawn in full, as the plan.
+   */
+  road?: readonly MapStop[];
 }) {
-  const { route } = useTripRoute(props.stops, {
+  const { route } = useTripRoute(road ?? props.stops, {
     enabled: routing?.enabled ?? true,
   });
   return (
@@ -29,6 +36,9 @@ export function RoutedTripMap({
         route.status === "ready"
           ? {
               legs: route.answer.routes[0].legs.map((l) => l.path),
+              done: road
+                ? route.answer.routes[0].legs.map(() => true)
+                : undefined,
               stale: route.refreshing,
             }
           : null
