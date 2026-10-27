@@ -1,10 +1,12 @@
 import { destination, destinationName } from "../../catalogue/destinations.ts";
 import { haversineM, type LonLat } from "../../geo.ts";
 import type { Pace } from "../document.ts";
+import { CIVIL, sunWindow } from "../sun.ts";
 import { straightLineTravel } from "../travel.ts";
+import { IMPLICIT_LEG_MAX_MIN } from "../validate.ts";
 import type { Constraints } from "./constraints.ts";
 import type { Candidate, Plan, PlanDay, PlanStop, Slot } from "./plan.ts";
-import { DAY_START, SLOT_WINDOW } from "./schedule.ts";
+import { addDays, DAY_START, SLOT_WINDOW } from "./schedule.ts";
 
 // The plan of last resort, when the model has failed twice. No model, no
 // hand-authored templates (curated place ids differ between databases): a
@@ -64,6 +66,13 @@ const byId = (a: Candidate, b: Candidate) => (a.id < b.id ? -1 : 1);
 const minutesOf = (hhmm: string) =>
   Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
+/** Minutes after local midnight (Georgia is UTC+4 all year) at an instant. */
+const localMinutes = (at: Date) =>
+  Math.floor(((at.getTime() + 4 * 3_600_000) % 86_400_000) / 60_000);
+
+/** Time to walk between two stops, and to find the door. */
+const BETWEEN_STOPS_MIN = 10;
+
 /**
  * Days per area, in the traveller's order, in proportion to how much there is
  * to see in each (every area gets a day when there are enough days).
@@ -92,7 +101,10 @@ export function splitDays(
 }
 
 export function fallbackPlan(
-  c: Pick<Constraints, "days" | "places" | "pace" | "interests">,
+  c: Pick<
+    Constraints,
+    "days" | "places" | "pace" | "interests" | "start" | "finish" | "startDate"
+  >,
   candidates: readonly Candidate[],
   exclude: ReadonlySet<string> = new Set(),
 ): Plan {
@@ -149,12 +161,30 @@ export function fallbackPlan(
     // The day the trip moves on starts with the drive, and whatever part of
     // the day the drive takes has no stops in it: arriving at three leaves the
     // afternoon and dinner, not a morning walk.
+    // The first day's drive is from where the traveller arrives.
     const from =
-      i > 0 && dayAreas[i - 1] !== area ? whereabouts(dayAreas[i - 1]) : null;
+      i === 0
+        ? (destination(c.start)?.lonLat ?? null)
+        : dayAreas[i - 1] !== area
+          ? whereabouts(dayAreas[i - 1])
+          : null;
     const to = whereabouts(area);
     const arrives =
       minutesOf(DAY_START[c.pace]) +
       (from && to ? straightLineTravel.minutes(from, to) : 0);
+
+    // The last day ends with the drive to where the traveller leaves from,
+    // which has to be over before dark: nothing is planned that would run past it.
+    const finishAt =
+      i === dayAreas.length - 1 ? destination(c.finish)?.lonLat : undefined;
+    const homeward =
+      finishAt && to ? straightLineTravel.minutes(to, finishAt) : 0;
+    const dark =
+      homeward > IMPLICIT_LEG_MAX_MIN && finishAt
+        ? sunWindow(addDays(c.startDate, i), finishAt, CIVIL)
+        : null;
+    const mustLeaveBy = dark ? localMinutes(dark.set) - homeward : Infinity;
+    let free = arrives;
 
     for (const [index, [slot, kind]] of shape.entries()) {
       if (minutesOf(SLOT_WINDOW[slot][1]) < arrives) continue;
@@ -188,16 +218,18 @@ export function fallbackPlan(
               (p) => (usedMeals.has(p.id) ? 1 : 0),
             );
       if (!pick) continue;
+      const durationMin =
+        kind === "visit"
+          ? (VISIT_MINUTES[pick.group] as number)
+          : (MEAL_MINUTES[slot] ?? 60);
+      const begins = Math.max(
+        free,
+        minutesOf(SLOT_WINDOW[slot][0] ?? DAY_START[c.pace]),
+      );
+      if (begins + durationMin > mustLeaveBy) continue;
+      free = begins + durationMin + BETWEEN_STOPS_MIN;
       (kind === "visit" ? usedVisits : usedMeals).add(pick.id);
-      stops.push({
-        placeId: pick.id,
-        slot,
-        kind,
-        durationMin:
-          kind === "visit"
-            ? (VISIT_MINUTES[pick.group] as number)
-            : (MEAL_MINUTES[slot] ?? 60),
-      });
+      stops.push({ placeId: pick.id, slot, kind, durationMin });
       here = pick.lonLat;
     }
 
