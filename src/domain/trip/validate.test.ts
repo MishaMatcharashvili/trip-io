@@ -153,12 +153,23 @@ describe("darkness", () => {
     assert.match(v.message, /19:39/);
   });
 
-  test("a mountain drive after dusk", () => {
+  test("a mountain drive after dusk is worth a warning, not a refusal", () => {
     const doc = kazbegiDoc();
     edit(doc, N.drive, { startsAt: at(DAY, "19:30") });
     assert.deepEqual(
-      only(validateDay(doc, DAY, ctx()), "darkness").map((v) => v.nodeIds),
-      [[N.drive]],
+      only(validateDay(doc, DAY, ctx()), "darkness").map((v) => [
+        v.nodeIds,
+        v.severity,
+      ]),
+      [[[N.drive], "warning"]],
+    );
+  });
+
+  test("an outdoor visit after dusk is still a refusal", () => {
+    const doc = edit(kazbegiDoc(), N.hike, { startsAt: at(DAY, "17:30") });
+    assert.deepEqual(
+      only(validateDay(doc, DAY, ctx()), "darkness").map((v) => v.severity),
+      ["error"],
     );
   });
 
