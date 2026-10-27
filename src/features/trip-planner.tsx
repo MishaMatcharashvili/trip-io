@@ -3,18 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Constraints } from "@/domain/trip/generate/constraints";
-import { assessAsked } from "@/domain/trip/generate/feasibility";
+import { assessAsked, reasons } from "@/domain/trip/generate/feasibility";
 import {
   applyEdit,
   INTAKE_MAX_CHARS,
   INTAKE_MAX_TURNS,
   type IntakeMessage,
+  type IntakeOption,
   type IntakeState,
   initialState,
 } from "@/domain/trip/generate/intake";
+import { sketchTrip } from "@/domain/trip/generate/sketch";
 import { withGuestSession } from "@/lib/guest-session";
 import { apiClient } from "@/lib/hono-client";
-import { Button } from "@/ui/button";
+import { Button, QuietAction } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
@@ -22,44 +24,33 @@ import { Icon } from "@/ui/icon";
 import { Eyebrow } from "@/ui/text";
 import { ConstraintCards } from "./constraint-cards";
 import {
+  type Conversation,
+  conversation as conversationSchema,
   encodeConstraints,
   forgetConversation,
   PLANNER_STORAGE_KEY,
+  turnReply,
 } from "./new-trip";
+import { OptionCards, TripSketchCard } from "./planner-cards";
 
 // The conversation on /new. The traveller writes, the planner replies
-// (src/bll/intake.ts) and shows what it holds as cards under its latest
-// message. Sending a message never builds anything: the trip is built by the
-// one button under the cards, and only by it — and not at all while a card is
-// red: a trip that cannot be done is explained, not attempted.
-
-type Conversation = {
-  messages: IntakeMessage[];
-  state: IntakeState;
-  /** The planner has nothing left to ask. */
-  ready: boolean;
-  /** Places asked for that no trip can go to: the Place card is red while any stand. */
-  unsupported?: string[];
-  /** One-tap answers to the planner's latest question. */
-  suggestions?: string[];
-};
-
-type Reply = {
-  ok: true;
-  reply: string;
-  state: IntakeState;
-  ready: boolean;
-  unsupported: string[];
-  suggestions: string[];
-};
+// (src/bll/intake.ts), and along the way it puts cards down: the choices it
+// offers, under the message that offers them, and the trip as it stands so
+// far, in numbers. Sending a message never builds anything: the day-by-day
+// plan is built by the one button on the sketch, and only by it — and not at
+// all while the trip is red: a trip that cannot be done is explained, not
+// attempted.
 
 const OPENING =
-  "Tell me about the trip you have in mind: where in Georgia, how long, who is coming and what you like. I will ask about what is missing, and nothing is built until you say so.";
+  "Tell me about the trip you have in mind: where in Georgia, how long, who is coming and what you enjoy. I will work it out with you, and nothing is built until you say so.";
 
+/** The tab's conversation, if it kept one this page can still read. */
 function restore(): Conversation | null {
   try {
     const raw = sessionStorage.getItem(PLANNER_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Conversation) : null;
+    return raw
+      ? (conversationSchema.safeParse(JSON.parse(raw)).data ?? null)
+      : null;
   } catch {
     return null;
   }
@@ -82,11 +73,11 @@ async function takeTurn(state: IntakeState, messages: IntakeMessage[]) {
       "That is a lot of messages in a short while. Give it a minute, or build from the cards.",
     );
   }
-  const body = (await res.json().catch(() => null)) as Reply | null;
-  if (!res.ok || !body?.ok) {
+  const body = turnReply.safeParse(await res.json().catch(() => null));
+  if (!res.ok || !body.success) {
     throw new Error("I couldn’t reply just now. Try sending that again.");
   }
-  return body;
+  return body.data;
 }
 
 export function TripPlanner({
@@ -109,14 +100,17 @@ export function TripPlanner({
   const [text, setText] = useState("");
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The cards to correct the request by hand, under the sketch. */
+  const [details, setDetails] = useState(false);
   const started = useRef(false);
   const end = useRef<HTMLDivElement>(null);
 
   const { messages, state, ready, unsupported } = conversation;
-  // Offered only under the question they answer: the planner's last word, with
-  // nothing sent since.
-  const answers =
-    messages.at(-1)?.role === "planner" ? (conversation.suggestions ?? []) : [];
+  // Offered only under the message they answer: the planner's last word, with
+  // nothing sent since. A question has answers to tap; a choice has cards.
+  const latest = messages.at(-1)?.role === "planner";
+  const answers = latest ? (conversation.suggestions ?? []) : [];
+  const options = latest ? (conversation.options ?? []) : [];
   const turns = messages.filter((m) => m.role === "traveller").length;
   const talkedOut = turns >= INTAKE_MAX_TURNS;
   const answered = messages.some((m) => m.role === "planner");
@@ -125,6 +119,10 @@ export function TripPlanner({
   const verdict = useMemo(
     () => assessAsked(state.constraints, unsupported),
     [state.constraints, unsupported],
+  );
+  const sketch = useMemo(
+    () => sketchTrip(state.constraints),
+    [state.constraints],
   );
 
   const update = (next: Conversation) => {
@@ -150,7 +148,8 @@ export function TripPlanner({
         state: turn.state,
         ready: turn.ready,
         unsupported: turn.unsupported,
-        suggestions: turn.suggestions ?? [],
+        suggestions: turn.suggestions,
+        options: turn.options,
       });
     } catch (e) {
       // Unsent: the words go back in the box rather than into a transcript
@@ -192,6 +191,15 @@ export function TripPlanner({
       ...conversation,
       state: applyEdit(state, patch),
       unsupported: "places" in patch ? [] : unsupported,
+    });
+
+  // A card taken is the planner's change, made, and the traveller's answer,
+  // said: the next turn starts from the request with it applied.
+  const pick = (option: IntakeOption) =>
+    void send(option.title, {
+      ...conversation,
+      state: applyEdit(state, option.patch),
+      options: [],
     });
 
   const build = () =>
@@ -269,55 +277,80 @@ export function TripPlanner({
               ))}
             </div>
           ) : null}
+
+          {options.length && !waiting && !talkedOut ? (
+            <div className="pl-[27px]">
+              <OptionCards options={options} onPick={pick} />
+            </div>
+          ) : null}
         </div>
 
         {answered ? (
           <div className="flex flex-col gap-3 lg:pl-[27px]">
-            <ConstraintCards
+            <TripSketchCard
+              // Put down again whenever the trip changes: the card is the
+              // planner's latest word on it, not a form that edits in place.
+              key={JSON.stringify(state.constraints)}
               constraints={state.constraints}
+              sketch={sketch}
               said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
-              verdict={verdict}
-              onChange={edit}
-              today={today}
-            />
-            {state.constraints.notes ? (
-              <p className="text-mini text-ink-muted">
-                <span className="font-medium text-ink">Keeping in mind:</span>{" "}
-                {state.constraints.notes}{" "}
-                <button
-                  type="button"
-                  onClick={() =>
-                    update({
-                      ...conversation,
-                      state: {
-                        ...state,
-                        constraints: { ...state.constraints, notes: "" },
-                      },
-                    })
-                  }
-                  className="font-medium text-agent"
+              blockers={reasons(verdict)}
+              ready={ready}
+            >
+              {state.constraints.notes ? (
+                <p className="text-mini text-ink-muted">
+                  <span className="font-medium text-ink">Keeping in mind:</span>{" "}
+                  {state.constraints.notes}{" "}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update({
+                        ...conversation,
+                        state: {
+                          ...state,
+                          constraints: { ...state.constraints, notes: "" },
+                        },
+                      })
+                    }
+                    className="font-medium text-agent"
+                  >
+                    Clear
+                  </button>
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Button
+                  variant={ready ? "primary" : "secondary"}
+                  className="px-5 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={waiting || !verdict.possible}
+                  onClick={build}
                 >
-                  Clear
-                </button>
-              </p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                variant="primary"
-                className="px-5 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={waiting || !verdict.possible}
-                onClick={build}
-              >
-                Build this trip
-              </Button>
+                  {ready ? "Looks right — plan every day" : "Plan it as it is"}
+                </Button>
+                <QuietAction
+                  aria-expanded={details}
+                  onClick={() => setDetails(!details)}
+                >
+                  {details ? "Hide the details" : "Correct the details"}
+                </QuietAction>
+              </div>
               <span className="text-mini text-ink-faint">
                 {!verdict.possible
-                  ? "Put the red card right first, or tell me what to change."
+                  ? "Put the red part right first, or tell me what to change."
                   : ready
-                    ? "Builds from the cards above. Takes up to a minute."
-                    : "You can build now with what is assumed, or keep talking."}
+                    ? "Builds every day, stop by stop, for you to edit. Takes up to a minute."
+                    : "Anything not yet said is assumed. Keep talking, or plan it now."}
               </span>
-            </div>
+            </TripSketchCard>
+            {details || !verdict.possible ? (
+              <ConstraintCards
+                constraints={state.constraints}
+                said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
+                verdict={verdict}
+                onChange={edit}
+                today={today}
+              />
+            ) : null}
           </div>
         ) : null}
 

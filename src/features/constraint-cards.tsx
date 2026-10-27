@@ -8,14 +8,11 @@ import {
 } from "@/domain/catalogue/destinations";
 import {
   type Constraints,
+  DAY_ENDS_RANGE,
   type Interest,
   routeOf,
 } from "@/domain/trip/generate/constraints";
-import {
-  type Assessment,
-  type Judgement,
-  reasons,
-} from "@/domain/trip/generate/feasibility";
+import type { Assessment, Judgement } from "@/domain/trip/generate/feasibility";
 import { Card } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
@@ -27,11 +24,23 @@ import { interestNames } from "./constraint-labels";
 //
 // A card's colour says where its value came from: yellow is my assumption,
 // green is the traveller's own word, and red is something that cannot be done
-// (src/domain/trip/generate/feasibility.ts) — with the reason underneath.
+// (src/domain/trip/generate/feasibility.ts). Why it cannot is said once, on
+// the sketch above them (planner-cards.tsx).
 
 const byName = [...destinations].sort((a, b) => a.name.localeCompare(b.name));
 
 const interests: Interest[] = ["heritage", "nature", "culture", "food"];
+
+/** Every half hour a day may end at, from the earliest to the latest. */
+const dayEndChoices = (() => {
+  const [from, to] = DAY_ENDS_RANGE.map(
+    (t) => Number(t.slice(0, 2)) * 2 + Number(t.slice(3)) / 30,
+  );
+  return Array.from({ length: to - from + 1 }, (_, i) => {
+    const half = from + i;
+    return `${String(Math.floor(half / 2)).padStart(2, "0")}:${half % 2 ? "30" : "00"}`;
+  });
+})();
 
 const longDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", {
@@ -239,8 +248,6 @@ export function ConstraintCards({
 }) {
   const [editing, setEditing] = useState<Field | null>(null);
 
-  const blockers = reasons(verdict);
-
   /** Red when it cannot be done; otherwise whose word the value is. */
   const standing = (key: keyof Constraints, judged?: Judgement): Standing =>
     judged?.level === "impossible"
@@ -285,7 +292,7 @@ export function ConstraintCards({
       value: `${c.days} day${c.days === 1 ? "" : "s"}`,
       note: noted(
         verdict.days,
-        `${said("days") ? "From" : "Assumed · from"} ${longDate(c.startDate)}${said("days") && !said("startDate") ? " · date assumed" : ""}`,
+        `${said("days") ? "From" : "Assumed · from"} ${longDate(c.startDate)}${said("days") && !said("startDate") ? " · date assumed" : ""} · until ${c.dayEnds}`,
       ),
       standing: standing("days", verdict.days),
     },
@@ -370,22 +377,6 @@ export function ConstraintCards({
         ))}
       </div>
 
-      {blockers.length ? (
-        <div
-          role="alert"
-          className="flex flex-col gap-2 rounded-card border border-alert/45 bg-alert/10 px-4 py-3"
-        >
-          <span className="text-small font-semibold text-alert">
-            This trip can’t be done as asked
-          </span>
-          {blockers.map((why) => (
-            <span key={why} className="text-small">
-              {why}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
       {editing ? (
         <Card className="flex flex-wrap items-center gap-3 px-4 py-3">
           {editing === "places" ? (
@@ -430,6 +421,20 @@ export function ConstraintCards({
                   }
                   className="h-9 rounded-control border border-control bg-surface px-2 text-small"
                 />
+              </label>
+              <label className="flex items-center gap-2 text-small">
+                Days end at
+                <select
+                  value={c.dayEnds}
+                  onChange={(e) => set({ dayEnds: e.target.value })}
+                  className={cx(selectClass, "h-9")}
+                >
+                  {dayEndChoices.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
               </label>
             </>
           ) : null}
