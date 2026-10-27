@@ -124,6 +124,12 @@ export default function NewTrip() {
     .filter((j) => j.level === "impossible" && j.why)
     .map((j) => j.why as string);
   const people = c.party.adults + c.party.children;
+  // Where it starts, the places it visits, where it finishes: a place named
+  // twice running is one place, so a start in the first place is no extra drive.
+  const route = [c.start, ...c.places, c.finish].filter(
+    (slug, i, all) => slug !== all[i - 1],
+  );
+  const endpointsSaid = said("places") || said("start") || said("finish");
 
   const build = () =>
     router.push({
@@ -191,8 +197,13 @@ export default function NewTrip() {
         <Fact
           wide
           label="Route"
-          value={c.places.map(nameOf).join(" → ")}
-          assumed={!said("places")}
+          value={route.map(nameOf).join(" → ")}
+          note={
+            c.start === c.finish
+              ? `Start and finish in ${nameOf(c.start)}${said("start") || said("finish") ? "" : " unless you say otherwise"}`
+              : `Start in ${nameOf(c.start)}, finish in ${nameOf(c.finish)}`
+          }
+          assumed={!endpointsSaid}
           judgement={assessment.places}
         />
         <Fact
