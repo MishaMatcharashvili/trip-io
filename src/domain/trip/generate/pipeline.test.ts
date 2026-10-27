@@ -73,6 +73,18 @@ const goodPlan = (): RefPlan => ({
   ],
 });
 
+/** The same trip with its second day filled from morning to dinner. */
+const fullPlan = (): RefPlan => {
+  const plan = goodPlan();
+  plan.days[1].stops.unshift({
+    ref: ref(P.friendship),
+    slot: "morning",
+    kind: "visit",
+    durationMin: 45,
+  });
+  return plan;
+};
+
 const invented = (): RefPlan => {
   const plan = goodPlan();
   plan.days[1].stops[1].ref = "p99";
@@ -128,7 +140,7 @@ const deps = (compose: Composer, cache = memoryCache()) => ({
 
 describe("generate", () => {
   test("a clean first attempt is used and cached", async () => {
-    const { compose } = scripted(goodPlan());
+    const { compose } = scripted(fullPlan());
     const cache = memoryCache();
     const result = await generate(constraints, deps(compose, cache));
     assert.ok(result.ok);
@@ -136,12 +148,12 @@ describe("generate", () => {
     assert.ok(cache.calls.includes("put"));
     assert.equal(
       Object.values(result.doc.nodes).filter((n) => n.kind === "visit").length,
-      2,
+      3,
     );
   });
 
   test("an invented place is rejected and the retry is told which", async () => {
-    const { compose, seen } = scripted(invented(), goodPlan());
+    const { compose, seen } = scripted(invented(), fullPlan());
     const result = await generate(constraints, deps(compose));
     assert.ok(result.ok);
     assert.equal(result.source, "retry");
@@ -159,7 +171,7 @@ describe("generate", () => {
     const bad = goodPlan();
     // An outdoor hike in the evening can't end before dark.
     bad.days[1].stops[1].slot = "evening";
-    const { compose, seen } = scripted(bad, goodPlan());
+    const { compose, seen } = scripted(bad, fullPlan());
     const result = await generate(constraints, deps(compose));
     assert.ok(result.ok);
     assert.ok(seen[1]?.problems.some((p) => /after dark/.test(p)));
@@ -205,7 +217,7 @@ describe("generate", () => {
     const { compose } = scripted();
     const first = await generate(
       constraints,
-      deps(scripted(goodPlan()).compose),
+      deps(scripted(fullPlan()).compose),
     );
     assert.ok(first.ok);
     const result = await generate(
@@ -219,7 +231,7 @@ describe("generate", () => {
   test("a cache hit that doesn't fit these dates is dropped", async () => {
     const first = await generate(
       constraints,
-      deps(scripted(goodPlan()).compose),
+      deps(scripted(fullPlan()).compose),
     );
     assert.ok(first.ok);
     // The museum is closed on day 2 (Wednesday) of these dates.
@@ -233,11 +245,72 @@ describe("generate", () => {
     const cache = memoryCache(stale);
     const result = await generate(
       constraints,
-      deps(scripted(goodPlan()).compose, cache),
+      deps(scripted(fullPlan()).compose, cache),
     );
     assert.ok(result.ok);
     assert.equal(result.source, "model");
     assert.ok(cache.calls.includes("drop"));
+  });
+
+  describe("days with holes in them", () => {
+    // goodPlan() leaves day 2's morning empty after the drive: 2h50, and a
+    // moderate day leaves at most 2h.
+    test("the model is told where, and a fuller retry is used and cached", async () => {
+      const { compose, seen } = scripted(goodPlan(), fullPlan());
+      const cache = memoryCache();
+      const result = await generate(constraints, deps(compose, cache));
+      assert.ok(result.ok);
+      assert.equal(result.source, "retry");
+      assert.match(seen[1]?.problems[0] ?? "", /2h50 with nothing planned/);
+      assert.deepEqual(seen[1]?.invented, []);
+      assert.ok(cache.calls.includes("put"));
+    });
+
+    test("a plan that stays sparse is still the trip, but is not cached", async () => {
+      const { compose } = scripted(goodPlan(), goodPlan());
+      const cache = memoryCache();
+      const result = await generate(constraints, deps(compose, cache));
+      assert.ok(result.ok);
+      assert.equal(result.source, "model");
+      assert.deepEqual(
+        result.attempts.map((a) => a.source),
+        ["model", "retry"],
+      );
+      assert.ok(!cache.calls.includes("put"));
+    });
+
+    test("a retry that breaks something does not cost the sparse plan", async () => {
+      const { compose } = scripted(goodPlan(), invented());
+      const result = await generate(constraints, deps(compose));
+      assert.ok(result.ok);
+      assert.equal(result.source, "model");
+    });
+
+    test("a cached plan with a hole is composed again", async () => {
+      const sparse = await generate(
+        constraints,
+        deps(scripted(goodPlan(), goodPlan()).compose),
+      );
+      assert.ok(sparse.ok);
+      const cache = memoryCache(sparse.plan);
+      const result = await generate(
+        constraints,
+        deps(scripted(fullPlan()).compose, cache),
+      );
+      assert.ok(result.ok);
+      assert.equal(result.source, "model");
+      assert.ok(cache.calls.includes("drop"));
+    });
+
+    test("a relaxed day may rest between its stops", async () => {
+      const result = await generate(
+        { ...constraints, pace: "relaxed" },
+        deps(scripted(goodPlan()).compose),
+      );
+      assert.ok(result.ok);
+      assert.equal(result.source, "model");
+      assert.equal(result.attempts.length, 1);
+    });
   });
 });
 
@@ -392,16 +465,33 @@ describe("the route", () => {
 });
 
 describe("fallbackPlan", () => {
-  test("uses one base per area and fills the day shape for the pace", () => {
+  test("uses one base per area, and each day takes its share of what there is to visit", () => {
     const plan = fallbackPlan(constraints, curated);
     assert.equal(plan.days.length, 2);
     assert.equal(plan.days[0].stayId, plan.days[1].stayId);
+    // Two to visit on each of two days: the first does not take them all.
+    assert.deepEqual(
+      plan.days[0].stops.map((s) => `${s.slot}:${s.kind}`),
+      ["morning:visit", "morning:visit", "midday:meal", "evening:meal"],
+    );
+    assert.ok(plan.days[1].stops.some((s) => s.kind === "visit"));
+  });
+
+  test("with enough to see, a moderate day fills its afternoon too", () => {
+    const rich = [
+      ...curated,
+      ...[1, 2, 3, 4].map((n) =>
+        somewhere("kazbegi", n, "heritage", [44.64 + n * 0.004, 42.66]),
+      ),
+    ];
+    const plan = fallbackPlan({ ...constraints, days: 1 }, rich);
     assert.deepEqual(
       plan.days[0].stops.map((s) => `${s.slot}:${s.kind}`),
       [
         "morning:visit",
         "morning:visit",
         "midday:meal",
+        "afternoon:visit",
         "afternoon:visit",
         "evening:meal",
       ],

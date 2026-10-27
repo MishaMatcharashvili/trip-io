@@ -7,6 +7,7 @@ import { type Violation, validateDoc } from "../validate.ts";
 import { cacheKey } from "./cache-key.ts";
 import type { Constraints } from "./constraints.ts";
 import { fallbackPlan } from "./fallback.ts";
+import { idleGaps } from "./idle.ts";
 import {
   type Candidate,
   type Plan,
@@ -232,6 +233,9 @@ export async function generate(
     return {
       doc,
       warnings: violations.filter((v) => v.severity === "warning"),
+      // Soft: a day the catalogue cannot fill is still a day. Asked about once,
+      // of the model; never a reason to throw the plan away.
+      idle: idleGaps(doc).map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
         ...errors.map((v) => `${v.day}: ${v.message}`),
@@ -253,12 +257,13 @@ export async function generate(
   const cached = await deps.cache.get(key);
   if (cached) {
     const { value: result, ms } = await timed(() => evaluate(cached));
-    const ok = result.problems.length === 0;
+    // A plan cached before days were checked for holes is one: re-composed.
+    const ok = result.problems.length === 0 && result.idle.length === 0;
     attempts.push({
       source: "cache",
       ok,
       invented: [],
-      problems: result.problems,
+      problems: [...result.problems, ...result.idle],
       ms,
     });
     if (ok) {
@@ -312,6 +317,10 @@ export async function generate(
   };
 
   let feedback: ComposeFeedback | undefined;
+  /** A plan that is valid but leaves holes in its days: kept, in case the retry does no better. */
+  let sparse:
+    | { source: Source; plan: Plan; result: ReturnType<typeof evaluate> }
+    | undefined;
   for (const source of ["model", "retry"] as const) {
     const t0 = performance.now();
     let refPlan: RefPlan;
@@ -332,15 +341,16 @@ export async function generate(
     const { plan, invented } = resolveRefs(refPlan, toId);
     const result = invented.length === 0 ? evaluate(plan) : undefined;
     const problems = result?.problems ?? [];
+    const idle = result?.idle ?? [];
     const ok = invented.length === 0 && problems.length === 0;
     attempts.push({
       source,
-      ok,
+      ok: ok && idle.length === 0,
       invented,
-      problems,
+      problems: [...problems, ...idle],
       ms: Math.round(performance.now() - t0),
     });
-    if (ok && result) {
+    if (ok && result && idle.length === 0) {
       await deps.cache.put(key, plan);
       return {
         ok,
@@ -351,7 +361,28 @@ export async function generate(
         attempts,
       };
     }
+    if (ok && result) {
+      if (!sparse || idle.length < sparse.result.idle.length) {
+        sparse = { source, plan, result };
+      }
+      feedback = { previous: refPlan, invented, problems: idle };
+      continue;
+    }
     feedback = { previous: refPlan, invented, problems };
+  }
+
+  // Two goes at a fuller day did not get one. Still a valid trip, and a better
+  // one than the template's: it is what the traveller gets, and it is not
+  // cached, so the next request tries again.
+  if (sparse) {
+    return {
+      ok: true,
+      source: sparse.source,
+      doc: sparse.result.doc,
+      plan: sparse.plan,
+      warnings: sparse.result.warnings,
+      attempts,
+    };
   }
 
   // 3. The fallback: drop whatever it tripped on and try again.

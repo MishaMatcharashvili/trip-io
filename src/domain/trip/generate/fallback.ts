@@ -27,6 +27,7 @@ const DAY_SHAPE: Record<Pace, [Slot, PlanStop["kind"]][]> = {
     ["morning", "visit"],
     ["midday", "meal"],
     ["afternoon", "visit"],
+    ["afternoon", "visit"],
     ["evening", "meal"],
   ],
   packed: [
@@ -186,8 +187,22 @@ export function fallbackPlan(
     const mustLeaveBy = dark ? localMinutes(dark.set) - homeward : Infinity;
     let free = arrives;
 
+    // A full day's shape must not leave the days after it nothing: each day in
+    // an area gets its share of what is left to visit there, and at least one.
+    const daysLeft = dayAreas.slice(i).filter((a) => a === area).length;
+    const toVisit = inArea(area).filter(
+      (p) => visitable(p) && !usedVisits.has(p.id),
+    ).length;
+    const quota = Math.max(1, Math.floor(toVisit / daysLeft));
+
     for (const [index, [slot, kind]] of shape.entries()) {
       if (minutesOf(SLOT_WINDOW[slot][1]) < arrives) continue;
+      if (
+        kind === "visit" &&
+        stops.filter((s) => s.kind === "visit").length >= quota
+      ) {
+        continue;
+      }
       const previous = stops.at(-1);
       if (
         kind === "visit" &&
