@@ -6,7 +6,11 @@ import {
   destinations,
   MAX_PLACES,
 } from "@/domain/catalogue/destinations";
-import type { Constraints, Interest } from "@/domain/trip/generate/constraints";
+import {
+  type Constraints,
+  type Interest,
+  routeOf,
+} from "@/domain/trip/generate/constraints";
 import {
   type Assessment,
   type Judgement,
@@ -80,8 +84,9 @@ function Toggle({
 }
 
 /**
- * The route, in the order it is travelled: the first place is the start, the
- * last the finish. Any place in Georgia can be added, and any moved earlier.
+ * The places the trip visits, in the order it visits them. Any place in
+ * Georgia can be added, and any moved earlier. Each is a day of its own; where
+ * the trip starts and finishes is `EndpointsEditor`'s.
  */
 function PlacesEditor({
   places,
@@ -103,11 +108,6 @@ function PlacesEditor({
           key={`${slug}-${i}`}
           className="inline-flex h-8 items-center gap-1 rounded-full border border-control bg-surface pl-3 pr-1 text-mini font-medium"
         >
-          {places.length > 1 && (i === 0 || i === places.length - 1) ? (
-            <span className="text-ink-faint">
-              {i === 0 ? "Start" : "Finish"}
-            </span>
-          ) : null}
           {destinationName(slug)}
           {i > 0 ? (
             <button
@@ -147,6 +147,72 @@ function PlacesEditor({
             </option>
           ))}
         </select>
+      ) : null}
+    </>
+  );
+}
+
+const selectClass =
+  "h-8 rounded-control border border-control bg-surface px-2 text-mini text-ink";
+
+/**
+ * Where the traveller arrives and leaves from: Tbilisi unless they change it.
+ * Neither is a stop, so a trip that starts and finishes in Tbilisi to see
+ * Sighnaghi is one place and two drives. Finishing where they started is the
+ * usual case and the default; the second select is there when it is not.
+ */
+function EndpointsEditor({
+  start,
+  finish,
+  onChange,
+}: {
+  start: string;
+  finish: string;
+  onChange: (patch: Pick<Constraints, "start" | "finish">) => void;
+}) {
+  const [separate, setSeparate] = useState(start !== finish);
+  const options = byName.map((d) => (
+    <option key={d.slug} value={d.slug}>
+      {d.name}
+    </option>
+  ));
+  return (
+    <>
+      <label className="flex items-center gap-2 text-small">
+        Start
+        <select
+          value={start}
+          onChange={(e) =>
+            onChange({
+              start: e.target.value,
+              finish: separate ? finish : e.target.value,
+            })
+          }
+          className={selectClass}
+        >
+          {options}
+        </select>
+      </label>
+      <Toggle
+        on={!separate}
+        onClick={() => {
+          if (separate) onChange({ start, finish: start });
+          setSeparate(!separate);
+        }}
+      >
+        Finish where I start
+      </Toggle>
+      {separate ? (
+        <label className="flex items-center gap-2 text-small">
+          Finish
+          <select
+            value={finish}
+            onChange={(e) => onChange({ start, finish: e.target.value })}
+            className={selectClass}
+          >
+            {options}
+          </select>
+        </label>
       ) : null}
     </>
   );
@@ -197,16 +263,21 @@ export function ConstraintCards({
     {
       field: "places",
       label: c.places.length === 1 ? "Place" : "Places",
-      value: c.places.map(destinationName).join(" → "),
+      value: routeOf(c).map(destinationName).join(" → "),
       note: noted(
         verdict.places,
         !said("places")
           ? "Assumed — tap to choose"
-          : c.places.length === 1
-            ? "Start and finish"
-            : `Start in ${destinationName(c.places[0])}, finish in ${destinationName(c.places.at(-1) as string)}`,
+          : c.start === c.finish
+            ? `Start and finish in ${destinationName(c.start)}`
+            : `Start in ${destinationName(c.start)}, finish in ${destinationName(c.finish)}`,
       ),
-      standing: standing("places", verdict.places),
+      standing:
+        verdict.places.level === "impossible"
+          ? "impossible"
+          : said("places") || said("start") || said("finish")
+            ? "said"
+            : "assumed",
     },
     {
       field: "days",
@@ -318,10 +389,18 @@ export function ConstraintCards({
       {editing ? (
         <Card className="flex flex-wrap items-center gap-3 px-4 py-3">
           {editing === "places" ? (
-            <PlacesEditor
-              places={c.places}
-              onChange={(places) => set({ places })}
-            />
+            <>
+              <span className="text-small text-ink-muted">Visit</span>
+              <PlacesEditor
+                places={c.places}
+                onChange={(places) => set({ places })}
+              />
+              <EndpointsEditor
+                start={c.start}
+                finish={c.finish}
+                onChange={set}
+              />
+            </>
           ) : null}
           {editing === "days" ? (
             <>
