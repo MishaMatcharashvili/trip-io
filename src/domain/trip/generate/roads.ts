@@ -8,6 +8,11 @@ import { REST_EVERY_MIN, REST_LAST_MIN } from "./rests.ts";
 /** A drive this long has a rest in it, when there is a station where one falls due. */
 export const ROAD_STOP_DRIVE_MIN = REST_EVERY_MIN + REST_LAST_MIN;
 
+/** A station further than this from the road is off it: a pump in town, not on the highway. */
+export const STATION_OFF_ROAD_M = 500;
+/** Enough for Tbilisi to Batumi, every station on the way. */
+export const STATIONS_PER_ROAD = 80;
+
 /** How a drive is named, on the stations found along it. */
 export const driveLabel = (d: Pick<Leg, "from" | "to">) =>
   `${d.from} > ${d.to}`;

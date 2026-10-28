@@ -9,6 +9,7 @@ import {
   placeNames,
   plannableNear,
   roadsideCandidates,
+  stationsAlong,
 } from "./places.ts";
 
 // A place id arrives from outside more often than it looks: a patch body, a
@@ -167,5 +168,38 @@ describe("places near a review site's pins", () => {
     );
     assert.equal(palaty.nameKa, "პალატი");
     assert.equal(palaty.group, "food");
+  });
+});
+
+describe("stations along a road", () => {
+  test("a road that is not a line is not looked along", async () => {
+    const { conn, params } = recording();
+    assert.deepEqual(await stationsAlong([[44.8, 41.695]], conn), []);
+    assert.deepEqual(params, []);
+  });
+
+  test("a station is in no place, and keeps its chain", async () => {
+    const { conn } = recording([
+      {
+        id: PLACE,
+        name: "Gori 1",
+        category: "gas_station",
+        tier: "verified",
+        opening_hours: null,
+        brand: "Rompetrol",
+        lon: 44.148,
+        lat: 42.019,
+      },
+    ]);
+    const [station] = await stationsAlong(
+      [
+        [44.8, 41.695],
+        [42.663, 42.26],
+      ],
+      conn,
+    );
+    assert.equal(station.group, "services");
+    assert.equal(station.brand, "Rompetrol");
+    assert.deepEqual(station.areas, []);
   });
 });

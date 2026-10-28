@@ -25,6 +25,8 @@ import {
   ROAD_SIGHTS,
   ROAD_SIGHTS_PER_DRIVE,
   ROAD_STOP_SPAN,
+  STATION_OFF_ROAD_M,
+  STATIONS_PER_ROAD,
 } from "../domain/trip/generate/roads.ts";
 import type { PlaceInfo } from "../domain/trip/validate.ts";
 import { areaPredicate, list } from "./area-predicate.ts";
@@ -280,6 +282,36 @@ function candidateOf(
 /** A line as PostGIS reads it, longitude first. */
 export const lineWkt = (line: readonly LonLat[]) =>
   `LINESTRING(${line.map(([lon, lat]) => `${lon} ${lat}`).join(", ")})`;
+
+/**
+ * The fuel stations a plan may rest at along a routed road, in the order the
+ * road passes them, with their chain when the source names one. Which of them
+ * a drive stops at is the scheduler's to choose (rests.ts).
+ */
+export async function stationsAlong(
+  road: readonly LonLat[],
+  conn: Queryable = db,
+): Promise<Candidate[]> {
+  if (road.length < 2) return [];
+  const rows = await conn.execute(sql`
+    WITH road AS (SELECT ST_GeogFromText(${lineWkt(road)}) AS g)
+    SELECT p.id, p.name, p.category, p.tier, p.opening_hours,
+           p.attrs->>'brand' AS brand,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
+    FROM place p, road
+    WHERE p.tier IN ('curated', 'verified')
+      AND p.category IN (${list(categoryGroups.services)})
+      AND ST_DWithin(p.geom, road.g, ${STATION_OFF_ROAD_M})
+    ORDER BY ST_LineLocatePoint(road.g::geometry, p.geom::geometry)
+    LIMIT ${STATIONS_PER_ROAD}
+  `);
+  return rows.rows.map((r) => ({
+    ...candidateOf(r),
+    area: "",
+    areas: [],
+    ...(typeof r.brand === "string" && r.brand ? { brand: r.brand } : {}),
+  }));
+}
 
 export type RoadsideQuery = {
   /** The drive's label (roads.ts, driveLabel), carried by every place found. */
