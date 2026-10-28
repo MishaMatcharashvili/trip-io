@@ -3,8 +3,10 @@ import { describe, test } from "node:test";
 import {
   classify,
   googlePlaces,
+  googleRatings,
   parseDetails,
   toCandidates,
+  toRated,
   toReviews,
 } from "./google-places.ts";
 
@@ -297,5 +299,77 @@ describe("the calls", () => {
       timeoutMs: 10,
     }).search(place);
     assert.deepEqual(result, { ok: false, reason: "timeout" });
+  });
+});
+
+describe("a town's best-rated places", () => {
+  const town = {
+    places: [
+      {
+        id: "ChIJpalaty",
+        displayName: { text: "Palaty", languageCode: "en" },
+        location: { latitude: 42.2716, longitude: 42.7004 },
+        rating: 4.6,
+        userRatingCount: 2400,
+      },
+      // Nobody has rated it: nothing to choose it by.
+      {
+        id: "ChIJnew",
+        displayName: { text: "Just opened" },
+        location: { latitude: 42.27, longitude: 42.7 },
+      },
+    ],
+  };
+
+  test("only what travellers have rated comes back, longitude first", () => {
+    assert.deepEqual(toRated(town), [
+      {
+        id: "ChIJpalaty",
+        names: ["Palaty"],
+        lonLat: [42.7004, 42.2716],
+        rating: { value: 4.6, count: 2400 },
+      },
+    ]);
+    assert.deepEqual(toRated({}), []);
+  });
+
+  test("one search per town and kind, a full page, the rating in the mask, near the town", async () => {
+    const { fetch, calls } = fake({ "/places:searchText": town });
+    const result = await googleRatings({ key: "secret", fetch }).popular({
+      kind: "restaurant",
+      in: "Kutaisi",
+      near: [42.663, 42.26],
+    });
+    assert.ok(result.ok);
+    assert.equal(result.places.length, 1);
+    assert.equal(calls.length, 1);
+    const { url, init } = calls[0];
+    const headers = init.headers as Record<string, string>;
+    assert.equal(
+      headers["X-Goog-FieldMask"],
+      "places.id,places.displayName,places.location,places.rating,places.userRatingCount",
+    );
+    const body = JSON.parse(String(init.body));
+    assert.equal(body.textQuery, "best restaurants in Kutaisi, Georgia");
+    assert.equal(body.includedType, "restaurant");
+    assert.equal(body.pageSize, 20);
+    assert.deepEqual(body.locationBias.circle.center, {
+      latitude: 42.26,
+      longitude: 42.663,
+    });
+    assert.ok(!url.href.includes("secret"));
+  });
+
+  test("without a key nothing is sent, and a refusal is a reason", async () => {
+    const none = fake({});
+    assert.deepEqual(
+      await googleRatings({ key: undefined, fetch: none.fetch }).popular({
+        kind: "hotel",
+        in: "Kutaisi",
+        near: [42.663, 42.26],
+      }),
+      { ok: false, reason: "not-configured" },
+    );
+    assert.equal(none.calls.length, 0);
   });
 });

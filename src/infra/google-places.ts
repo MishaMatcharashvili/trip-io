@@ -10,6 +10,12 @@ import type {
   Review,
   SearchOutcome,
 } from "../domain/catalogue/enrichment.ts";
+import type {
+  RatedKind,
+  RatedListing,
+  RatedOutcome,
+  RatingSource,
+} from "../domain/catalogue/ratings.ts";
 
 // Google's Places API (New), behind the domain's PlaceEnricher port, beside
 // Tripadvisor's: the only file that knows its URL, its parameters or its response
@@ -116,6 +122,40 @@ const detailsResponse = z.object({
 });
 
 const mediaResponse = z.object({ photoUri: secureUrl });
+
+const ratedResponse = z.object({
+  places: z
+    .array(
+      z.object({
+        id: z.string(),
+        displayName: localised,
+        location: z
+          .object({ latitude: z.number(), longitude: z.number() })
+          .optional(),
+        rating: z.number().min(1).max(5).optional(),
+        userRatingCount: z.number().int().min(0).optional(),
+      }),
+    )
+    .default([]),
+});
+
+/** A town's rated places; one nobody has rated is left out. */
+export function toRated(body: unknown): RatedListing[] {
+  return ratedResponse.parse(body).places.flatMap((p): RatedListing[] =>
+    p.rating !== undefined && p.userRatingCount !== undefined
+      ? [
+          {
+            id: p.id,
+            names: p.displayName ? [p.displayName.text] : [],
+            lonLat: p.location
+              ? [p.location.longitude, p.location.latitude]
+              : null,
+            rating: { value: p.rating, count: p.userRatingCount },
+          },
+        ]
+      : [],
+  );
+}
 
 export function toCandidates(body: unknown): Candidate[] {
   return searchResponse.parse(body).places.map((p) => ({
@@ -332,6 +372,58 @@ export function googlePlaces(options: CallOptions): PlaceEnricher {
         return enrichment
           ? { ok: true, enrichment }
           : { ok: false, reason: "no-match" };
+      } catch {
+        return { ok: false, reason: "malformed" };
+      }
+    },
+  };
+}
+
+/** A whole page of a town's places: one call, billed once. */
+const RATED_RESULTS = 20;
+/** Around the town's centre; the catalogue match decides what is in it. */
+const TOWN_BIAS_M = 20_000;
+
+/** What each kind is called to the search, and the type it is held to. */
+const ratedSearch: Record<RatedKind, { query: string; type: string }> = {
+  restaurant: { query: "best restaurants in", type: "restaurant" },
+  hotel: { query: "best hotels in", type: "lodging" },
+  attraction: { query: "top sights in", type: "tourist_attraction" },
+};
+
+/**
+ * A town's best-rated restaurants, hotels or sights, as Google ranks them: one
+ * Text Search with a rating and its count in the field mask, which puts the
+ * call in a dearer tier than finding one place (docs/google-places.md). The
+ * results are matched to the catalogue by the domain (ratings.ts), never
+ * planned from directly.
+ */
+export function googleRatings(options: CallOptions): RatingSource {
+  const call = caller(options);
+  return {
+    provider: "google",
+    configured: Boolean(options.key),
+
+    async popular({ kind, in: where, near }): Promise<RatedOutcome> {
+      const [longitude, latitude] = near;
+      const reply = await call(
+        "/places:searchText",
+        "places.id,places.displayName,places.location,places.rating,places.userRatingCount",
+        {},
+        {
+          textQuery: `${ratedSearch[kind].query} ${where.slice(0, 100)}, Georgia`,
+          includedType: ratedSearch[kind].type,
+          languageCode: "en",
+          regionCode: "GE",
+          pageSize: RATED_RESULTS,
+          locationBias: {
+            circle: { center: { latitude, longitude }, radius: TOWN_BIAS_M },
+          },
+        },
+      );
+      if (!reply.ok) return reply;
+      try {
+        return { ok: true, places: toRated(reply.body) };
       } catch {
         return { ok: false, reason: "malformed" };
       }
