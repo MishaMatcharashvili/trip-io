@@ -40,6 +40,7 @@ import {
 import { straightLineTravel } from "../domain/trip/travel.ts";
 import type { Violation } from "../domain/trip/validate.ts";
 import { composeWithOpenAI } from "../infra/openai-composer.ts";
+import { type RatingDeps, ratedInArea } from "./ratings.ts";
 import { computeRoute } from "./route.ts";
 import {
   type AppendFailure,
@@ -55,12 +56,14 @@ import {
 /**
  * Places across the requested destinations — curated first, verified filling
  * in — spread evenly so one dense destination can't crowd the others out of the
- * prompt. A place that lies in two of them (Telavi, when Kakheti was asked for
- * too) comes back once, and knows both.
+ * prompt, with the places travellers rate best in each on top. A place that
+ * lies in two of them (Telavi, when Kakheti was asked for too) comes back
+ * once, and knows both.
  */
 export async function loadCandidates(
   places: readonly string[],
   limit = CANDIDATE_LIMIT,
+  ratings?: RatingDeps,
 ): Promise<Candidate[]> {
   // A round trip names its start twice; it is still one place to retrieve.
   const wanted = [...new Set(places)].flatMap(
@@ -70,8 +73,13 @@ export async function loadCandidates(
     CANDIDATES_PER_AREA_MIN,
     Math.ceil(limit / Math.max(1, wanted.length)),
   );
+  // What travellers rate best comes first, and on top of the share: a town's
+  // best restaurant is a candidate whether or not its category's turn came.
   const perAreaResults = await Promise.all(
-    wanted.map((d) => candidatesInArea(d, perArea)),
+    wanted.flatMap((d) => [
+      ratings ? ratedInArea(d, ratings) : [],
+      candidatesInArea(d, perArea),
+    ]),
   );
   return merged(perAreaResults.flat());
 }
@@ -248,12 +256,15 @@ export async function generateTrip(
     compose = composeWithOpenAI,
     stillWanted = async () => true,
     roads,
+    ratings,
   }: {
     compose?: Composer;
     /** Asked once the plan is ready and before anything is written. */
     stillWanted?: () => Promise<boolean>;
     /** Routes the long drives, to find places to stop on the way. Without one there are none. */
     roads?: RoutesProvider;
+    /** What travellers rate the places in each destination. Without it nothing is rated. */
+    ratings?: RatingDeps;
   } = {},
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
@@ -267,7 +278,7 @@ export async function generateTrip(
   }
 
   const [inPlaces, onRoads] = await Promise.all([
-    loadCandidates(wanted.places),
+    loadCandidates(wanted.places, CANDIDATE_LIMIT, ratings),
     roads
       ? loadRoadStops(wanted, {
           road: routedRoad(roads, userId),
