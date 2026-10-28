@@ -5,6 +5,7 @@ import {
   DEFAULT_CONTENT_TTL_S,
   defaultLimits,
   enrichPlace,
+  GOOGLE_CONTENT_TTL_S,
 } from "@/bll/place-enrichment.ts";
 import { photosForPlace } from "@/bll/place-photos.ts";
 import type {
@@ -58,9 +59,6 @@ const keptFor = (provider: string) =>
         provider,
       })
     : undefined;
-
-/** How long Google's answer is kept unless told otherwise: 60 days, the owner's decision of 2026-10-03. */
-const GOOGLE_CONTENT_TTL_S = 60 * 86_400;
 
 /** The review sources a place can be asked of, each with its own terms and bill. */
 const sources = ["tripadvisor", "google"] as const;
