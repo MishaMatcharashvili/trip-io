@@ -13,7 +13,7 @@ export const STATION_OFF_ROAD_M = 500;
 /** Enough for Tbilisi to Batumi, every station on the way. */
 export const STATIONS_PER_ROAD = 80;
 
-/** How a drive is named, on the stations found along it. */
+/** How one drive is told from another: Tbilisi to Kutaisi is not Kutaisi to Tbilisi. */
 export const driveLabel = (d: Pick<Leg, "from" | "to">) =>
   `${d.from} > ${d.to}`;
 
@@ -33,42 +33,5 @@ export function longDrives(
   });
 }
 
-/**
- * What is worth getting out of the car for: what a town on the way is known
- * for, not its theatre or its cultural centre.
- */
-export const ROAD_SIGHTS = [
-  "castle",
-  "fort",
-  "historic_site",
-  "monument",
-  "christian_place_of_worship",
-  "museum",
-  "winery",
-  "national_park",
-  "nature_reserve",
-  "lake",
-  "waterfall",
-  "mountain",
-  "hot_springs",
-] as const;
-
-/** Lunch on the road is a sit-down meal: a roadside "eatery" is as often a bakery or a doughnut stand. */
-export const ROAD_MEALS = ["restaurant"] as const;
-
-/** A sight may be this far off the road: Uplistsikhe is worth the detour. */
-export const ROAD_SIGHT_DETOUR_M = 10_000;
-/** Lunch is by the road. */
-export const ROAD_MEAL_DETOUR_M = 2_500;
-/** Closer than this to either end is still the town the drive left, or already the one it is going to. */
-export const ROAD_END_MARGIN_M = 15_000;
-/**
- * How far along the road, as a share of it, a stop may lie: a break twenty
- * minutes out of Tbilisi on a four-hour drive is not a break, and lunch there
- * is at ten in the morning.
- */
-export const ROAD_STOP_SPAN = [0.15, 0.85] as const;
-export const ROAD_SIGHTS_PER_DRIVE = 10;
-export const ROAD_MEALS_PER_DRIVE = 6;
-/** The road is sent to the database simplified to this, well inside the detours above. */
+/** The road is sent to the database simplified to this, well inside STATION_OFF_ROAD_M. */
 export const ROAD_SIMPLIFY_M = 250;
