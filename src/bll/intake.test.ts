@@ -26,6 +26,7 @@ const answer = {
   start: null,
   finish: null,
   pace: null,
+  dayEnds: null,
   interests: null,
   adults: null,
   children: null,
@@ -35,6 +36,7 @@ const answer = {
   unsupported: [],
   ready: false,
   suggestions: [],
+  options: [],
 };
 
 describe("planningTurn", () => {

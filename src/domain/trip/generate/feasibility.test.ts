@@ -10,6 +10,7 @@ const trip = (over: Partial<Constraints> = {}): Constraints => ({
   start: "tbilisi",
   finish: "tbilisi",
   pace: "moderate",
+  dayEnds: "20:00",
   interests: [],
   party: { adults: 2, children: 0 },
   mobility: "moderate",

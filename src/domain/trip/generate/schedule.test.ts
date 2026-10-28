@@ -47,7 +47,7 @@ const kazbegiPlan = (day2: PlanStop[] = []): Plan => ({
   ],
 });
 
-const run = (plan: Plan) =>
+const run = (plan: Plan, over: Partial<Parameters<typeof schedule>[0]> = {}) =>
   schedule({
     plan,
     startDate: PREV,
@@ -55,6 +55,7 @@ const run = (plan: Plan) =>
     places: candidates,
     travel: straightLineTravel,
     newId: idSequence(),
+    ...over,
   });
 
 const timeline = (nodes: TripDoc["nodes"]) =>
@@ -76,8 +77,8 @@ describe("schedule", () => {
       "09:45 transfer Drive to Zeta Camp (40)",
       "12:30 meal Lunch · Zeta Camp (75)",
       "14:30 visit Gergeti Trinity Church (160)",
-      "19:00 meal Dinner · Cafe 5047m (90)",
-      "20:30 stay Check in · Rooms Kazbegi (15)",
+      "18:30 meal Dinner · Cafe 5047m (90)",
+      "20:00 stay Check in · Rooms Kazbegi (15)",
     ]);
   });
 
@@ -130,6 +131,42 @@ describe("schedule", () => {
       kazbegiPlan([stop(P.gergeti, "evening", "visit", 160)]),
     );
     assert.match(problems[0].message, /after dark/);
+  });
+
+  test("no stop starts after the day ends", () => {
+    const { nodes, problems } = run(kazbegiPlan(), { dayEnds: "18:00" });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0].message, /after the day ends at 18:00/);
+    assert.ok(!timeline(nodes).some((t) => t.includes("Dinner")));
+  });
+
+  test("the drive to the finish may run after dark, until two hours past the day's end", () => {
+    // Gudauri to Kazbegi: dinner until 20:00, then the drive back to the
+    // Gudauri lodge in the dark, which is late but not too late.
+    const home = {
+      lonLat: candidates.get(P.roomsGudauri)?.lonLat ?? [0, 0],
+      name: "Gudauri",
+    } as const;
+    const late = run(kazbegiPlan(), { finish: home });
+    assert.deepEqual(late.problems, []);
+    assert.match(
+      timeline(late.nodes).at(-1) ?? "",
+      /^20:00 transfer Drive to Gudauri/,
+    );
+
+    // A day that ends at half four cannot have its drive to Tbilisi, three
+    // hours away, end after half six.
+    const early = run(
+      kazbegiPlan([
+        stop(P.roomsGudauri, "morning", "meal", 45),
+        stop(P.gergeti, "afternoon", "visit", 160),
+      ]),
+      { finish: { lonLat: [44.79, 41.72], name: "Tbilisi" }, dayEnds: "16:30" },
+    );
+    assert.match(
+      early.problems.at(-1)?.message ?? "",
+      /too late in a day that ends at 16:30/,
+    );
   });
 
   test("reports a place that isn't a candidate", () => {

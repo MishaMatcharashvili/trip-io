@@ -174,6 +174,29 @@ describe("understand", () => {
     assert.ok(!said.includes("startDate"));
   });
 
+  test("days end at eight in the evening unless the words say when", () => {
+    const { constraints: c, said } = understand("3 days in Kakheti", TODAY);
+    assert.equal(c.dayEnds, "20:00");
+    assert.ok(!said.includes("dayEnds"));
+  });
+
+  test("when the days end, from how a traveller says it", () => {
+    const ends = (text: string) => understand(text, TODAY).constraints.dayEnds;
+    assert.equal(ends("day trip to Mtskheta, back by 6pm"), "18:00");
+    assert.equal(ends("Kazbegi, home by seven"), "19:00");
+    assert.equal(ends("out until 22:00 every day"), "22:00");
+    assert.equal(ends("we like to wrap up at 9"), "21:00");
+    assert.equal(ends("back by 17:40"), "17:30");
+    assert.ok(understand("back by 6pm", TODAY).said.includes("dayEnds"));
+  });
+
+  test("a number of days, or an hour no day can end at, is not when it ends", () => {
+    const ends = (text: string) => understand(text, TODAY).constraints.dayEnds;
+    assert.equal(ends("until 5 days before Christmas"), "20:00");
+    assert.equal(ends("back by 2am"), "20:00");
+    assert.equal(ends("back to Tbilisi"), "20:00");
+  });
+
   test("a family", () => {
     const { constraints: c } = understand("family trip with 2 kids", TODAY);
     assert.deepEqual(c.party, { adults: 2, children: 2 });

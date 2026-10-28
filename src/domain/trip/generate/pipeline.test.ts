@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { nodeEnd } from "../document.ts";
 import { candidates, idSequence, P, PREV } from "../test-fixtures.ts";
 import { straightLineTravel } from "../travel.ts";
 import type { Constraints } from "./constraints.ts";
@@ -22,6 +23,7 @@ const constraints: Constraints = {
   start: "kazbegi",
   finish: "kazbegi",
   pace: "moderate",
+  dayEnds: "20:00",
   interests: [],
   party: { adults: 2, children: 0 },
   mobility: "moderate",
@@ -41,12 +43,25 @@ const goodPlan = (): RefPlan => ({
       day: 1,
       theme: "Up the Military Road",
       stayRef: ref(P.roomsGudauri),
+      // Arrives at two and runs until dinner: a full afternoon and evening.
       stops: [
         {
           ref: ref(P.friendship),
           slot: "afternoon",
           kind: "visit",
           durationMin: 40,
+        },
+        {
+          ref: ref(P.museum),
+          slot: "afternoon",
+          kind: "visit",
+          durationMin: 90,
+        },
+        {
+          ref: ref(P.cafe5047),
+          slot: "evening",
+          kind: "meal",
+          durationMin: 90,
         },
       ],
     },
@@ -148,7 +163,7 @@ describe("generate", () => {
     assert.ok(cache.calls.includes("put"));
     assert.equal(
       Object.values(result.doc.nodes).filter((n) => n.kind === "visit").length,
-      3,
+      4,
     );
   });
 
@@ -263,6 +278,43 @@ describe("generate", () => {
       assert.equal(result.source, "retry");
       assert.match(seen[1]?.problems[0] ?? "", /2h50 with nothing planned/);
       assert.deepEqual(seen[1]?.invented, []);
+      assert.ok(cache.calls.includes("put"));
+    });
+
+    test("two museums in a day nobody asked for go back to the model", async () => {
+      // Sorts after every fixture, so the other refs stay what they were.
+      const gallery: Candidate = {
+        ...(candidates.get(P.museum) as Candidate),
+        id: "f0000000-0000-4000-8000-000000000001",
+        name: "Kazbegi Gallery",
+        category: "art_gallery",
+      };
+      // The fixture's museum is filed under its group; the catalogue's are "museum".
+      const pool = [
+        ...curated.map((p) =>
+          p.id === P.museum ? { ...p, category: "museum" } : p,
+        ),
+        gallery,
+      ];
+      const heavy = fullPlan();
+      heavy.days[0].stops[0] = {
+        ref: `p${pool.length}`,
+        slot: "afternoon",
+        kind: "visit",
+        durationMin: 40,
+      };
+      const { compose, seen } = scripted(heavy, fullPlan());
+      const cache = memoryCache();
+      const result = await generate(
+        { ...constraints, interests: ["food", "nature"] },
+        { ...deps(compose, cache), candidates: pool },
+      );
+      assert.ok(result.ok);
+      assert.equal(result.source, "retry");
+      assert.match(
+        seen[1]?.problems.join("\n") ?? "",
+        /2 museums and galleries \("Kazbegi Gallery", /,
+      );
       assert.ok(cache.calls.includes("put"));
     });
 
@@ -427,7 +479,7 @@ describe("the route", () => {
     );
   });
 
-  test("a day trip drives out from the start and back to the finish, before dark", async () => {
+  test("a day trip drives out from the start, fills the day, and drives back to the finish", async () => {
     const dayTrip: Constraints = {
       ...route,
       days: 1,
@@ -445,8 +497,21 @@ describe("the route", () => {
       .map((n) => n.meta.title);
     assert.match(titles[0], /^Drive to /);
     assert.equal(titles.at(-1), "Drive to Tbilisi");
-    // Home by dark means no dinner out there.
-    assert.ok(!titles.some((t) => t.startsWith("Dinner")));
+    // A full day, not a morning: the afternoon has its visits, and the
+    // drive home is not cut short by dusk.
+    const nodes = Object.values(result.doc.nodes).sort((a, b) =>
+      a.startsAt.localeCompare(b.startsAt),
+    );
+    const home = nodes.at(-1);
+    assert.ok(home);
+    const local = (ms: number) =>
+      new Date(ms + 4 * 3_600_000).toISOString().slice(11, 16);
+    assert.ok(local(Date.parse(home.startsAt)) >= "17:00");
+    assert.ok(local(nodeEnd(home)) <= "22:00");
+    assert.ok(
+      nodes.filter((n) => n.kind === "visit").length >= 3,
+      titles.join(", "),
+    );
     // And no bed: the traveller sleeps where they started.
     assert.ok(!titles.some((t) => t.startsWith("Check in")));
   });
@@ -465,6 +530,25 @@ describe("the route", () => {
 });
 
 describe("fallbackPlan", () => {
+  test("a morning the drive has used up gets one visit, and the rest go to the afternoon", () => {
+    // Two hours from Tbilisi to Sighnaghi: arriving after eleven leaves room
+    // for one visit before noon, not two.
+    const plan = fallbackPlan(
+      {
+        ...constraints,
+        days: 1,
+        places: ["signagi"],
+        start: "tbilisi",
+        finish: "tbilisi",
+      },
+      town("signagi", 45.724, 41.484),
+    );
+    const slots = plan.days[0].stops
+      .filter((s) => s.kind === "visit")
+      .map((s) => s.slot);
+    assert.deepEqual(slots, ["morning", "afternoon", "afternoon"]);
+  });
+
   test("uses one base per area, and each day takes its share of what there is to visit", () => {
     const plan = fallbackPlan(constraints, curated);
     assert.equal(plan.days.length, 2);

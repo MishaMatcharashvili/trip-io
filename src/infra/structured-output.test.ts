@@ -33,6 +33,29 @@ describe("strict structured output", () => {
     });
   });
 
+  test("the planner's proposals are strict objects, every field required", () => {
+    const { schema } = zodTextFormat(intakeReply, "turn");
+    const options = (
+      schema as {
+        properties: {
+          options: {
+            items: {
+              required: string[];
+              properties: Record<string, unknown>;
+              additionalProperties: boolean;
+            };
+          };
+        };
+      }
+    ).properties.options.items;
+    assert.equal(options.additionalProperties, false);
+    assert.deepEqual(
+      [...options.required].sort(),
+      Object.keys(options.properties).sort(),
+    );
+    assert.ok(options.required.includes("dayEnds"));
+  });
+
   test("the composer's plan converts with its refs as an enum", () => {
     const refs = z.enum(["p1", "p2"]);
     const { schema } = zodTextFormat(planSchema(refs), "plan");

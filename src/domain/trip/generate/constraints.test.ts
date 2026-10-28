@@ -10,6 +10,7 @@ const base: Constraints = {
   start: "tbilisi",
   finish: "tbilisi",
   pace: "moderate",
+  dayEnds: "20:00",
   interests: [],
   party: { adults: 1, children: 0 },
   mobility: "moderate",

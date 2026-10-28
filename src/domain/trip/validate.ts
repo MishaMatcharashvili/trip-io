@@ -195,9 +195,12 @@ export function validateDay(
       add("window", [id], `${title(node)} falls outside the trip's dates`);
     }
 
-    const outdoors =
-      (node.kind === "visit" && !node.indoor) ||
-      (node.kind === "transfer" && !node.meta.urban);
+    // An outdoor visit in the dark cannot be done. A drive in the dark can,
+    // and is worth knowing about: a warning, or every day trip would have to
+    // be home by dusk, which is four in the afternoon in December.
+    const drive = node.kind === "transfer" && !node.meta.urban;
+    const outdoors = (node.kind === "visit" && !node.indoor) || drive;
+    const severity = drive ? "warning" : "error";
     const at = where(node);
     if (outdoors && at) {
       const sun = sunWindow(day, at, CIVIL);
@@ -206,12 +209,14 @@ export function validateDay(
           "darkness",
           [id],
           `${title(node)} starts at ${hhmm(start)}, before first light at ${hhmm(sun.rise)}`,
+          severity,
         );
       } else if (sun && end > sun.set.getTime()) {
         add(
           "darkness",
           [id],
           `${title(node)} ends at ${hhmm(end)}, after dark (${hhmm(sun.set)})`,
+          severity,
         );
       }
     }

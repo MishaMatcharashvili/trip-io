@@ -41,7 +41,7 @@ const MAX_CHARS = 500;
 const INTERESTS: Record<string, string> = {
   heritage: "Heritage",
   nature: "Nature",
-  culture: "Culture",
+  culture: "Museums & art",
   food: "Food & wine",
 };
 

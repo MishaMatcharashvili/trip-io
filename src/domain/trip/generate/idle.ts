@@ -46,8 +46,12 @@ export type IdleGap = {
  * Every stretch within a day, from its first stop to its last, longer than the
  * pace allows. Check-in is not a stop to fill the time before: the evening
  * after dinner is the traveller's own.
+ *
+ * Given when the days end, the end of a day is a stretch too: a day trip whose
+ * last stop is over at four, home by six, is a morning and an afternoon of a
+ * day that was meant to run until eight.
  */
-export function idleGaps(doc: TripDoc): IdleGap[] {
+export function idleGaps(doc: TripDoc, dayEnds?: string): IdleGap[] {
   const limit = MAX_IDLE_MIN[doc.trip.pace];
   const byDay = new Map<string, ReturnType<typeof sortedNodes>>();
   for (const entry of sortedNodes(doc.nodes)) {
@@ -71,6 +75,18 @@ export function idleGaps(doc: TripDoc): IdleGap[] {
         message: `${day}: ${length(minutes)} with nothing planned between "${before.meta.title}" (ends ${clock.format(nodeEnd(before))}) and "${after.meta.title}" (${clock.format(Date.parse(after.startsAt))}). A ${doc.trip.pace} day leaves at most ${length(limit)}: add a visit there`,
       });
     }
+
+    const last = entries.at(-1)?.node;
+    if (!dayEnds || !last) continue;
+    const minutes = Math.round(
+      (Date.parse(`${day}T${dayEnds}:00+04:00`) - nodeEnd(last)) / 60_000,
+    );
+    if (minutes <= limit) continue;
+    gaps.push({
+      day,
+      minutes,
+      message: `${day}: the day is over when "${last.meta.title}" ends at ${clock.format(nodeEnd(last))}, ${length(minutes)} before it was meant to end at ${dayEnds}. Fill the afternoon and the evening, with dinner, until about ${dayEnds}`,
+    });
   }
   return gaps;
 }

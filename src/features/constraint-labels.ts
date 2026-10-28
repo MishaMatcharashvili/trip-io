@@ -2,6 +2,6 @@
 export const interestNames: Record<string, string> = {
   heritage: "Heritage",
   nature: "Nature",
-  culture: "Culture",
+  culture: "Museums & art",
   food: "Food & wine",
 };

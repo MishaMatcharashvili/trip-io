@@ -6,7 +6,9 @@ import {
 import type { Pace } from "../document.ts";
 import {
   type Constraints,
+  DEFAULT_DAY_ENDS,
   DEFAULT_ENDPOINT,
+  dayEnds,
   type Interest,
 } from "./constraints.ts";
 import { addDays } from "./schedule.ts";
@@ -279,6 +281,33 @@ function readPace(text: string): Pace | null {
   return null;
 }
 
+/**
+ * When the days end, from "back by 6pm", "until 22:00", "home by seven" or
+ * "end the day at 9". A bare hour under 12 is the evening: nobody asks for a
+ * day that ends at seven in the morning. Rounded to the half hour, and null
+ * when it falls outside what a day may be.
+ */
+function readDayEnds(text: string): string | null {
+  const m = text.match(
+    new RegExp(
+      `\\b(?:back|home|done|finish(?:ed)?|end(?:s|ing)?(?: the days?)?|wrap(?:ped)? up|until|till)\\s+(?:by|at|around|before)?\\s*${NUMBER}(?:[:.](\\d{2}))?\\s*(am|pm)?\\b(?!\\s*(?:days?|nights?|weeks?|people|adults|kids))`,
+      "i",
+    ),
+  );
+  if (!m) return null;
+  let hour = num(m[1]);
+  const minutes = m[2] ? Number(m[2]) : 0;
+  if (!Number.isInteger(hour) || hour < 1 || hour > 23 || minutes > 59) {
+    return null;
+  }
+  const meridiem = m[3]?.toLowerCase();
+  if (meridiem === "pm" ? hour < 12 : !meridiem && hour < 12) hour += 12;
+  const half = minutes < 15 ? "00" : minutes < 45 ? "30" : "00";
+  if (minutes >= 45) hour += 1;
+  const at = `${String(hour).padStart(2, "0")}:${half}`;
+  return dayEnds.safeParse(at).success ? at : null;
+}
+
 function readMobility(text: string): Constraints["mobility"] | null {
   if (
     /\b(wheelchair|limited mobility|elderly|father|dad|mother|mum|mom|parents|grand(ma|pa|parents)|toddler)\b/i.test(
@@ -336,6 +365,7 @@ export function understand(text: string, today: string): Understood {
     start,
     finish,
     pace,
+    dayEnds: pick("dayEnds", readDayEnds(text), DEFAULT_DAY_ENDS),
     interests: pick(
       "interests",
       interestsSaid.length ? interestsSaid : null,

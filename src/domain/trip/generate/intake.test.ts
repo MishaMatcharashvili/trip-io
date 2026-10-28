@@ -20,6 +20,7 @@ const unchanged = {
   start: null,
   finish: null,
   pace: null,
+  dayEnds: null,
   interests: null,
   adults: null,
   children: null,
@@ -29,7 +30,19 @@ const unchanged = {
   unsupported: [],
   ready: false,
   suggestions: [],
+  options: [],
 };
+
+const option = (over: Record<string, unknown> = {}) => ({
+  title: "Kazbegi as a day trip",
+  detail: "About 3 h each way; back in Tbilisi by 22:00.",
+  days: null,
+  places: null,
+  pace: null,
+  interests: null,
+  dayEnds: null,
+  ...over,
+});
 
 const said = (text: string): IntakeMessage[] => [{ role: "traveller", text }];
 
@@ -221,7 +234,10 @@ describe("suggestions from the model", () => {
   });
 
   test("are dropped when the planner has nothing left to ask", () => {
-    assert.deepEqual(ask(["Couple"], true)?.suggestions, []);
+    assert.deepEqual(
+      ask(["Couple"], false, INTAKE_MAX_QUESTIONS - 1)?.suggestions,
+      [],
+    );
   });
 
   test("the question budget makes it ready, once the essentials are said", () => {
@@ -232,6 +248,35 @@ describe("suggestions from the model", () => {
     const last = ask(["Couple"], false, INTAKE_MAX_QUESTIONS - 1);
     assert.equal(last?.ready, true);
     assert.deepEqual(last?.suggestions, []);
+  });
+
+  test("the model cannot call a trip ready before it knows what the traveller enjoys", () => {
+    assert.equal(ask([], true)?.ready, false);
+    const told = readIntake(
+      {
+        ...unchanged,
+        days: 3,
+        places: ["kakheti"],
+        interests: ["food", "nature"],
+        ready: true,
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(told?.ready, true);
+    // "Anything" is an answer: no interests, said.
+    const anything = readIntake(
+      {
+        ...unchanged,
+        days: 3,
+        places: ["kakheti"],
+        interests: [],
+        ready: true,
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(anything?.ready, true);
   });
 
   test("the budget does not declare a trip ready that has no places", () => {
@@ -245,13 +290,93 @@ describe("suggestions from the model", () => {
   });
 });
 
-describe("fallbackTurn", () => {
-  test("reads the latest message onto the state", () => {
-    const turn = fallbackTurn(
-      said("Long weekend in Kakheti with my partner"),
+describe("options from the model", () => {
+  const offer = (options: ReturnType<typeof option>[], over = {}) =>
+    readIntake(
+      {
+        ...unchanged,
+        days: 3,
+        places: ["tbilisi"],
+        suggestions: ["Yes", "No"],
+        options,
+        ...over,
+      },
       initialState(TODAY),
       TODAY,
     );
+
+  test("become cards with their change as a patch, and replace the chips", () => {
+    const turn = offer([
+      option({ places: ["tbilisi", "kazbegi"], dayEnds: "21:00" }),
+      option({ title: "Stay in Tbilisi, slower", pace: "relaxed" }),
+    ]);
+    assert.deepEqual(turn?.options, [
+      {
+        title: "Kazbegi as a day trip",
+        detail: "About 3 h each way; back in Tbilisi by 22:00.",
+        patch: { places: ["tbilisi", "kazbegi"], dayEnds: "21:00" },
+      },
+      {
+        title: "Stay in Tbilisi, slower",
+        detail: "About 3 h each way; back in Tbilisi by 22:00.",
+        patch: { pace: "relaxed" },
+      },
+    ]);
+    assert.deepEqual(turn?.suggestions, []);
+  });
+
+  test("one that changes nothing, repeats another, or cannot be done is dropped", () => {
+    const turn = offer([
+      option({ days: 3 }),
+      option({ pace: "packed" }),
+      option({ title: " kazbegi  as a DAY trip", pace: "relaxed" }),
+      option({ title: "Too long", detail: "x".repeat(200), pace: "relaxed" }),
+      option({ title: "Back at midnight", dayEnds: "24:00" }),
+    ]);
+    assert.deepEqual(
+      turn?.options.map((o) => o.title),
+      ["Kazbegi as a day trip"],
+    );
+  });
+
+  test("at most three, none once the trip is ready, and the chips come back without them", () => {
+    const many = [1, 2, 3, 4].map((n) =>
+      option({ title: `Option ${n}`, days: n + 3 }),
+    );
+    assert.equal(offer(many)?.options.length, 3);
+    assert.deepEqual(
+      offer(many, { interests: ["food"], ready: true })?.options,
+      [],
+    );
+    assert.deepEqual(offer([option({ days: 3 })])?.suggestions, ["Yes", "No"]);
+  });
+
+  test("the reply sets when the days end, and an hour no day ends at is ignored", () => {
+    const back = readIntake(
+      { ...unchanged, dayEnds: "18:00" },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(back?.state.constraints.dayEnds, "18:00");
+    assert.ok(back?.state.said.includes("dayEnds"));
+    const odd = readIntake(
+      { ...unchanged, dayEnds: "3pm" },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(odd?.state.constraints.dayEnds, "20:00");
+  });
+});
+
+describe("fallbackTurn", () => {
+  test("reads the latest message onto the state", () => {
+    const turn = fallbackTurn(
+      said("Long weekend in Kakheti with my partner, back by 7"),
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(turn.state.constraints.dayEnds, "19:00");
+    assert.ok(turn.state.said.includes("dayEnds"));
     assert.equal(turn.state.constraints.days, 3);
     assert.deepEqual(turn.state.constraints.places, ["kakheti"]);
     assert.ok(constraints.safeParse(turn.state.constraints).success);
@@ -270,6 +395,7 @@ describe("fallbackTurn", () => {
       "Food and wine",
       "Hiking and nature",
       "Monasteries and history",
+      "Museums and art",
     ]);
 
     const all = fallbackTurn(
