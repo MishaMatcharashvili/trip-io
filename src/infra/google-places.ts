@@ -212,15 +212,16 @@ export function classify(status: number): EnrichFailure {
 
 type Reply = { ok: true; body: unknown } | { ok: false; reason: EnrichFailure };
 
-export function googlePlaces(options: {
+type CallOptions = {
   key: string | undefined;
   fetch?: typeof fetch;
   timeoutMs?: number;
-}): PlaceEnricher {
-  const { key, timeoutMs = TIMEOUT_MS } = options;
-  const send = options.fetch ?? fetch;
+};
 
-  async function call(
+/** One request to the Places API, its failures reduced to a reason. */
+function caller({ key, timeoutMs = TIMEOUT_MS, ...options }: CallOptions) {
+  const send = options.fetch ?? fetch;
+  return async function call(
     path: string,
     fields: string | null,
     params: Record<string, string | number | boolean> = {},
@@ -260,7 +261,11 @@ export function googlePlaces(options: {
     } catch {
       return { ok: false, reason: "malformed" };
     }
-  }
+  };
+}
+
+export function googlePlaces(options: CallOptions): PlaceEnricher {
+  const call = caller(options);
 
   /** The keyless address of a photograph, or nothing: one that fails is dropped. */
   async function addressOf(photo: Details["photos"][number]) {
@@ -275,7 +280,7 @@ export function googlePlaces(options: {
 
   return {
     provider: "google",
-    configured: Boolean(key),
+    configured: Boolean(options.key),
 
     async search(place: PlaceIdentity): Promise<SearchOutcome> {
       const [longitude, latitude] = place.lonLat;
