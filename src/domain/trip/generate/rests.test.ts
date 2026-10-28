@@ -50,11 +50,14 @@ describe("rest stops", () => {
     assert.ok(only.endsWith("-gori"), only);
   });
 
-  test("Tbilisi to Batumi stops about every two hours, in the order driven", () => {
-    const ids = stops(tbilisi, batumi);
-    assert.ok(ids.length >= 2, ids.join());
-    assert.equal(ids[0], "wissol-gori");
-    assert.ok(ids[1].startsWith("socar-"), ids.join());
+  test("Tbilisi to Batumi stops twice, at Gori and at Argveta", () => {
+    assert.deepEqual(stops(tbilisi, batumi), ["wissol-gori", "socar-argveta"]);
+  });
+
+  test("and twice on the way back, not at every station it passes", () => {
+    const ids = stops(batumi, tbilisi);
+    assert.equal(ids.length, 2, ids.join());
+    assert.ok(ids[1].endsWith("-gori"), ids.join());
   });
 
   test("a big brand is worth a little further, a pump by the road is not worse than nothing", () => {
