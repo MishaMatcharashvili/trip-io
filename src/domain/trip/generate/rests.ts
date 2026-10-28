@@ -93,3 +93,20 @@ export function restStops(
   }
   return chosen;
 }
+
+/** How long a drive takes with its rests: the legs between stations, and half an hour at each. */
+export function restedMinutes(
+  from: LonLat,
+  to: LonLat,
+  stations: readonly Candidate[],
+  travel: TravelEstimator,
+): number {
+  const rests = restStops(from, to, stations, travel);
+  let here = from;
+  let minutes = 0;
+  for (const at of [...rests.map((s) => s.lonLat), to]) {
+    minutes += travel.minutes(here, at);
+    here = at;
+  }
+  return minutes + rests.length * REST_STOP_MIN;
+}

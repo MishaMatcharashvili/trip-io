@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import type { LonLat } from "../../geo.ts";
 import { straightLineTravel } from "../travel.ts";
 import type { Candidate } from "./plan.ts";
-import { isBigStation, restStops } from "./rests.ts";
+import { isBigStation, restedMinutes, restStops } from "./rests.ts";
 
 describe("rest stops", () => {
   // Stations on the East–West Highway and on to Batumi, where the catalogue
@@ -83,5 +83,39 @@ describe("rest stops", () => {
     assert.ok(isBigStation({ name: "Gori 1", brand: "Rompetrol" }));
     assert.ok(isBigStation({ name: "АЗС 16-A", brand: "ლუკოილი" }));
     assert.ok(!isBigStation({ name: "Goodlike" }));
+  });
+});
+
+describe("a drive's time with its rests", () => {
+  const tbilisi: LonLat = [44.8, 41.695];
+  const kutaisi: LonLat = [42.663, 42.26];
+  const wissol: Candidate = {
+    id: "wissol",
+    name: "Wissol",
+    category: "gas_station",
+    group: "services",
+    tier: "verified",
+    lonLat: [44.065, 42.016],
+    openingHours: null,
+    outdoor: false,
+    area: "",
+    areas: [],
+  };
+
+  test("is the drive itself when there is nowhere to rest", () => {
+    assert.equal(
+      restedMinutes(tbilisi, kutaisi, [], straightLineTravel),
+      straightLineTravel.minutes(tbilisi, kutaisi),
+    );
+  });
+
+  test("is the legs either side of the station, and half an hour there", () => {
+    const legs =
+      straightLineTravel.minutes(tbilisi, wissol.lonLat) +
+      straightLineTravel.minutes(wissol.lonLat, kutaisi);
+    assert.equal(
+      restedMinutes(tbilisi, kutaisi, [wissol], straightLineTravel),
+      legs + 30,
+    );
   });
 });
