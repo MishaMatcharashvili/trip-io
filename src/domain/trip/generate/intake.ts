@@ -3,6 +3,7 @@ import {
   destinationName,
   destinationSlugs,
   MAX_PLACES,
+  mentions,
 } from "../../catalogue/destinations.ts";
 import { paces } from "../document.ts";
 import {
@@ -143,6 +144,8 @@ export const intakeReply = z.object({
   options: z.array(optionReply),
 });
 
+type IntakeReply = z.infer<typeof intakeReply>;
+
 export type IntakeInput = {
   /** YYYY-MM-DD in Tbilisi. */
   today: string;
@@ -230,13 +233,15 @@ export function readIntake(
   today: string,
   /** Replies the planner has already given in this conversation. */
   asked = 0,
+  /** The traveller's latest message, for what the model failed to take from it. */
+  latest = "",
 ): IntakeTurn | null {
   const parsed = intakeReply.safeParse(raw);
   if (!parsed.success) return null;
   const r = parsed.data;
   const c = state.constraints;
 
-  const patch = patchOf(r);
+  const patch = { ...missed(r, state, latest, today), ...patchOf(r) };
   if (r.startDate !== null && realDate(r.startDate) && r.startDate >= today) {
     patch.startDate = r.startDate;
   }
@@ -278,6 +283,40 @@ export function readIntake(
     suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
     options,
   };
+}
+
+/**
+ * The route and the length the latest message plainly gives, when the model
+ * left them null and nothing was said of them before. A model offering "a day
+ * trip or a night" to "one day trip to Kutaisi" otherwise keeps neither, and
+ * the trip so far stays the default nobody asked for. Only places the message
+ * names: `understand` also guesses one from an interest ("wine" is Kakheti).
+ */
+function missed(
+  r: Pick<IntakeReply, "places" | "days">,
+  state: IntakeState,
+  latest: string,
+  today: string,
+): Partial<Constraints> {
+  if (!latest.trim()) return {};
+  const read = understand(latest, today);
+  const patch: Partial<Constraints> = {};
+  if (
+    !r.places?.length &&
+    !state.said.includes("places") &&
+    read.said.includes("places") &&
+    mentions(latest).length
+  ) {
+    patch.places = read.constraints.places;
+  }
+  if (
+    r.days === null &&
+    !state.said.includes("days") &&
+    read.said.includes("days")
+  ) {
+    patch.days = read.constraints.days;
+  }
+  return patch;
 }
 
 /**

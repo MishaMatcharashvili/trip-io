@@ -156,6 +156,49 @@ describe("readIntake", () => {
     assert.deepEqual(turn?.unsupported, ["Sukhumi"]);
   });
 
+  test("a place and a length the message names are kept when the model offers a choice instead", () => {
+    const turn = readIntake(
+      {
+        ...unchanged,
+        options: [option({ title: "One night in Kutaisi", days: 2 })],
+      },
+      initialState(TODAY),
+      TODAY,
+      0,
+      "one day trip to kutaisi",
+    );
+    assert.deepEqual(turn?.state.constraints.places, ["kutaisi"]);
+    assert.equal(turn?.state.constraints.days, 1);
+    assert.ok(turn?.state.said.includes("places"));
+    assert.equal(turn?.options[0]?.patch.days, 2);
+  });
+
+  test("what the model returns, or was said before, wins over the message", () => {
+    const before = applyEdit(initialState(TODAY), { places: ["kakheti"] });
+    const kept = readIntake(unchanged, before, TODAY, 1, "maybe Kutaisi");
+    assert.deepEqual(kept?.state.constraints.places, ["kakheti"]);
+
+    const taken = readIntake(
+      { ...unchanged, places: ["signagi"] },
+      initialState(TODAY),
+      TODAY,
+      0,
+      "Kutaisi, or rather Sighnaghi",
+    );
+    assert.deepEqual(taken?.state.constraints.places, ["signagi"]);
+  });
+
+  test("a place only guessed from an interest is not taken as said", () => {
+    const turn = readIntake(
+      unchanged,
+      initialState(TODAY),
+      TODAY,
+      0,
+      "food and wine",
+    );
+    assert.ok(!turn?.state.said.includes("places"));
+  });
+
   test("notes replace the notes, cut to their limit", () => {
     const turn = readIntake(
       { ...unchanged, notes: `vegetarian ${"x".repeat(600)}` },

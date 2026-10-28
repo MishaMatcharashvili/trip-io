@@ -55,6 +55,7 @@ export async function planningTurn(
       state,
       today,
       messages.filter((m) => m.role === "planner").length,
+      messages.findLast((m) => m.role === "traveller")?.text,
     );
     if (turn) return { ok: true, source: "model", ...turn };
   } catch {
