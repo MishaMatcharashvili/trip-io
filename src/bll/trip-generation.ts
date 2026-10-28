@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { candidatesInArea } from "../dal/places.ts";
+import { candidatesInArea, roadsideCandidates } from "../dal/places.ts";
 import {
   cancelRequest,
   claimRequest,
@@ -13,6 +13,8 @@ import {
   destination,
   destinationName,
 } from "../domain/catalogue/destinations.ts";
+import { type LonLat, simplifyLine } from "../domain/geo.ts";
+import type { RoutesProvider } from "../domain/route/contract.ts";
 import type { TripDoc } from "../domain/trip/document.ts";
 import { cacheKey } from "../domain/trip/generate/cache-key.ts";
 import {
@@ -30,9 +32,15 @@ import {
   tripHeader as tripHeaderFor,
 } from "../domain/trip/generate/pipeline.ts";
 import type { Candidate } from "../domain/trip/generate/plan.ts";
+import {
+  driveLabel,
+  longDrives,
+  ROAD_SIMPLIFY_M,
+} from "../domain/trip/generate/roads.ts";
 import { straightLineTravel } from "../domain/trip/travel.ts";
 import type { Violation } from "../domain/trip/validate.ts";
 import { composeWithOpenAI } from "../infra/openai-composer.ts";
+import { computeRoute } from "./route.ts";
 import {
   type AppendFailure,
   addAllOps,
@@ -65,17 +73,98 @@ export async function loadCandidates(
   const perAreaResults = await Promise.all(
     wanted.map((d) => candidatesInArea(d, perArea)),
   );
+  return merged(perAreaResults.flat());
+}
 
+/**
+ * One candidate per place, knowing every area and road it was found for: the
+ * fortress on the way to Kutaisi is on the way back too.
+ */
+export function merged(found: readonly Candidate[]): Candidate[] {
   const byId = new Map<string, Candidate>();
-  for (const c of perAreaResults.flat()) {
+  for (const c of found) {
     const known = byId.get(c.id);
-    byId.set(
-      c.id,
-      known ? { ...known, areas: [...known.areas, ...c.areas] } : c,
-    );
+    if (!known) {
+      byId.set(c.id, c);
+      continue;
+    }
+    const roads = [...new Set([...(known.roads ?? []), ...(c.roads ?? [])])];
+    byId.set(c.id, {
+      ...known,
+      areas: [...new Set([...known.areas, ...c.areas])],
+      ...(roads.length ? { roads } : {}),
+    });
   }
   return [...byId.values()];
 }
+
+export type RoadStopDeps = {
+  /** The road from one point to another, as driven; null when there is none to be had. */
+  road: (from: LonLat, to: LonLat) => Promise<LonLat[] | null>;
+  find: typeof roadsideCandidates;
+};
+
+/**
+ * Places to stop at on the trip's long drives (roads.ts). Each road is routed
+ * once, whichever way it is driven. A road that cannot be routed has no stops,
+ * and the trip is planned without them: a break on the way is a nicety, never
+ * a reason to fail.
+ */
+export async function loadRoadStops(
+  c: Pick<Constraints, "start" | "places" | "finish">,
+  deps: RoadStopDeps,
+): Promise<Candidate[]> {
+  const roads = new Map<string, Promise<LonLat[] | null>>();
+  const roadBetween = (a: string, b: string, from: LonLat, to: LonLat) => {
+    const key = [a, b].sort().join("|");
+    let road = roads.get(key);
+    if (!road) {
+      road = deps.road(from, to).catch(() => null);
+      roads.set(key, road);
+    }
+    return road;
+  };
+
+  const found = await Promise.all(
+    longDrives(c).map(async (drive) => {
+      const from = destination(drive.from);
+      const to = destination(drive.to);
+      if (!from || !to) return [];
+      const road = await roadBetween(
+        from.slug,
+        to.slug,
+        from.lonLat,
+        to.lonLat,
+      );
+      if (!road) return [];
+      return deps
+        .find({
+          label: driveLabel(drive),
+          road: simplifyLine(road, ROAD_SIMPLIFY_M),
+          ends: [from, to].map((d) => ({ lonLat: d.lonLat, match: d.match })),
+        })
+        .catch(() => []);
+    }),
+  );
+  return found.flat();
+}
+
+/** The road as the routing provider drives it, through the same limits as any route. */
+const routedRoad =
+  (provider: RoutesProvider, userId: string | null): RoadStopDeps["road"] =>
+  async (from, to) => {
+    const outcome = await computeRoute(
+      {
+        mode: "drive",
+        stops: [{ lonLat: from }, { lonLat: to }],
+        departure: "now",
+        alternatives: false,
+      },
+      userId ?? "anonymous",
+      { provider },
+    );
+    return outcome.ok ? (outcome.answer.routes[0]?.path ?? null) : null;
+  };
 
 export type GeneratedTrip = {
   ok: true;
@@ -155,10 +244,13 @@ export async function generateTrip(
   {
     compose = composeWithOpenAI,
     stillWanted = async () => true,
+    roads,
   }: {
     compose?: Composer;
     /** Asked once the plan is ready and before anything is written. */
     stillWanted?: () => Promise<boolean>;
+    /** Routes the long drives, to find places to stop on the way. Without one there are none. */
+    roads?: RoutesProvider;
   } = {},
 ): Promise<GeneratedTrip | GenerationFailure> {
   const key = cacheKey(wanted);
@@ -171,10 +263,19 @@ export async function generateTrip(
     return { ok: false, reason: "impossible", explanations: reasons(verdict) };
   }
 
+  const [inPlaces, onRoads] = await Promise.all([
+    loadCandidates(wanted.places),
+    roads
+      ? loadRoadStops(wanted, {
+          road: routedRoad(roads, userId),
+          find: roadsideCandidates,
+        })
+      : [],
+  ]);
   const result = await generate(wanted, {
     compose,
     cache: planCache,
-    candidates: await loadCandidates(wanted.places),
+    candidates: merged([...inPlaces, ...onRoads]),
     travel: straightLineTravel,
     newId: randomUUID,
     describeHours,
