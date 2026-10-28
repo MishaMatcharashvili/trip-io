@@ -201,6 +201,15 @@ describe("stops on the road", () => {
     assert.deepEqual(unsearched, []);
   });
 
+  test("a rating found by one search is kept when another finds the place too", () => {
+    const rating = { value: 4.4, count: 900 };
+    const [one] = merged([
+      { ...fort(["tbilisi > kutaisi"]) },
+      { ...fort([]), roads: undefined, rating },
+    ]);
+    assert.deepEqual(one.rating, rating);
+  });
+
   test("a place in a town on the trip and on the road keeps both", () => {
     const [one] = merged([
       { ...fort([]), roads: undefined, area: "gori", areas: ["gori"] },

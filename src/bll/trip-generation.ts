@@ -77,8 +77,9 @@ export async function loadCandidates(
 }
 
 /**
- * One candidate per place, knowing every area and road it was found for: the
- * fortress on the way to Kutaisi is on the way back too.
+ * One candidate per place, knowing every area and road it was found for (the
+ * fortress on the way to Kutaisi is on the way back too) and its rating,
+ * whichever search found it.
  */
 export function merged(found: readonly Candidate[]): Candidate[] {
   const byId = new Map<string, Candidate>();
@@ -89,10 +90,12 @@ export function merged(found: readonly Candidate[]): Candidate[] {
       continue;
     }
     const roads = [...new Set([...(known.roads ?? []), ...(c.roads ?? [])])];
+    const rating = known.rating ?? c.rating;
     byId.set(c.id, {
       ...known,
       areas: [...new Set([...known.areas, ...c.areas])],
       ...(roads.length ? { roads } : {}),
+      ...(rating ? { rating } : {}),
     });
   }
   return [...byId.values()];
