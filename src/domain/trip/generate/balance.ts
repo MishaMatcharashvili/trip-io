@@ -45,3 +45,60 @@ export function museumHeavy(
     ];
   });
 }
+
+/** Somewhere to get a coffee or buy food, not to sit down to lunch or dinner. */
+const NOT_A_MEAL = new Set(["coffee_shop", "farmers_market"]);
+
+/** Stages: what they are for is a performance in the evening, not a look round. */
+const STAGES = new Set([
+  "theatre_venue",
+  "music_venue",
+  "performing_arts_venue",
+]);
+
+/**
+ * Stops in the wrong place for what they are: lunch at a coffee shop, a
+ * theatre visited in the afternoon, or at all by someone who never asked for
+ * one. Feedback for the composer, like the museums above.
+ */
+export function misplaced(
+  plan: Plan,
+  places: ReadonlyMap<string, Candidate>,
+  c: { interests: readonly Interest[]; startDate: string },
+): Imbalance[] {
+  const culture = c.interests.includes("culture");
+  return plan.days.flatMap((d) => {
+    const day = addDays(c.startDate, d.day - 1);
+    return d.stops.flatMap((s) => {
+      const p = places.get(s.placeId);
+      if (!p) return [];
+      if (s.kind === "meal" && NOT_A_MEAL.has(p.category)) {
+        return [
+          {
+            day,
+            message: `${day}: the ${s.slot} meal is at "${p.name}", a ${p.category.replace(/_/g, " ")}, which serves no meal. Put it at a restaurant or an eatery nearby`,
+          },
+        ];
+      }
+      if (s.kind === "visit" && STAGES.has(p.category)) {
+        if (!culture) {
+          return [
+            {
+              day,
+              message: `${day}: "${p.name}" is a stage, for a traveller who did not ask for theatre or music. Put a sight, a view, a walk, a church, a market or a winery in its place`,
+            },
+          ];
+        }
+        if (s.slot !== "evening") {
+          return [
+            {
+              day,
+              message: `${day}: "${p.name}" is a stage, visited in the ${s.slot}. A performance is in the evening: move it there, or put a sight in its place`,
+            },
+          ];
+        }
+      }
+      return [];
+    });
+  });
+}
