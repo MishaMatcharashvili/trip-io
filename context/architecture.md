@@ -221,6 +221,15 @@ rows or overwrite the curator's name/category/position; non-curated rows missing
 are demoted to `raw`, never deleted (`trip_node.place_id` would null out). Sense regions are the 64
 municipalities and self-governing cities of Georgia, excluding Abkhazia and South Ossetia.
 
+Fuel stations (`gas_station`, `fueling_station`, the `services` group) are in the catalogue only so
+long drives can rest at them: never a candidate a day is composed from. Trip generation routes each
+drive of 3½ hours or more on the estimate (Mapbox, through `computeRoute`), finds the verified
+stations within 500 m of the road, and the scheduler stops for half an hour about every two hours
+of real driving, a Wissol, SOCAR, Gulf, Rompetrol or Lukoil before a pump by the road
+(`src/domain/trip/generate/rests.ts`). The rest is a `visit` node marked `meta.rest`, between the
+two transfers it splits the drive into. Loaded with the 2026-08-19.0 release on 2026-10-28: 55
+verified and 129 raw stations; raw ones (an address and nothing else) are never planned.
+
 ### The watch pipeline, as built
 
 ```
