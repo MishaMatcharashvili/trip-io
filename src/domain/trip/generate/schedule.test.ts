@@ -165,7 +165,7 @@ describe("schedule", () => {
     );
     assert.match(
       early.problems.at(-1)?.message ?? "",
-      /too late in a day that ends at 16:30/,
+      /too late in a day that ends at 16:30: it has to leave by \d\d:\d\d/,
     );
   });
 

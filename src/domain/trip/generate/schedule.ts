@@ -268,7 +268,9 @@ export function schedule(input: ScheduleInput): {
         problems.push({
           day: tail.date,
           placeId: lastPlaceId,
-          message: `the drive to ${finish.name} would end after ${hhmm(homeBy)}, too late in a day that ends at ${dayEnds}: end the day's stops earlier`,
+          // The time to leave by, not only that it is late: told just "end
+          // earlier", a model cuts dinner and leaves the rest as it was.
+          message: `the drive to ${finish.name} would end after ${hhmm(homeBy)}, too late in a day that ends at ${dayEnds}: it has to leave by ${hhmm(homeBy - drive)}, and the stops before it run until ${hhmm(driveStart)}. Drop or shorten stops so the last one ends by ${hhmm(homeBy - drive)}`,
         });
       }
       node({
