@@ -36,6 +36,7 @@ const queueOrder: CategoryGroup[] = [
   "food",
   "transport",
   "lodging",
+  "services",
 ];
 
 const ranked = queueOrder.map((group) => categoryGroups[group]);

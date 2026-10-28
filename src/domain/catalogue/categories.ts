@@ -62,6 +62,10 @@ export const categoryGroups = {
     "beach",
   ],
   transport: ["airport", "train_station"],
+  // Where a long drive stops for fuel, a coffee and the toilet: the highway's
+  // big stations have a market and somewhere to eat. Never a sight or a meal
+  // (src/domain/trip/generate/roads.ts).
+  services: ["gas_station", "fueling_station"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type CategoryGroup = keyof typeof categoryGroups;
