@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { Candidate, Plan } from "./plan.ts";
 import {
+  breakDrives,
   driveLabel,
   longDrives,
   ROAD_STOP_DRIVE_MIN,
@@ -123,5 +124,135 @@ describe("drives with no stop on the way", () => {
       }),
       [],
     );
+  });
+});
+
+describe("breaking a drive the plan sits through", () => {
+  const at = (
+    id: string,
+    group: Candidate["group"],
+    where: { areas: string[] } | { roads: string[] },
+  ): Candidate => ({
+    id,
+    name: id,
+    category: group === "food" ? "restaurant" : "fort",
+    group,
+    tier: "verified",
+    lonLat: [44.108, 41.986],
+    openingHours: null,
+    outdoor: false,
+    area: "",
+    areas: "areas" in where ? where.areas : [],
+    ...("roads" in where ? { roads: where.roads } : {}),
+  });
+  const both = { roads: ["tbilisi > kutaisi", "kutaisi > tbilisi"] };
+  const places = new Map(
+    [
+      at("lunch on the road", "food", both),
+      at("fortress", "heritage", both),
+      at("cave town", "heritage", both),
+      at("cathedral", "heritage", { areas: ["kutaisi"] }),
+      at("dinner", "food", { areas: ["kutaisi"] }),
+    ].map((p) => [p.id, p]),
+  );
+  const roundTrip = {
+    start: "tbilisi",
+    places: ["kutaisi"],
+    finish: "tbilisi",
+  };
+  const twoDays: Plan = {
+    days: [1, 2].map((day) => ({
+      day,
+      theme: "Kutaisi",
+      stayId: null,
+      stops: [
+        {
+          placeId: "cathedral",
+          slot: "afternoon",
+          kind: "visit",
+          durationMin: 60,
+        },
+        { placeId: "dinner", slot: "midday", kind: "meal", durationMin: 60 },
+      ],
+    })),
+  };
+
+  test("the way out stops first thing, and the way home last, at the road's first sight", () => {
+    const broken = breakDrives(twoDays, places, roundTrip, () => true);
+    const [out, home] = broken.days;
+    assert.deepEqual(out.stops[0], {
+      placeId: "fortress",
+      slot: "morning",
+      kind: "visit",
+      durationMin: 60,
+    });
+    // And lunch on the way out is on the road, near it, not in Kutaisi.
+    assert.deepEqual(
+      out.stops.filter((s) => s.kind === "meal").map((s) => s.placeId),
+      ["lunch on the road"],
+    );
+    // Not the fortress again: the cave town, after the day's stops.
+    assert.deepEqual(home.stops.at(-1), {
+      placeId: "cave town",
+      slot: "afternoon",
+      kind: "visit",
+      durationMin: 60,
+    });
+  });
+
+  test("lunch stays where it was when the sight fits only without moving it", () => {
+    const broken = breakDrives(
+      { days: [twoDays.days[0]] },
+      places,
+      { ...roundTrip, finish: "kutaisi" },
+      (plan) =>
+        !plan.days[0].stops.some((s) => s.placeId === "lunch on the road"),
+    );
+    assert.deepEqual(
+      broken.days[0].stops.map((s) => s.placeId),
+      ["fortress", "cathedral", "dinner"],
+    );
+  });
+
+  test("a sight that does not fit is passed over for the next", () => {
+    const broken = breakDrives(
+      { days: [twoDays.days[0]] },
+      places,
+      { ...roundTrip, finish: "kutaisi" },
+      (plan) => !plan.days[0].stops.some((s) => s.placeId === "fortress"),
+    );
+    assert.equal(broken.days[0].stops[0].placeId, "cave town");
+  });
+
+  test("when nothing fits, the plan is as it was", () => {
+    assert.equal(
+      breakDrives(twoDays, places, roundTrip, () => false),
+      twoDays,
+    );
+  });
+
+  test("a drive the composer already broke is left alone", () => {
+    const stopped: Plan = {
+      days: [
+        {
+          ...twoDays.days[0],
+          stops: [
+            {
+              placeId: "cave town",
+              slot: "morning",
+              kind: "visit",
+              durationMin: 45,
+            },
+            ...twoDays.days[0].stops,
+          ],
+        },
+      ],
+    };
+    const tried: Plan[] = [];
+    breakDrives(stopped, places, { ...roundTrip, finish: "kutaisi" }, (p) => {
+      tried.push(p);
+      return true;
+    });
+    assert.deepEqual(tried, []);
   });
 });
