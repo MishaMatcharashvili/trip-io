@@ -1,4 +1,5 @@
 import { destination, destinationName } from "../../catalogue/destinations.ts";
+import { ratingScore } from "../../catalogue/ratings.ts";
 import { haversineM, type LonLat } from "../../geo.ts";
 import type { Pace } from "../document.ts";
 import { straightLineTravel } from "../travel.ts";
@@ -71,6 +72,19 @@ const notASight = (p: Candidate) =>
 
 const byId = (a: Candidate, b: Candidate) => (a.id < b.id ? -1 : 1);
 
+/** Unrated is as if middling: nobody has said it is good, or that it is not. */
+const rated = (p: Candidate) => (p.rating ? ratingScore(p.rating) : 0);
+
+/** A meal worth walking a little further for. */
+const WELL_RATED = 4.3;
+/** And how far is a little. */
+const WALK_FOR_RATING_M = 2_000;
+
+const wellRatedNear = (here: LonLat | null, p: Candidate) =>
+  !!p.rating &&
+  ratingScore(p.rating) >= WELL_RATED &&
+  (!here || haversineM(here, p.lonLat) <= WALK_FOR_RATING_M);
+
 const minutesOf = (hhmm: string) =>
   Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
@@ -139,11 +153,14 @@ export function fallbackPlan(
     const score = (s: Candidate) =>
       things.filter((t) => haversineM(s.lonLat, t.lonLat) < STAY_RADIUS_M)
         .length;
+    // Most to do nearby first; between beds as well placed, the better rated.
     stayFor.set(
       area,
       inArea(area)
         .filter((p) => p.group === "lodging")
-        .sort((a, b) => score(b) - score(a) || byId(a, b))[0],
+        .sort(
+          (a, b) => score(b) - score(a) || rated(b) - rated(a) || byId(a, b),
+        )[0],
     );
   }
 
@@ -243,8 +260,11 @@ export function fallbackPlan(
               inArea(area).filter(
                 (p) => p.group === "food" && !NOT_A_MEAL.has(p.category),
               ),
-              // A good restaurant can come round again, but prefer a new one.
-              (p) => (usedMeals.has(p.id) ? 1 : 0),
+              // A good restaurant can come round again, but prefer a new one,
+              // and one travellers rate well over the nearest door.
+              (p) =>
+                (usedMeals.has(p.id) ? 2 : 0) +
+                (wellRatedNear(here, p) ? 0 : 1),
             );
       if (!pick) continue;
       const durationMin =

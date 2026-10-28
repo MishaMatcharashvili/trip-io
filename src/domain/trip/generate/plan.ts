@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CategoryGroup } from "../../catalogue/categories.ts";
 import type { OpeningHours } from "../../catalogue/opening-hours.ts";
+import type { Rating } from "../../catalogue/ratings.ts";
 import type { PlaceTier } from "../../catalogue/tier.ts";
 import type { LonLat } from "../../geo.ts";
 
@@ -96,8 +97,15 @@ export type Candidate = {
   openingHours: OpeningHours | null;
   /** Visited in the open: bound by daylight. */
   outdoor: boolean;
-  /** The first destination it was retrieved for; the fallback plans one at a time. */
+  /** The first destination (or, for a road stop, the drive) it was retrieved for. */
   area: string;
   /** Every requested destination it lies in: Telavi's cathedral is in Telavi and in Kakheti. */
   areas: readonly string[];
+  /**
+   * The long drives (roads.ts, driveLabel) it is a stop on: Gori's fortress
+   * is on "tbilisi > kutaisi". A place found only along a road is in no area.
+   */
+  roads?: readonly string[];
+  /** What travellers give it on a review site (catalogue/ratings.ts), when they rate it enough to say. */
+  rating?: Rating;
 };

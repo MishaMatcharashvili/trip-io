@@ -530,6 +530,145 @@ describe("the route", () => {
   });
 });
 
+describe("road stops", () => {
+  // Gori is on the road from Tbilisi to Kutaisi, in neither of them.
+  const at = (
+    n: number,
+    group: Candidate["group"],
+    lonLat: [number, number],
+    where: { areas: string[] } | { roads: string[] },
+  ): Candidate => ({
+    ...(candidates.get(P.gergeti) as Candidate),
+    id: `30000000-0000-4000-8000-00000000000${n}`,
+    name: `${group} ${n}`,
+    category: group === "food" ? "restaurant" : "fort",
+    group,
+    lonLat,
+    openingHours: null,
+    outdoor: false,
+    area: "areas" in where ? where.areas[0] : "",
+    areas: "areas" in where ? where.areas : [],
+    ...("roads" in where ? { roads: where.roads } : {}),
+  });
+  const road = { roads: ["tbilisi > kutaisi"] };
+  const kutaisi = { areas: ["kutaisi"] };
+  const places = [
+    at(1, "heritage", [44.107, 41.986], road),
+    at(2, "food", [44.11, 41.984], road),
+    at(3, "lodging", [42.7, 42.27], kutaisi),
+    at(4, "heritage", [42.704, 42.27], kutaisi),
+    at(5, "food", [42.702, 42.27], kutaisi),
+  ];
+  const trip: Constraints = {
+    ...constraints,
+    days: 2,
+    places: ["kutaisi"],
+    start: "tbilisi",
+    finish: "kutaisi",
+  };
+
+  test("the composer is told the long drive, and which places are on it", async () => {
+    let input: ComposeInput | undefined;
+    await generate(trip, {
+      ...deps(async (seen) => {
+        input = seen;
+        throw new Error("only looking");
+      }),
+      candidates: places,
+    });
+    assert.deepEqual(
+      input?.drives.map((d) => d.road),
+      ["tbilisi > kutaisi"],
+    );
+    const fort = input?.candidates.find((c) => c.name === "heritage 1");
+    assert.equal(fort?.roads.length, 1);
+    assert.equal(fort?.roads[0].road, "tbilisi > kutaisi");
+    // Gori is a little under two hours out, on the travel estimate.
+    assert.ok((fort?.roads[0].after ?? 0) > 60);
+    assert.ok((fort?.roads[0].after ?? 999) < 120);
+    assert.deepEqual(fort?.areas, []);
+  });
+
+  test("what travellers rate a place reaches the composer, and only when known", async () => {
+    let input: ComposeInput | undefined;
+    const rated = places.map((p, i) =>
+      i === 4 ? { ...p, rating: { value: 4.6, count: 2_400 } } : p,
+    );
+    await generate(trip, {
+      ...deps(async (seen) => {
+        input = seen;
+        throw new Error("only looking");
+      }),
+      candidates: rated,
+    });
+    const named = (name: string) =>
+      input?.candidates.find((c) => c.name === name);
+    assert.deepEqual(named("food 5")?.rating, { value: 4.6, count: 2_400 });
+    assert.equal(named("food 2")?.rating, undefined);
+  });
+
+  test("a stop on the way splits the drive in two, and is not a day in a place", async () => {
+    const { toRef } = candidateRefs(places);
+    const r = (n: number) => toRef.get(places[n - 1].id) as string;
+    const plan: RefPlan = {
+      days: [
+        {
+          day: 1,
+          theme: "Gori on the way to Kutaisi",
+          stayRef: r(3),
+          stops: [
+            { ref: r(1), slot: "morning", kind: "visit", durationMin: 60 },
+            { ref: r(2), slot: "midday", kind: "meal", durationMin: 60 },
+            { ref: r(4), slot: "afternoon", kind: "visit", durationMin: 45 },
+            { ref: r(5), slot: "evening", kind: "meal", durationMin: 75 },
+          ],
+        },
+        {
+          day: 2,
+          theme: "Kutaisi",
+          stayRef: r(3),
+          stops: [
+            { ref: r(4), slot: "morning", kind: "visit", durationMin: 60 },
+            { ref: r(5), slot: "midday", kind: "meal", durationMin: 60 },
+          ],
+        },
+      ],
+    };
+    const result = await generate(
+      { ...trip, pace: "relaxed", dayEnds: "21:00" },
+      { ...deps(scripted(plan, plan).compose), candidates: places },
+    );
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    const titles = Object.values(result.doc.nodes)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map((n) => n.meta.title);
+    assert.deepEqual(titles.slice(0, 4), [
+      "Drive to heritage 1",
+      "heritage 1",
+      "Lunch · food 2",
+      "Drive to heritage 4",
+    ]);
+  });
+
+  test("with the model down, the template still breaks the drive, lunch and all", async () => {
+    const result = await generate(
+      { ...trip, days: 1, pace: "relaxed", dayEnds: "21:00" },
+      { ...deps(down), candidates: places },
+    );
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    assert.equal(result.source, "template");
+    const titles = Object.values(result.doc.nodes)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map((n) => n.meta.title);
+    assert.deepEqual(titles.slice(0, 4), [
+      "Drive to heritage 1",
+      "heritage 1",
+      "Lunch · food 2",
+      "Drive to heritage 4",
+    ]);
+  });
+});
+
 describe("the days the composer is given", () => {
   const daysSeen = async (c: Constraints) => {
     let days: ComposeInput["days"] = [];
@@ -625,6 +764,33 @@ describe("fallbackPlan", () => {
         "evening:meal",
       ],
     );
+  });
+
+  test("lunch and the bed are where travellers rate them well, when as near", () => {
+    const first = fallbackPlan({ ...constraints, days: 1 }, curated);
+    const lunch = first.days[0].stops.find((s) => s.slot === "midday");
+    const bed = curated.find((p) => p.id === first.days[0].stayId);
+    const meal = curated.find((p) => p.id === lunch?.placeId);
+    assert.ok(meal && bed);
+    // The same doors, a few metres on, and rated: a better lunch and a
+    // better bed for no more walking.
+    const rating = { value: 4.7, count: 1_800 };
+    const better = (p: Candidate, n: number): Candidate => ({
+      ...p,
+      id: `60000000-0000-4000-8000-00000000000${n}`,
+      lonLat: [p.lonLat[0] + 0.0002, p.lonLat[1]],
+      rating,
+    });
+    const second = fallbackPlan({ ...constraints, days: 1 }, [
+      ...curated,
+      better(meal, 1),
+      better(bed, 2),
+    ]);
+    assert.equal(
+      second.days[0].stops.find((s) => s.slot === "midday")?.placeId,
+      better(meal, 1).id,
+    );
+    assert.equal(second.days[0].stayId, better(bed, 2).id);
   });
 
   test("lunch is not at a coffee shop, and a stage or a hall is not a sight", () => {

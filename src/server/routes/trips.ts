@@ -5,6 +5,8 @@ import { askAboutTrip } from "@/bll/ask.ts";
 import { briefingPage } from "@/bll/briefing.ts";
 import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
+import { GOOGLE_CONTENT_TTL_S } from "@/bll/place-enrichment.ts";
+import { type RatingDeps, ratingDefaults } from "@/bll/ratings.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
 import { submitSurvey } from "@/bll/survey.ts";
 import {
@@ -52,12 +54,38 @@ import {
 } from "@/domain/trip/generate/intake.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
+import { googleRatings } from "@/infra/google-places.ts";
+import { mapboxDirections } from "@/infra/mapbox-directions.ts";
+import { upstashRatings } from "@/infra/upstash.ts";
+import { env } from "@/lib/env.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
 // The trip document over HTTP. The work is done in src/bll/*; these handlers do
 // validation, status codes and nothing else.
 
 const params = z.object({ id: z.uuid() });
+
+/** Routes a trip's long drives, to find places to stop on the way. */
+const roads = mapboxDirections({ token: env.MAPBOX_DIRECTIONS_TOKEN });
+
+/**
+ * What travellers rate the places a trip goes, from Google, kept in Redis for
+ * as long as its other answers are (docs/google-places.md). Without Redis
+ * every trip searches, under the same daily ceiling.
+ */
+const ratings: RatingDeps = {
+  ...ratingDefaults(),
+  source: googleRatings({ key: env.GOOGLE_PLACES_API_KEY }),
+  kept:
+    env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN
+      ? upstashRatings({
+          url: env.UPSTASH_REDIS_REST_URL,
+          token: env.UPSTASH_REDIS_REST_TOKEN,
+          provider: "google",
+        })
+      : undefined,
+  ttlSeconds: env.GOOGLE_PLACES_CONTENT_TTL_S ?? GOOGLE_CONTENT_TTL_S,
+};
 
 /** A point as `lon,lat`, the way the catalogue's `near` takes one. */
 const lonLat = z
@@ -212,7 +240,10 @@ export const trips = new Hono<SessionEnv>()
 
       let result: Awaited<ReturnType<typeof generateTrip>>;
       if (requestId) {
-        const outcome = await buildTripOnce(requestId, wanted, userId);
+        const outcome = await buildTripOnce(requestId, wanted, userId, {
+          generate: (w, u, options) =>
+            generateTrip(w, u, { ...options, roads, ratings }),
+        });
         if (outcome.kind === "existing") {
           return c.json({ id: outcome.tripId }, 200);
         }
@@ -224,7 +255,7 @@ export const trips = new Hono<SessionEnv>()
         }
         result = outcome.kind === "built" ? outcome.trip : outcome.failure;
       } else {
-        result = await generateTrip(wanted, userId);
+        result = await generateTrip(wanted, userId, { roads, ratings });
       }
 
       if (!result.ok) {

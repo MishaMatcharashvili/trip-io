@@ -39,6 +39,8 @@ export type EnrichLimits = {
 
 /** How long what the provider said is kept: long enough to matter, short of a day. */
 export const DEFAULT_CONTENT_TTL_S = 12 * 3_600;
+/** How long Google's answers are kept unless told otherwise: 60 days, the owner's decision of 2026-10-03. */
+export const GOOGLE_CONTENT_TTL_S = 60 * 86_400;
 /** A refusal or a failure is kept briefly, so a struggling provider is not hammered. */
 const FAILURE_TTL_S = 30;
 

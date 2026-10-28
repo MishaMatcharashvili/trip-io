@@ -144,6 +144,7 @@ was verified from Mapbox's pricing while this was written.
 |---|---|
 | A map instantiated in the browser (a "map load") | Once per visit to a screen with a map, not per pan or zoom. The pool (`src/ui/map/pool.ts`) reuses one map across pages, and a theme or base-map change (Map, Satellite, Terrain) restyles it rather than building another, so switching costs no map load |
 | A Directions request | One per change of a shown route's stops or mode (debounced 400 ms), or per press of *Refresh* / *Try again*. A trip of more than 25 stops asks once per 24 stretches |
+| Generating a trip | One Directions request per long drive on the route (90 minutes or more, `src/domain/trip/generate/roads.ts`), to find places to stop on the way; a road driven there and back is asked for once. Through `computeRoute`, so the same per-traveller and global limits apply, and a refusal only means the trip has no road stops |
 | The traffic layer | Vector tile requests. The layer is hidden by default, and a hidden layer requests no tiles; it asks nothing of Directions |
 
 What does not trigger a Directions request: pan, zoom, hover, a panel opening, the theme changing, a
