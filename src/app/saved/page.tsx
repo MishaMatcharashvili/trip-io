@@ -24,6 +24,7 @@ const groupNames: Record<string, string> = {
   culture: "Culture",
   lodging: "Stay",
   transport: "Getting around",
+  services: "Fuel & rest",
 };
 
 /**

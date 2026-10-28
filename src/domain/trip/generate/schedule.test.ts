@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { sortedNodes, type TripDoc } from "../document.ts";
+import { nodeEnd, sortedNodes, type TripDoc } from "../document.ts";
 import {
   at,
   candidates,
@@ -12,7 +12,7 @@ import {
 } from "../test-fixtures.ts";
 import { straightLineTravel } from "../travel.ts";
 import { validateDoc } from "../validate.ts";
-import type { Plan, PlanStop } from "./plan.ts";
+import type { Candidate, Plan, PlanStop } from "./plan.ts";
 import { schedule } from "./schedule.ts";
 
 const stop = (
@@ -186,5 +186,102 @@ describe("schedule", () => {
       (n) => n.kind === "stay",
     );
     assert.equal(stays.length, 1);
+  });
+});
+
+describe("rests on a long drive", () => {
+  // Tbilisi to Kutaisi: four hours and more on the estimate, with Gori's
+  // Wissol two hours out.
+  const place = (
+    id: string,
+    name: string,
+    lonLat: [number, number],
+  ): Candidate => ({
+    ...(candidates.get(P.gergeti) as Candidate),
+    id,
+    name,
+    lonLat,
+    openingHours: null,
+    outdoor: false,
+  });
+  const bagrati = place(
+    "70000000-0000-4000-8000-000000000001",
+    "Bagrati",
+    [42.704, 42.277],
+  );
+  const wissol: Candidate = {
+    ...place(
+      "70000000-0000-4000-8000-000000000002",
+      "Wissol",
+      [44.065, 42.016],
+    ),
+    category: "gas_station",
+    group: "services",
+  };
+  const dayTrip: Plan = {
+    days: [
+      {
+        day: 1,
+        theme: "Kutaisi",
+        stayId: null,
+        stops: [stop(bagrati.id, "afternoon", "visit", 60)],
+      },
+    ],
+  };
+  const nodesWith = (stations: Candidate[]) =>
+    run(dayTrip, {
+      places: new Map([[bagrati.id, bagrati]]),
+      start: [44.8, 41.695],
+      stations,
+      dayEnds: "21:00",
+    }).nodes;
+  const drive = (stations: Candidate[]) =>
+    Object.values(nodesWith(stations)).sort((a, b) =>
+      a.startsAt.localeCompare(b.startsAt),
+    );
+
+  test("the drive stops at the station for half an hour, and is the longer for it", () => {
+    const [toStation, rest, onward, visit] = drive([wissol]);
+    assert.equal(toStation.meta.title, "Drive to Wissol");
+    assert.equal(rest.kind, "visit");
+    assert.equal(rest.placeId, wissol.id);
+    assert.equal(rest.durationMin, 30);
+    assert.equal(rest.meta.title, "Rest stop · Wissol");
+    assert.equal(rest.meta.rest, true);
+    assert.equal(onward.meta.title, "Drive to Bagrati");
+    assert.equal(visit.meta.title, "Bagrati");
+    // It gets there later: the rest, and the way round by the station.
+    const without = drive([]);
+    assert.equal(without.length, 2);
+    assert.ok(nodeEnd(onward) - nodeEnd(without[0]) >= 30 * 60_000);
+  });
+
+  test("a station's chain names it when its own name is a number", () => {
+    const [, rest] = drive([{ ...wissol, name: "Gori 1", brand: "Rompetrol" }]);
+    assert.equal(rest.meta.title, "Rest stop · Rompetrol · Gori 1");
+  });
+
+  test("the drive with its rest still validates", () => {
+    const doc: TripDoc = {
+      trip: {
+        title: "Day trip",
+        startsAt: at(PREV, "00:00"),
+        endsAt: at(PREV, "23:59"),
+        party: {},
+        pace: "moderate",
+        budget: "",
+        prefs: {},
+      },
+      nodes: nodesWith([wissol]),
+    };
+    const errors = validateDoc(doc, {
+      places: new Map([
+        [bagrati.id, bagrati],
+        [wissol.id, wissol],
+      ]),
+      travel: straightLineTravel,
+      author: "system",
+    }).filter((v) => v.severity === "error");
+    assert.deepEqual(errors, []);
   });
 });

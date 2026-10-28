@@ -30,6 +30,9 @@ export const nodeMeta = z.object({
   // Inside a city. Urban transfers are exempt from the darkness rule: driving
   // across Tbilisi after dusk is fine, driving the Military Road isn't.
   urban: z.boolean(),
+  // A stop on a long drive for fuel and a rest (generate/roads.ts): part of
+  // the drive, not something to see.
+  rest: z.boolean().optional(),
 });
 
 // - visit, meal: the itinerary itself.

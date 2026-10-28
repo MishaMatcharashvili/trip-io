@@ -530,13 +530,11 @@ describe("the route", () => {
   });
 });
 
-describe("road stops", () => {
-  // Gori is on the road from Tbilisi to Kutaisi, in neither of them.
+describe("the drive to Kutaisi", () => {
   const at = (
     n: number,
     group: Candidate["group"],
     lonLat: [number, number],
-    where: { areas: string[] } | { roads: string[] },
   ): Candidate => ({
     ...(candidates.get(P.gergeti) as Candidate),
     id: `30000000-0000-4000-8000-00000000000${n}`,
@@ -546,19 +544,22 @@ describe("road stops", () => {
     lonLat,
     openingHours: null,
     outdoor: false,
-    area: "areas" in where ? where.areas[0] : "",
-    areas: "areas" in where ? where.areas : [],
-    ...("roads" in where ? { roads: where.roads } : {}),
+    area: "kutaisi",
+    areas: ["kutaisi"],
   });
-  const road = { roads: ["tbilisi > kutaisi"] };
-  const kutaisi = { areas: ["kutaisi"] };
   const places = [
-    at(1, "heritage", [44.107, 41.986], road),
-    at(2, "food", [44.11, 41.984], road),
-    at(3, "lodging", [42.7, 42.27], kutaisi),
-    at(4, "heritage", [42.704, 42.27], kutaisi),
-    at(5, "food", [42.702, 42.27], kutaisi),
+    at(3, "lodging", [42.7, 42.27]),
+    at(4, "heritage", [42.704, 42.27]),
+    at(5, "food", [42.702, 42.27]),
   ];
+  // Gori's Wissol, two hours out of Tbilisi.
+  const wissol: Candidate = {
+    ...at(9, "services", [44.065, 42.016]),
+    name: "Wissol",
+    category: "gas_station",
+    area: "",
+    areas: [],
+  };
   const trip: Constraints = {
     ...constraints,
     days: 2,
@@ -566,37 +567,27 @@ describe("road stops", () => {
     start: "tbilisi",
     finish: "kutaisi",
   };
-
-  test("the composer is told the long drive, and which places are on it", async () => {
+  const seen = async (stations: Candidate[]) => {
     let input: ComposeInput | undefined;
     await generate(trip, {
-      ...deps(async (seen) => {
-        input = seen;
+      ...deps(async (given) => {
+        input = given;
         throw new Error("only looking");
       }),
       candidates: places,
+      stations,
     });
-    assert.deepEqual(
-      input?.drives.map((d) => d.road),
-      ["tbilisi > kutaisi"],
-    );
-    const fort = input?.candidates.find((c) => c.name === "heritage 1");
-    assert.equal(fort?.roads.length, 1);
-    assert.equal(fort?.roads[0].road, "tbilisi > kutaisi");
-    // Gori is a little under two hours out, on the travel estimate.
-    assert.ok((fort?.roads[0].after ?? 0) > 60);
-    assert.ok((fort?.roads[0].after ?? 999) < 120);
-    assert.deepEqual(fort?.areas, []);
-  });
+    return input;
+  };
 
   test("what travellers rate a place reaches the composer, and only when known", async () => {
     let input: ComposeInput | undefined;
     const rated = places.map((p, i) =>
-      i === 4 ? { ...p, rating: { value: 4.6, count: 2_400 } } : p,
+      i === 2 ? { ...p, rating: { value: 4.6, count: 2_400 } } : p,
     );
     await generate(trip, {
-      ...deps(async (seen) => {
-        input = seen;
+      ...deps(async (given) => {
+        input = given;
         throw new Error("only looking");
       }),
       candidates: rated,
@@ -604,21 +595,28 @@ describe("road stops", () => {
     const named = (name: string) =>
       input?.candidates.find((c) => c.name === name);
     assert.deepEqual(named("food 5")?.rating, { value: 4.6, count: 2_400 });
-    assert.equal(named("food 2")?.rating, undefined);
+    assert.equal(named("heritage 4")?.rating, undefined);
   });
 
-  test("a stop on the way splits the drive in two, and is not a day in a place", async () => {
+  test("a station is never a candidate, and its rest makes the day arrive later", async () => {
+    const without = await seen([]);
+    const rested = await seen([wissol]);
+    assert.ok(!rested?.candidates.some((c) => c.name === "Wissol"));
+    const arrives = (input: ComposeInput | undefined) =>
+      input?.days[0].arrives ?? "";
+    assert.ok(arrives(rested) > arrives(without), arrives(rested));
+  });
+
+  test("the day's drive rests at the station, and the trip still validates", async () => {
     const { toRef } = candidateRefs(places);
-    const r = (n: number) => toRef.get(places[n - 1].id) as string;
+    const r = (n: number) => toRef.get(places[n - 3].id) as string;
     const plan: RefPlan = {
       days: [
         {
           day: 1,
-          theme: "Gori on the way to Kutaisi",
+          theme: "To Kutaisi",
           stayRef: r(3),
           stops: [
-            { ref: r(1), slot: "morning", kind: "visit", durationMin: 60 },
-            { ref: r(2), slot: "midday", kind: "meal", durationMin: 60 },
             { ref: r(4), slot: "afternoon", kind: "visit", durationMin: 45 },
             { ref: r(5), slot: "evening", kind: "meal", durationMin: 75 },
           ],
@@ -636,36 +634,92 @@ describe("road stops", () => {
     };
     const result = await generate(
       { ...trip, pace: "relaxed", dayEnds: "21:00" },
-      { ...deps(scripted(plan, plan).compose), candidates: places },
+      {
+        ...deps(scripted(plan, plan).compose),
+        candidates: places,
+        stations: [wissol],
+      },
     );
     assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
     const titles = Object.values(result.doc.nodes)
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map((n) => n.meta.title);
     assert.deepEqual(titles.slice(0, 4), [
-      "Drive to heritage 1",
-      "heritage 1",
-      "Lunch · food 2",
+      "Drive to Wissol",
+      "Rest stop · Wissol",
       "Drive to heritage 4",
+      "heritage 4",
     ]);
   });
 
-  test("with the model down, the template still breaks the drive, lunch and all", async () => {
+  test("a day that much on the road is a travel day, not an empty one", async () => {
+    // Tbilisi to Batumi, nearly seven hours on the estimate, and dinner.
+    const batumi = town("batumi", 41.625, 41.624);
+    const plan: Plan = {
+      days: [
+        {
+          day: 1,
+          theme: "To Batumi",
+          stayId: batumi[0].id,
+          stops: [
+            {
+              placeId: batumi[4].id,
+              slot: "evening",
+              kind: "meal",
+              durationMin: 75,
+            },
+          ],
+        },
+      ],
+    };
     const result = await generate(
-      { ...trip, days: 1, pace: "relaxed", dayEnds: "21:00" },
-      { ...deps(down), candidates: places },
+      {
+        ...trip,
+        days: 1,
+        places: ["batumi"],
+        finish: "batumi",
+        dayEnds: "21:00",
+      },
+      { ...deps(down), cache: memoryCache(plan), candidates: batumi },
     );
-    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
-    assert.equal(result.source, "template");
-    const titles = Object.values(result.doc.nodes)
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-      .map((n) => n.meta.title);
-    assert.deepEqual(titles.slice(0, 4), [
-      "Drive to heritage 1",
-      "heritage 1",
-      "Lunch · food 2",
-      "Drive to heritage 4",
-    ]);
+    const cached = result.attempts.find((a) => a.source === "cache");
+    assert.ok(cached, JSON.stringify(result.attempts));
+    assert.ok(
+      !cached.problems.some((p) => /nothing to see that day/.test(p)),
+      JSON.stringify(cached),
+    );
+  });
+
+  test("a rest at a station is not something to see that day", async () => {
+    const plan: Plan = {
+      days: [1, 2].map((day) => ({
+        day,
+        theme: "Kutaisi",
+        stayId: places[0].id,
+        stops:
+          day === 2
+            ? [
+                {
+                  placeId: places[1].id,
+                  slot: "morning",
+                  kind: "visit",
+                  durationMin: 60,
+                },
+              ]
+            : [],
+      })),
+    };
+    const result = await generate(trip, {
+      ...deps(down),
+      cache: memoryCache(plan),
+      candidates: places,
+      stations: [wissol],
+    });
+    const cached = result.attempts.find((a) => a.source === "cache");
+    assert.ok(
+      cached?.problems.some((p) => /nothing to see that day/.test(p)),
+      JSON.stringify(cached),
+    );
   });
 });
 

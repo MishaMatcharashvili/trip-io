@@ -8,7 +8,7 @@ import {
   placeFacts,
   placeNames,
   plannableNear,
-  roadsideCandidates,
+  stationsAlong,
 } from "./places.ts";
 
 // A place id arrives from outside more often than it looks: a patch body, a
@@ -62,68 +62,6 @@ describe("place lookups", () => {
   });
 });
 
-describe("places along a road", () => {
-  const ends = [
-    {
-      lonLat: [44.8, 41.695] as [number, number],
-      match: { kind: "regions" as const, slugs: ["tbilisi"] },
-    },
-    {
-      lonLat: [42.663, 42.26] as [number, number],
-      match: { kind: "regions" as const, slugs: ["kutaisi"] },
-    },
-  ];
-
-  test("the road goes to PostGIS longitude first", () => {
-    assert.equal(
-      lineWkt([
-        [44.8, 41.695],
-        [44.11, 41.98],
-      ]),
-      "LINESTRING(44.8 41.695, 44.11 41.98)",
-    );
-  });
-
-  test("a road that is not a line is not looked along", async () => {
-    const { conn, params } = recording();
-    const found = await roadsideCandidates(
-      { label: "tbilisi > kutaisi", road: [[44.8, 41.695]], ends },
-      conn,
-    );
-    assert.deepEqual(found, []);
-    assert.deepEqual(params, []);
-  });
-
-  test("what is found is on the drive, and in no place of the trip", async () => {
-    const { conn } = recording([
-      {
-        id: PLACE,
-        name: "Gori Fortress",
-        category: "fort",
-        tier: "verified",
-        opening_hours: null,
-        lon: 44.108,
-        lat: 41.986,
-      },
-    ]);
-    const [fort] = await roadsideCandidates(
-      {
-        label: "tbilisi > kutaisi",
-        road: [
-          [44.8, 41.695],
-          [42.663, 42.26],
-        ],
-        ends,
-      },
-      conn,
-    );
-    assert.deepEqual(fort.roads, ["tbilisi > kutaisi"]);
-    assert.deepEqual(fort.areas, []);
-    assert.equal(fort.group, "heritage");
-    assert.equal(fort.outdoor, true);
-  });
-});
-
 describe("places near a review site's pins", () => {
   const area = { kind: "regions" as const, slugs: ["kutaisi"] };
 
@@ -167,5 +105,48 @@ describe("places near a review site's pins", () => {
     );
     assert.equal(palaty.nameKa, "პალატი");
     assert.equal(palaty.group, "food");
+  });
+});
+
+describe("stations along a road", () => {
+  test("the road goes to PostGIS longitude first", () => {
+    assert.equal(
+      lineWkt([
+        [44.8, 41.695],
+        [44.11, 41.98],
+      ]),
+      "LINESTRING(44.8 41.695, 44.11 41.98)",
+    );
+  });
+
+  test("a road that is not a line is not looked along", async () => {
+    const { conn, params } = recording();
+    assert.deepEqual(await stationsAlong([[44.8, 41.695]], conn), []);
+    assert.deepEqual(params, []);
+  });
+
+  test("a station is in no place, and keeps its chain", async () => {
+    const { conn } = recording([
+      {
+        id: PLACE,
+        name: "Gori 1",
+        category: "gas_station",
+        tier: "verified",
+        opening_hours: null,
+        brand: "Rompetrol",
+        lon: 44.148,
+        lat: 42.019,
+      },
+    ]);
+    const [station] = await stationsAlong(
+      [
+        [44.8, 41.695],
+        [42.663, 42.26],
+      ],
+      conn,
+    );
+    assert.equal(station.group, "services");
+    assert.equal(station.brand, "Rompetrol");
+    assert.deepEqual(station.areas, []);
   });
 });

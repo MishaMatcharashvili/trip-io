@@ -19,12 +19,7 @@ import {
   type RefPlan,
   resolveRefs,
 } from "./plan.ts";
-import {
-  breakDrives,
-  driveLabel,
-  longDrives,
-  unbrokenDrives,
-} from "./roads.ts";
+import { restedMinutes } from "./rests.ts";
 import { addDays, DAY_START, HOME_BY_MIN, schedule } from "./schedule.ts";
 
 // constraints → cache? → candidates → compose → resolve refs → schedule → validate
@@ -45,8 +40,6 @@ export type CandidateRef = {
   area: Candidate["area"];
   /** Every place on the route it lies in. */
   areas: Candidate["areas"];
-  /** The long drives it is a stop on, and how many minutes into each it lies. */
-  roads: { road: string; after: number }[];
   /** What travellers give it, when enough of them have. */
   rating?: Candidate["rating"];
   /** Human-readable, e.g. "mon–sat 10:00–18:00; sun closed", or "unknown". */
@@ -56,8 +49,6 @@ export type CandidateRef = {
 export type ComposeInput = {
   constraints: Constraints;
   candidates: CandidateRef[];
-  /** Drives long enough to break (roads.ts): the candidates whose `roads` name one are on the way. */
-  drives: { road: string; from: string; to: string; minutes: number }[];
   days: {
     day: number;
     date: string;
@@ -68,8 +59,6 @@ export type ComposeInput = {
     arrives?: string;
     /** "HH:MM": when the drive to where the trip finishes has to set off. */
     leavesBy?: string;
-    /** The long drives (in `drives`) this day is known to take: out from the start, home to the finish. */
-    roads?: string[];
   }[];
 };
 
@@ -111,6 +100,8 @@ export type GenerateDeps = {
   travel: TravelEstimator;
   newId: () => string;
   describeHours: (c: Candidate) => string;
+  /** Fuel stations along the trip's long drives, where they rest (rests.ts). Never planned from. */
+  stations?: Candidate[];
 };
 
 export type GenerateResult =
@@ -132,6 +123,9 @@ export type GenerateResult =
     };
 
 const MAX_FALLBACK_ROUNDS = 12;
+
+/** On the road this long, rests included, a day has done its seeing from the car. */
+export const TRAVEL_DAY_MIN = 6 * 60;
 
 /**
  * What a plan leaves out of the places it was asked to visit. Every one is
@@ -211,12 +205,16 @@ const shifted = (hhmm: string, minutes: number) => {
 function dayLimits(
   c: Constraints,
   travel: TravelEstimator,
+  stations: readonly Candidate[],
 ): { arrives?: string; leavesBy?: string } {
+  // With its rests: a stop for fuel at Gori is half an hour the day does not have.
   const drive = (a: string, b: string) => {
     const from = destination(a)?.lonLat;
     const to = destination(b)?.lonLat;
     const minutes = from && to && a !== b ? travel.minutes(from, to) : 0;
-    return minutes > IMPLICIT_LEG_MAX_MIN ? minutes : 0;
+    return minutes > IMPLICIT_LEG_MAX_MIN && from && to
+      ? restedMinutes(from, to, stations, travel)
+      : 0;
   };
   const there = drive(c.start, c.places[0]);
   const home = drive(c.places[c.places.length - 1], c.finish);
@@ -245,6 +243,12 @@ export async function generate(
   }
 
   const places = new Map(deps.candidates.map((p) => [p.id, p]));
+  const stations = deps.stations ?? [];
+  /** What the validator may find on a day: the stations a drive rests at too. */
+  const known = new Map([
+    ...places,
+    ...stations.map((s) => [s.id, s] as const),
+  ]);
   const header = tripHeader(c);
 
   /** Schedule and validate. Problems are what a retry or the fallback acts on. */
@@ -259,20 +263,32 @@ export async function generate(
       start: destination(c.start)?.lonLat ?? null,
       finish: finishOf(c),
       dayEnds: c.dayEnds,
+      stations,
     });
     const doc: TripDoc = { trip: header, nodes };
     const violations = validateDoc(doc, {
-      places,
+      places: known,
       travel: deps.travel,
       author: "system",
     });
     const errors = violations.filter((v) => v.severity === "error");
 
-    const busyDays = new Set(
-      Object.values(nodes)
-        .filter((n) => n.kind === "visit")
+    // A rest at a station is part of a drive, not something to see; and a
+    // day that much on the road is a travel day, with nothing to see owed.
+    const driving = new Map<string, number>();
+    for (const n of Object.values(nodes)) {
+      if (n.kind !== "transfer" && !n.meta.rest) continue;
+      const day = dayKey(n.startsAt);
+      driving.set(day, (driving.get(day) ?? 0) + n.durationMin);
+    }
+    const busyDays = new Set([
+      ...Object.values(nodes)
+        .filter((n) => n.kind === "visit" && !n.meta.rest)
         .map((n) => dayKey(n.startsAt)),
-    );
+      ...[...driving]
+        .filter(([, minutes]) => minutes >= TRAVEL_DAY_MIN)
+        .map(([day]) => day),
+    ]);
     const empty = Array.from({ length: c.days }, (_, i) =>
       addDays(c.startDate, i),
     )
@@ -291,14 +307,12 @@ export async function generate(
       doc,
       warnings: violations.filter((v) => v.severity === "warning"),
       // Soft: a day the catalogue cannot fill, or can fill only with museums
-      // and stages, is still a day, and four hours in the car is still a
-      // drive. Asked about once, of the model; never a reason to throw the
-      // plan away.
+      // and stages, is still a day. Asked about once, of the model; never a
+      // reason to throw the plan away.
       idle: [
         ...idleGaps(doc, c.dayEnds),
         ...museumHeavy(plan, places, c),
         ...misplaced(plan, places, c),
-        ...unbrokenDrives(plan, places, c),
       ].map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
@@ -314,26 +328,6 @@ export async function generate(
     const t0 = performance.now();
     const value = await fn();
     return { value, ms: Math.round(performance.now() - t0) };
-  };
-
-  /**
-   * A valid plan with a stop on each long drive it sits through, where one
-   * fits and leaves the trip better than it was (roads.ts).
-   */
-  const withBreaks = (plan: Plan, result: ReturnType<typeof evaluate>) => {
-    let best = { plan, result };
-    breakDrives(plan, places, c, (next) => {
-      const tried = evaluate(next);
-      if (
-        tried.problems.length > 0 ||
-        tried.idle.length >= best.result.idle.length
-      ) {
-        return false;
-      }
-      best = { plan: next, result: tried };
-      return true;
-    });
-    return best;
   };
 
   // 1. Warm-start cache. A hit is re-timed for these dates and re-validated.
@@ -371,24 +365,7 @@ export async function generate(
         sorted.reduce((s, p) => s + p.lonLat[1], 0) / sorted.length,
       ]
     : [44.79, 41.72];
-  const limits = dayLimits(c, deps.travel);
-  const drives = longDrives(c);
-  // Where each drive sets off from: a stop twenty minutes out of Tbilisi is
-  // not a break from four hours on the road, and lunch there is at ten.
-  const setsOff = new Map(
-    drives.map((d) => [driveLabel(d), destination(d.from)?.lonLat]),
-  );
-  // Which day drives what is the model's to decide in between; the first day
-  // drives out from the start and the last drives to the finish.
-  const out = driveLabel({ from: c.start, to: c.places[0] });
-  const home = driveLabel({
-    from: c.places[c.places.length - 1],
-    to: c.finish,
-  });
-  const roadsOn = (i: number) =>
-    [...(i === 0 ? [out] : []), ...(i === c.days - 1 ? [home] : [])].filter(
-      (road) => setsOff.has(road),
-    );
+  const limits = dayLimits(c, deps.travel, stations);
   const input: ComposeInput = {
     constraints: c,
     candidates: sorted.map((p, i) => ({
@@ -400,20 +377,8 @@ export async function generate(
       outdoor: p.outdoor,
       area: p.area,
       areas: p.areas,
-      roads: (p.roads ?? []).flatMap((road) => {
-        const from = setsOff.get(road);
-        return from
-          ? [{ road, after: deps.travel.minutes(from, p.lonLat) }]
-          : [];
-      }),
       hours: deps.describeHours(p),
       ...(p.rating ? { rating: p.rating } : {}),
-    })),
-    drives: drives.map((d) => ({
-      road: driveLabel(d),
-      from: d.from,
-      to: d.to,
-      minutes: d.minutes,
     })),
     days: Array.from({ length: c.days }, (_, i) => {
       const date = addDays(c.startDate, i);
@@ -429,7 +394,6 @@ export async function generate(
         dusk: sun ? localHhmm(sun.set) : "",
         ...(i === 0 ? { arrives: limits.arrives } : {}),
         ...(i === c.days - 1 ? { leavesBy: limits.leavesBy } : {}),
-        ...(roadsOn(i).length ? { roads: roadsOn(i) } : {}),
       };
     }),
   };
@@ -493,13 +457,12 @@ export async function generate(
   // one than the template's: it is what the traveller gets, and it is not
   // cached, so the next request tries again.
   if (sparse) {
-    const { plan, result } = withBreaks(sparse.plan, sparse.result);
     return {
       ok: true,
       source: sparse.source,
-      doc: result.doc,
-      plan,
-      warnings: result.warnings,
+      doc: sparse.result.doc,
+      plan: sparse.plan,
+      warnings: sparse.result.warnings,
       attempts,
     };
   }
@@ -508,11 +471,8 @@ export async function generate(
   const exclude = new Set<string>();
   for (let round = 0; round < MAX_FALLBACK_ROUNDS; round++) {
     const { value, ms } = await timed(() => {
-      const plan = fallbackPlan(c, deps.candidates, exclude);
-      const result = evaluate(plan);
-      return result.problems.length
-        ? { plan, result }
-        : withBreaks(plan, result);
+      const plan = fallbackPlan(c, deps.candidates, exclude, stations);
+      return { plan, result: evaluate(plan) };
     });
     const { plan, result } = value;
     const ok = result.problems.length === 0;
