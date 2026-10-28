@@ -31,11 +31,15 @@ Rules:
   drive there. When the two are far apart, the morning goes to the drive and its road stops (below),
   and the day's stops in the new place are in the afternoon and evening.
 - "drives" lists the long drives on the route, each with its "road" and how many "minutes" it
-  takes. A candidate whose "roads" names one lies along that drive and in no place: it is a stop on
-  the way, not a day somewhere. Break each long drive with a road stop when the day has room: the
-  one sight that road is known for (a fortress, a cave town, a monastery, a lake), 45-90 min, and on
-  a drive of three hours or more, lunch at a restaurant on the way too. Use a road stop only on the
-  day that drives its road, in the order the road passes them. On a day that drives from "start"
+  takes. A candidate whose "roads" names one lies along that drive, "after" minutes into it, and in
+  no place: it is a stop on the way, not a day somewhere. Break each long drive with a road stop
+  when the day has room: the one sight that road is known for (a fortress, a cave town, a
+  monastery, a lake), 45-90 min, somewhere in the middle of the drive rather than in its first or
+  last half hour, and on a drive of three hours or more, lunch at a restaurant on the way too,
+  near that sight. A drive of three hours or more always has its road stop: shorten or drop a stop
+  at either end of the day to make room rather than leave it out. A day in "days" names in
+  "roads" the long drives it is known to take. Use a road stop only on the day that drives its
+  road, in the order of "after". On a day that drives from "start"
   or moves on, road stops come first (morning, then lunch at midday), before the day's stops in
   the new place. On the last day, driving to "finish", they come last (afternoon), after the day's
   stops in the last place. A road stop's time comes out of the day: it makes "arrives" later, or

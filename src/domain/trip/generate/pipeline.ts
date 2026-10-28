@@ -19,7 +19,7 @@ import {
   type RefPlan,
   resolveRefs,
 } from "./plan.ts";
-import { driveLabel, longDrives } from "./roads.ts";
+import { driveLabel, longDrives, unbrokenDrives } from "./roads.ts";
 import { addDays, DAY_START, HOME_BY_MIN, schedule } from "./schedule.ts";
 
 // constraints → cache? → candidates → compose → resolve refs → schedule → validate
@@ -40,8 +40,8 @@ export type CandidateRef = {
   area: Candidate["area"];
   /** Every place on the route it lies in. */
   areas: Candidate["areas"];
-  /** The long drives it is a stop on. */
-  roads: readonly string[];
+  /** The long drives it is a stop on, and how many minutes into each it lies. */
+  roads: { road: string; after: number }[];
   /** Human-readable, e.g. "mon–sat 10:00–18:00; sun closed", or "unknown". */
   hours: string;
 };
@@ -61,6 +61,8 @@ export type ComposeInput = {
     arrives?: string;
     /** "HH:MM": when the drive to where the trip finishes has to set off. */
     leavesBy?: string;
+    /** The long drives (in `drives`) this day is known to take: out from the start, home to the finish. */
+    roads?: string[];
   }[];
 };
 
@@ -282,12 +284,14 @@ export async function generate(
       doc,
       warnings: violations.filter((v) => v.severity === "warning"),
       // Soft: a day the catalogue cannot fill, or can fill only with museums
-      // and stages, is still a day. Asked about once, of the model; never a
-      // reason to throw the plan away.
+      // and stages, is still a day, and four hours in the car is still a
+      // drive. Asked about once, of the model; never a reason to throw the
+      // plan away.
       idle: [
         ...idleGaps(doc, c.dayEnds),
         ...museumHeavy(plan, places, c),
         ...misplaced(plan, places, c),
+        ...unbrokenDrives(plan, places, c),
       ].map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
@@ -341,6 +345,23 @@ export async function generate(
       ]
     : [44.79, 41.72];
   const limits = dayLimits(c, deps.travel);
+  const drives = longDrives(c);
+  // Where each drive sets off from: a stop twenty minutes out of Tbilisi is
+  // not a break from four hours on the road, and lunch there is at ten.
+  const setsOff = new Map(
+    drives.map((d) => [driveLabel(d), destination(d.from)?.lonLat]),
+  );
+  // Which day drives what is the model's to decide in between; the first day
+  // drives out from the start and the last drives to the finish.
+  const out = driveLabel({ from: c.start, to: c.places[0] });
+  const home = driveLabel({
+    from: c.places[c.places.length - 1],
+    to: c.finish,
+  });
+  const roadsOn = (i: number) =>
+    [...(i === 0 ? [out] : []), ...(i === c.days - 1 ? [home] : [])].filter(
+      (road) => setsOff.has(road),
+    );
   const input: ComposeInput = {
     constraints: c,
     candidates: sorted.map((p, i) => ({
@@ -352,10 +373,15 @@ export async function generate(
       outdoor: p.outdoor,
       area: p.area,
       areas: p.areas,
-      roads: p.roads ?? [],
+      roads: (p.roads ?? []).flatMap((road) => {
+        const from = setsOff.get(road);
+        return from
+          ? [{ road, after: deps.travel.minutes(from, p.lonLat) }]
+          : [];
+      }),
       hours: deps.describeHours(p),
     })),
-    drives: longDrives(c).map((d) => ({
+    drives: drives.map((d) => ({
       road: driveLabel(d),
       from: d.from,
       to: d.to,
@@ -375,6 +401,7 @@ export async function generate(
         dusk: sun ? localHhmm(sun.set) : "",
         ...(i === 0 ? { arrives: limits.arrives } : {}),
         ...(i === c.days - 1 ? { leavesBy: limits.leavesBy } : {}),
+        ...(roadsOn(i).length ? { roads: roadsOn(i) } : {}),
       };
     }),
   };

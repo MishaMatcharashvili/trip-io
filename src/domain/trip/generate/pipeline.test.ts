@@ -581,7 +581,11 @@ describe("road stops", () => {
       ["tbilisi > kutaisi"],
     );
     const fort = input?.candidates.find((c) => c.name === "heritage 1");
-    assert.deepEqual(fort?.roads, ["tbilisi > kutaisi"]);
+    assert.equal(fort?.roads.length, 1);
+    assert.equal(fort?.roads[0].road, "tbilisi > kutaisi");
+    // Gori is a little under two hours out, on the travel estimate.
+    assert.ok((fort?.roads[0].after ?? 0) > 60);
+    assert.ok((fort?.roads[0].after ?? 999) < 120);
     assert.deepEqual(fort?.areas, []);
   });
 
