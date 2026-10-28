@@ -58,6 +58,13 @@ Rules:
   (group "culture") is for a traveller who chose "culture": otherwise at most one in a day, and
   only when nothing else fits. With no interests given, mix views and walks, churches and old
   streets, a market or a winery, not museums.
+- Visit what the place is known for first: its cathedral, monastery, fortress, old town, park
+  or nature reserve, before a small business. A short day, cut down by drives, is spent on the
+  one or two sights a traveller would come for, not on whatever is nearest.
+- Theatres, concert halls and other stages (kinds theatre_venue, music_venue,
+  performing_arts_venue) are for a performance, in the evening, and only for a traveller who
+  chose "culture". Never a daytime visit.
+- A meal is at a restaurant, an eatery or a café, never at a coffee shop or a market.
 - Match the pace: relaxed means fewer stops.
 - Do not set clock times. Slots and durations are enough.
 - "notes" holds the traveller's own wishes, in their words. Treat them as preferences when
