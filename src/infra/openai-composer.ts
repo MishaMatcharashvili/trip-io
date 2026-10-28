@@ -30,6 +30,12 @@ Rules:
 - A day that moves on to the next place, or starts with the drive from "start", begins with the
   drive there. When the two are far apart, leave the morning empty and put that day's stops in
   the afternoon and evening.
+- A day in "days" may have "arrives", when the drive from "start" gets there, and "leavesBy",
+  when the drive to "finish" has to set off. Every stop that day fits between the two: add up
+  the durations, with 20 minutes between stops and a quarter of an hour in hand, and leave
+  stops out until they fit. A day trip
+  with three hours there has lunch and the one or two sights the place is known for, nothing
+  more.
 - Every day runs until "dayEnds" (in "trip"): a full day, with an afternoon and a dinner, not a
   morning and an early afternoon. No stop starts after dayEnds.
 - A last day that ends with the drive to "finish" ends its stops so that the drive arrives no
