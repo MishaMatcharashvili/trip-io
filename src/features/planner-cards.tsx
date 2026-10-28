@@ -1,9 +1,14 @@
 import { destinationName } from "@/domain/catalogue/destinations";
-import { type Constraints, routeOf } from "@/domain/trip/generate/constraints";
+import {
+  type Constraints,
+  type Interest,
+  interests,
+  routeOf,
+} from "@/domain/trip/generate/constraints";
 import type { IntakeOption } from "@/domain/trip/generate/intake";
 import type { Sketch } from "@/domain/trip/generate/sketch";
 import { Card } from "@/ui/card";
-import { Chip } from "@/ui/chip";
+import { Chip, FilterChip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
 import { Eyebrow, Num } from "@/ui/text";
@@ -83,7 +88,9 @@ const DAYS_SHOWN = 5;
  * The trip as the conversation has it so far, in the numbers the planner is
  * quoting: where each day is spent, what it drives, when it starts and ends,
  * and what the money comes to a head. What the traveller has not said yet is
- * marked as assumed, so the card never claims more than was agreed.
+ * marked as assumed, so the card never claims more than was agreed, and a
+ * route nobody gave is not drawn at all. What they enjoy is chosen on the card
+ * itself: it decides every stop the build picks.
  */
 export function TripSketchCard({
   constraints: c,
@@ -91,6 +98,7 @@ export function TripSketchCard({
   said,
   blockers,
   ready,
+  onInterests,
   children,
 }: {
   constraints: Constraints;
@@ -100,11 +108,14 @@ export function TripSketchCard({
   blockers: string[];
   /** The planner has nothing left to ask. */
   ready: boolean;
+  /** What the traveller enjoys, chosen on the card. */
+  onInterests: (next: Interest[]) => void;
   /** The card's actions: the build, and the details to correct. */
   children?: React.ReactNode;
 }) {
-  const shown = sketch.days.slice(0, DAYS_SHOWN);
-  const rest = sketch.days.slice(DAYS_SHOWN);
+  const placed = said("places");
+  const shown = placed ? sketch.days.slice(0, DAYS_SHOWN) : [];
+  const rest = placed ? sketch.days.slice(DAYS_SHOWN) : [];
   const facts: { text: string; assumed: boolean }[] = [
     {
       text: `${sketch.people} ${sketch.people === 1 ? "person" : "people"}`,
@@ -118,15 +129,13 @@ export function TripSketchCard({
       text: `${c.pace[0].toUpperCase()}${c.pace.slice(1)}`,
       assumed: !said("pace"),
     },
-    {
-      text: c.interests.length
-        ? c.interests.map((i) => interestNames[i]).join(", ")
-        : said("interests")
-          ? "A bit of everything"
-          : "Interests not yet said",
-      assumed: !said("interests"),
-    },
   ];
+  const toggle = (i: Interest) =>
+    onInterests(
+      c.interests.includes(i)
+        ? c.interests.filter((x) => x !== i)
+        : interests.filter((x) => x === i || c.interests.includes(x)),
+    );
 
   return (
     <Card
@@ -144,58 +153,96 @@ export function TripSketchCard({
               ? "Ready to plan"
               : "The trip so far"}
         </Eyebrow>
-        <span className="text-title font-semibold tracking-[-0.014em]">
-          {routeOf(c).map(destinationName).join(" → ")}
+        <span
+          className={cx(
+            "text-title font-semibold tracking-[-0.014em]",
+            !placed && "text-ink-muted",
+          )}
+        >
+          {placed
+            ? routeOf(c).map(destinationName).join(" → ")
+            : "Where in Georgia? Not said yet"}
         </span>
         <span className="text-mini text-ink-muted">
           <Num>
-            {c.days} {c.days === 1 ? "day" : "days"} from {weekday(c.startDate)}
+            {said("days") || placed
+              ? `${c.days} ${c.days === 1 ? "day" : "days"} from ${weekday(c.startDate)}`
+              : "How long, not said yet"}
           </Num>
-          {sketch.driveMinutes ? (
+          {placed && sketch.driveMinutes ? (
             <>
               {" · "}
               <Num>{hours(sketch.driveMinutes)}</Num> on the road in all
             </>
           ) : null}
-          {!said("days") || !said("startDate") ? " · dates assumed" : ""}
+          {(said("days") || placed) && (!said("days") || !said("startDate"))
+            ? " · dates assumed"
+            : ""}
         </span>
       </div>
 
-      <ol className="flex flex-col divide-y divide-hairline border-y border-hairline">
-        {shown.map((d) => (
-          <li
-            key={d.day}
-            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2"
-          >
-            <span className="text-small">
-              <span className="text-ink-faint">
-                <Num>Day {d.day}</Num> ·{" "}
-              </span>
-              <span className="font-medium">{destinationName(d.place)}</span>
-            </span>
-            <span className="text-mini text-ink-muted">
-              <Num>
-                {d.starts}–{d.ends}
-              </Num>
-              {d.drives.map((l) => (
-                <span key={`${l.from}-${l.to}`}>
-                  {" · "}
-                  <Num>{hours(l.minutes)}</Num>{" "}
-                  {l.to === d.place
-                    ? "drive in"
-                    : `to ${destinationName(l.to)}`}
+      {placed ? (
+        <ol className="flex flex-col divide-y divide-hairline border-y border-hairline">
+          {shown.map((d) => (
+            <li
+              key={d.day}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2"
+            >
+              <span className="text-small">
+                <span className="text-ink-faint">
+                  <Num>Day {d.day}</Num> ·{" "}
                 </span>
-              ))}
+                <span className="font-medium">{destinationName(d.place)}</span>
+              </span>
+              <span className="text-mini text-ink-muted">
+                <Num>
+                  {d.starts}–{d.ends}
+                </Num>
+                {d.drives.map((l) => (
+                  <span key={`${l.from}-${l.to}`}>
+                    {" · "}
+                    <Num>{hours(l.minutes)}</Num>{" "}
+                    {l.to === d.place
+                      ? "drive in"
+                      : `to ${destinationName(l.to)}`}
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))}
+          {rest.length ? (
+            <li className="py-2 text-mini text-ink-muted">
+              and {rest.length} more {rest.length === 1 ? "day" : "days"} in{" "}
+              {[...new Set(rest.map((d) => destinationName(d.place)))].join(
+                ", ",
+              )}
+            </li>
+          ) : null}
+        </ol>
+      ) : null}
+
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-small font-medium">
+          {said("interests") ? "What you enjoy" : "What do you enjoy?"}
+          {said("interests") ? null : (
+            <span className="font-normal text-ink-muted">
+              {" "}
+              Pick any: every stop is chosen by it.
             </span>
-          </li>
-        ))}
-        {rest.length ? (
-          <li className="py-2 text-mini text-ink-muted">
-            and {rest.length} more {rest.length === 1 ? "day" : "days"} in{" "}
-            {[...new Set(rest.map((d) => destinationName(d.place)))].join(", ")}
-          </li>
-        ) : null}
-      </ol>
+          )}
+        </legend>
+        <div className="flex flex-wrap gap-1.5">
+          {interests.map((i) => (
+            <FilterChip
+              key={i}
+              selected={c.interests.includes(i)}
+              onClick={() => toggle(i)}
+            >
+              {interestNames[i]}
+            </FilterChip>
+          ))}
+        </div>
+      </fieldset>
 
       <div className="flex flex-wrap gap-1.5">
         {facts.map((f) => (

@@ -16,7 +16,7 @@ import {
 import { sketchTrip } from "@/domain/trip/generate/sketch";
 import { withGuestSession } from "@/lib/guest-session";
 import { apiClient } from "@/lib/hono-client";
-import { Button, QuietAction } from "@/ui/button";
+import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Chip } from "@/ui/chip";
 import { cx } from "@/ui/cx";
@@ -114,6 +114,9 @@ export function TripPlanner({
   const turns = messages.filter((m) => m.role === "traveller").length;
   const talkedOut = turns >= INTAKE_MAX_TURNS;
   const answered = messages.some((m) => m.role === "planner");
+  // A trip with no place of the traveller's own would be built on the default
+  // route, which nobody asked for.
+  const placed = state.said.includes("places");
   // A place the planner could not take is a reason the trip cannot be done as
   // asked, with the reason said when it is a known one.
   const verdict = useMemo(
@@ -204,6 +207,7 @@ export function TripPlanner({
 
   const build = () =>
     verdict.possible &&
+    placed &&
     router.push(
       `/new/building?c=${encodeConstraints(state.constraints)}&r=${crypto.randomUUID()}`,
     );
@@ -296,6 +300,7 @@ export function TripPlanner({
               said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
               blockers={reasons(verdict)}
               ready={ready}
+              onInterests={(interests) => edit({ interests })}
             >
               {state.constraints.notes ? (
                 <p className="text-mini text-ink-muted">
@@ -318,28 +323,42 @@ export function TripPlanner({
                   </button>
                 </p>
               ) : null}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <Button
-                  variant={ready ? "primary" : "secondary"}
-                  className="px-5 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={waiting || !verdict.possible}
+                  variant="primary"
+                  size="lg"
+                  className="px-5 font-semibold shadow-agent disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                  disabled={waiting || !verdict.possible || !placed}
                   onClick={build}
                 >
                   {ready ? "Looks right — plan every day" : "Plan it as it is"}
+                  <Icon name="arrowRight" size={15} strokeWidth={1.8} />
                 </Button>
-                <QuietAction
+                <Button
+                  size="lg"
+                  className="px-4"
                   aria-expanded={details}
                   onClick={() => setDetails(!details)}
                 >
                   {details ? "Hide the details" : "Correct the details"}
-                </QuietAction>
+                  <Icon
+                    name="chevronDown"
+                    size={15}
+                    className={cx(
+                      "transition-transform",
+                      details && "rotate-180",
+                    )}
+                  />
+                </Button>
               </div>
-              <span className="text-mini text-ink-faint">
+              <span className="text-mini text-ink-muted">
                 {!verdict.possible
                   ? "Put the red part right first, or tell me what to change."
-                  : ready
-                    ? "Builds every day, stop by stop, for you to edit. Takes up to a minute."
-                    : "Anything not yet said is assumed. Keep talking, or plan it now."}
+                  : !placed
+                    ? "Tell me where in Georgia first, or choose it in the details."
+                    : ready
+                      ? "Builds every day, stop by stop, for you to edit. Takes up to a minute."
+                      : "Anything not yet said is assumed. Keep talking, or plan it now."}
               </span>
             </TripSketchCard>
             {details || !verdict.possible ? (

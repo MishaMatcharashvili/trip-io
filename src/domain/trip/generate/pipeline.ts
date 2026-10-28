@@ -3,8 +3,12 @@ import type { LonLat } from "../../geo.ts";
 import { dayKey, type TripDoc, type TripHeader } from "../document.ts";
 import { CIVIL, sunWindow } from "../sun.ts";
 import type { TravelEstimator } from "../travel.ts";
-import { type Violation, validateDoc } from "../validate.ts";
-import { museumHeavy } from "./balance.ts";
+import {
+  IMPLICIT_LEG_MAX_MIN,
+  type Violation,
+  validateDoc,
+} from "../validate.ts";
+import { misplaced, museumHeavy } from "./balance.ts";
 import { cacheKey } from "./cache-key.ts";
 import type { Constraints } from "./constraints.ts";
 import { fallbackPlan } from "./fallback.ts";
@@ -15,7 +19,7 @@ import {
   type RefPlan,
   resolveRefs,
 } from "./plan.ts";
-import { addDays, schedule } from "./schedule.ts";
+import { addDays, DAY_START, HOME_BY_MIN, schedule } from "./schedule.ts";
 
 // constraints → cache? → candidates → compose → resolve refs → schedule → validate
 //                          ↑ retry once, with the rejection as feedback ↓
@@ -48,6 +52,10 @@ export type ComposeInput = {
     weekday: string;
     dawn: string;
     dusk: string;
+    /** "HH:MM": when the drive from where the trip starts gets there. */
+    arrives?: string;
+    /** "HH:MM": when the drive to where the trip finishes has to set off. */
+    leavesBy?: string;
   }[];
 };
 
@@ -171,6 +179,39 @@ export function candidateRefs(candidates: readonly Candidate[]) {
 const localHhmm = (d: Date) =>
   new Date(d.getTime() + 4 * 3_600_000).toISOString().slice(11, 16);
 
+/** "HH:MM" moved by some minutes, to the five, on a clock that does not wrap. */
+const shifted = (hhmm: string, minutes: number) => {
+  const m =
+    Math.round(
+      (Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3)) + minutes) / 5,
+    ) * 5;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
+/**
+ * When the first day gets there and when the last has to set off home, by
+ * the same drives and the same rule as the scheduler: told only the drive, a
+ * model fills a day trip to Kutaisi as if it had the whole day there, and
+ * both its tries miss the drive home.
+ */
+function dayLimits(
+  c: Constraints,
+  travel: TravelEstimator,
+): { arrives?: string; leavesBy?: string } {
+  const drive = (a: string, b: string) => {
+    const from = destination(a)?.lonLat;
+    const to = destination(b)?.lonLat;
+    const minutes = from && to && a !== b ? travel.minutes(from, to) : 0;
+    return minutes > IMPLICIT_LEG_MAX_MIN ? minutes : 0;
+  };
+  const there = drive(c.start, c.places[0]);
+  const home = drive(c.places[c.places.length - 1], c.finish);
+  return {
+    ...(there ? { arrives: shifted(DAY_START[c.pace], there) } : {}),
+    ...(home ? { leavesBy: shifted(c.dayEnds, HOME_BY_MIN - home) } : {}),
+  };
+}
+
 export async function generate(
   c: Constraints,
   deps: GenerateDeps,
@@ -235,12 +276,14 @@ export async function generate(
     return {
       doc,
       warnings: violations.filter((v) => v.severity === "warning"),
-      // Soft: a day the catalogue cannot fill, or can fill only with museums,
-      // is still a day. Asked about once, of the model; never a reason to
-      // throw the plan away.
-      idle: [...idleGaps(doc, c.dayEnds), ...museumHeavy(plan, places, c)].map(
-        (g) => g.message,
-      ),
+      // Soft: a day the catalogue cannot fill, or can fill only with museums
+      // and stages, is still a day. Asked about once, of the model; never a
+      // reason to throw the plan away.
+      idle: [
+        ...idleGaps(doc, c.dayEnds),
+        ...museumHeavy(plan, places, c),
+        ...misplaced(plan, places, c),
+      ].map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
         ...errors.map((v) => `${v.day}: ${v.message}`),
@@ -292,6 +335,7 @@ export async function generate(
         sorted.reduce((s, p) => s + p.lonLat[1], 0) / sorted.length,
       ]
     : [44.79, 41.72];
+  const limits = dayLimits(c, deps.travel);
   const input: ComposeInput = {
     constraints: c,
     candidates: sorted.map((p, i) => ({
@@ -317,6 +361,8 @@ export async function generate(
         }),
         dawn: sun ? localHhmm(sun.rise) : "",
         dusk: sun ? localHhmm(sun.set) : "",
+        ...(i === 0 ? { arrives: limits.arrives } : {}),
+        ...(i === c.days - 1 ? { leavesBy: limits.leavesBy } : {}),
       };
     }),
   };

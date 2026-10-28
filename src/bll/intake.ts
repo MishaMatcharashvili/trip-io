@@ -7,8 +7,10 @@ import {
   type IntakeState,
   type IntakeTurn,
   readIntake,
+  type Sights,
 } from "../domain/trip/generate/intake.ts";
 import { intakeWithOpenAI } from "../infra/openai-intake.ts";
+import { sightsInPlay } from "./sights.ts";
 
 // One turn of the conversation on /new. The planner is a model; when it is
 // unreachable, or answers with something `readIntake` refuses, the turn is
@@ -16,6 +18,7 @@ import { intakeWithOpenAI } from "../infra/openai-intake.ts";
 
 export type PlanningDeps = {
   intake: Intaker;
+  sights: (state: IntakeState, latest: string) => Promise<Sights>;
   count: (key: string, windowSeconds: number, now: Date) => Promise<number>;
   now: () => Date;
 };
@@ -36,6 +39,7 @@ export async function planningTurn(
 ): Promise<PlanningResult> {
   const deps: PlanningDeps = {
     intake: intakeWithOpenAI,
+    sights: sightsInPlay,
     count: countUse,
     now: () => new Date(),
     ...overrides,
@@ -49,12 +53,16 @@ export async function planningTurn(
   }
 
   const today = dayKey(now);
+  const latest = messages.findLast((m) => m.role === "traveller")?.text ?? "";
   try {
+    // Without the catalogue the planner still talks; it just recommends nothing.
+    const sights = await deps.sights(state, latest).catch(() => ({}));
     const turn = readIntake(
-      await deps.intake({ today, state, messages }),
+      await deps.intake({ today, state, messages, sights }),
       state,
       today,
       messages.filter((m) => m.role === "planner").length,
+      latest,
     );
     if (turn) return { ok: true, source: "model", ...turn };
   } catch {

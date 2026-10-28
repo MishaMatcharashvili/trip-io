@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { type Category, categoryGroups } from "../../catalogue/categories.ts";
 import {
   destinationName,
   destinationSlugs,
   MAX_PLACES,
+  mentions,
 } from "../../catalogue/destinations.ts";
 import { paces } from "../document.ts";
 import {
@@ -10,6 +12,7 @@ import {
   constraints,
   DEFAULT_ENDPOINT,
   dayEnds,
+  type Interest,
   interests,
   NOTES_MAX_CHARS,
   routeOf,
@@ -143,11 +146,36 @@ export const intakeReply = z.object({
   options: z.array(optionReply),
 });
 
+type IntakeReply = z.infer<typeof intakeReply>;
+
+/**
+ * What the planner may recommend in a place, by what the traveller enjoys:
+ * things to go and see, never somewhere to eat or sleep, and no theatre, whose
+ * performances nobody can promise. A cultural centre is a hall, not a sight.
+ */
+export const sightCategories = {
+  heritage: categoryGroups.heritage.filter((c) => c !== "cultural_center"),
+  nature: categoryGroups.nature,
+  culture: ["museum", "art_gallery"],
+  food: ["winery", "farmers_market", "brewery", "distillery"],
+} as const satisfies Record<Interest, readonly Category[]>;
+
+/** How many sights of each kind the planner is told of in a place. */
+export const SIGHTS_PER_INTEREST = 6;
+
+/**
+ * The sights the catalogue has in the places in play, by place name and then
+ * by interest: what the planner recommends from, so that "what do you enjoy?"
+ * is asked about Kutaisi and not about Georgia.
+ */
+export type Sights = Record<string, Partial<Record<Interest, string[]>>>;
+
 export type IntakeInput = {
   /** YYYY-MM-DD in Tbilisi. */
   today: string;
   state: IntakeState;
   messages: IntakeMessage[];
+  sights: Sights;
 };
 
 /** The port the model call implements (src/infra/openai-intake.ts). */
@@ -230,13 +258,15 @@ export function readIntake(
   today: string,
   /** Replies the planner has already given in this conversation. */
   asked = 0,
+  /** The traveller's latest message, for what the model failed to take from it. */
+  latest = "",
 ): IntakeTurn | null {
   const parsed = intakeReply.safeParse(raw);
   if (!parsed.success) return null;
   const r = parsed.data;
   const c = state.constraints;
 
-  const patch = patchOf(r);
+  const patch = { ...missed(r, state, latest, today), ...patchOf(r) };
   if (r.startDate !== null && realDate(r.startDate) && r.startDate >= today) {
     patch.startDate = r.startDate;
   }
@@ -278,6 +308,40 @@ export function readIntake(
     suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
     options,
   };
+}
+
+/**
+ * The route and the length the latest message plainly gives, when the model
+ * left them null and nothing was said of them before. A model offering "a day
+ * trip or a night" to "one day trip to Kutaisi" otherwise keeps neither, and
+ * the trip so far stays the default nobody asked for. Only places the message
+ * names: `understand` also guesses one from an interest ("wine" is Kakheti).
+ */
+function missed(
+  r: Pick<IntakeReply, "places" | "days">,
+  state: IntakeState,
+  latest: string,
+  today: string,
+): Partial<Constraints> {
+  if (!latest.trim()) return {};
+  const read = understand(latest, today);
+  const patch: Partial<Constraints> = {};
+  if (
+    !r.places?.length &&
+    !state.said.includes("places") &&
+    read.said.includes("places") &&
+    mentions(latest).length
+  ) {
+    patch.places = read.constraints.places;
+  }
+  if (
+    r.days === null &&
+    !state.said.includes("days") &&
+    read.said.includes("days")
+  ) {
+    patch.days = read.constraints.days;
+  }
+  return patch;
 }
 
 /**

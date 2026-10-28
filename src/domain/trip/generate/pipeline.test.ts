@@ -7,6 +7,7 @@ import type { Constraints } from "./constraints.ts";
 import { fallbackPlan, splitDays } from "./fallback.ts";
 import {
   type ComposeFeedback,
+  type ComposeInput,
   type Composer,
   candidateRefs,
   generate,
@@ -529,6 +530,50 @@ describe("the route", () => {
   });
 });
 
+describe("the days the composer is given", () => {
+  const daysSeen = async (c: Constraints) => {
+    let days: ComposeInput["days"] = [];
+    await generate(c, {
+      ...deps(async (input) => {
+        days = input.days;
+        throw new Error("only looking");
+      }),
+    });
+    return days;
+  };
+
+  test("a day trip says when it gets there and when it has to leave", async () => {
+    const [day] = await daysSeen({
+      ...constraints,
+      days: 1,
+      start: "tbilisi",
+      finish: "tbilisi",
+    });
+    // Hours to Kazbegi and back: later than the day starts, and away hours
+    // before the latest it may be home (two after the day ends at 20:00).
+    assert.match(day.arrives ?? "", /^\d\d:[0-5][05]$/);
+    assert.match(day.leavesBy ?? "", /^\d\d:[0-5][05]$/);
+    assert.ok((day.arrives ?? "") > "10:00");
+    assert.ok((day.leavesBy ?? "") < "21:00");
+  });
+
+  test("a trip that starts and ends where it is has neither", async () => {
+    const days = await daysSeen(constraints);
+    assert.equal(days.length, 2);
+    assert.ok(days.every((d) => !d.arrives && !d.leavesBy));
+  });
+
+  test("only the first day arrives, and only the last leaves", async () => {
+    const days = await daysSeen({
+      ...constraints,
+      start: "tbilisi",
+      finish: "tbilisi",
+    });
+    assert.ok(days[0].arrives && !days[0].leavesBy);
+    assert.ok(days[1].leavesBy && !days[1].arrives);
+  });
+});
+
 describe("fallbackPlan", () => {
   test("a morning the drive has used up gets one visit, and the rest go to the afternoon", () => {
     // Two hours from Tbilisi to Sighnaghi: arriving after eleven leaves room
@@ -580,6 +625,36 @@ describe("fallbackPlan", () => {
         "evening:meal",
       ],
     );
+  });
+
+  test("lunch is not at a coffee shop, and a stage or a hall is not a sight", () => {
+    // Nearer to everything than the café and the church, so picked first if allowed.
+    const at = (n: number, category: string, group: Candidate["group"]) => ({
+      ...(candidates.get(P.gergeti) as Candidate),
+      id: `50000000-0000-4000-8000-00000000000${n}`,
+      name: category,
+      category,
+      group,
+      lonLat: [44.642, 42.6605] as [number, number],
+    });
+    const pool = [
+      ...curated,
+      at(1, "coffee_shop", "food"),
+      at(2, "theatre_venue", "culture"),
+      at(3, "cultural_center", "heritage"),
+    ];
+    const plan = fallbackPlan({ ...constraints, days: 1 }, pool);
+    const chosen = plan.days[0].stops.map(
+      (s) => pool.find((p) => p.id === s.placeId)?.category,
+    );
+    assert.ok(chosen.length);
+    for (const category of [
+      "coffee_shop",
+      "theatre_venue",
+      "cultural_center",
+    ]) {
+      assert.ok(!chosen.includes(category), category);
+    }
   });
 
   test("never repeats a visit", () => {

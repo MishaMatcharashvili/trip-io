@@ -30,6 +30,12 @@ Rules:
 - A day that moves on to the next place, or starts with the drive from "start", begins with the
   drive there. When the two are far apart, leave the morning empty and put that day's stops in
   the afternoon and evening.
+- A day in "days" may have "arrives", when the drive from "start" gets there, and "leavesBy",
+  when the drive to "finish" has to set off. Every stop that day fits between the two: add up
+  the durations, with 20 minutes between stops and a quarter of an hour in hand, and leave
+  stops out until they fit. A day trip
+  with three hours there has lunch and the one or two sights the place is known for, nothing
+  more.
 - Every day runs until "dayEnds" (in "trip"): a full day, with an afternoon and a dinner, not a
   morning and an early afternoon. No stop starts after dayEnds.
 - A last day that ends with the drive to "finish" ends its stops so that the drive arrives no
@@ -58,6 +64,13 @@ Rules:
   (group "culture") is for a traveller who chose "culture": otherwise at most one in a day, and
   only when nothing else fits. With no interests given, mix views and walks, churches and old
   streets, a market or a winery, not museums.
+- Visit what the place is known for first: its cathedral, monastery, fortress, old town, park
+  or nature reserve, before a small business. A short day, cut down by drives, is spent on the
+  one or two sights a traveller would come for, not on whatever is nearest.
+- Theatres, concert halls and other stages (kinds theatre_venue, music_venue,
+  performing_arts_venue) are for a performance, in the evening, and only for a traveller who
+  chose "culture". Never a daytime visit.
+- A meal is at a restaurant, an eatery or a café, never at a coffee shop or a market.
 - Match the pace: relaxed means fewer stops.
 - Do not set clock times. Slots and durations are enough.
 - "notes" holds the traveller's own wishes, in their words. Treat them as preferences when

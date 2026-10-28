@@ -460,3 +460,38 @@ export async function countInArea(
     verified: (r.verified as number) ?? 0,
   };
 }
+
+/**
+ * The best-attested places of the given categories in one area, at most
+ * `perCategory` of each, curated first: what the planner on /new recommends
+ * from before any trip is composed.
+ */
+export async function sightsInArea(
+  match: AreaMatch,
+  categories: readonly string[],
+  perCategory: number,
+): Promise<{ name: string; category: string }[]> {
+  if (!categories.length) return [];
+  const rows = await db.execute(sql`
+    SELECT name, category
+    FROM (
+      SELECT p.name, p.category, p.tier,
+             (p.attrs->>'confidence')::float AS confidence,
+             row_number() OVER (
+               PARTITION BY p.category
+               ORDER BY p.tier = 'curated' DESC,
+                        (p.attrs->>'confidence')::float DESC NULLS LAST, p.name
+             ) AS rank
+      FROM place p
+      WHERE p.tier IN ('curated', 'verified')
+        AND p.category IN (${list(categories)})
+        AND ${areaPredicate(match)}
+    ) ranked
+    WHERE rank <= ${perCategory}
+    ORDER BY tier = 'curated' DESC, confidence DESC NULLS LAST, name
+  `);
+  return rows.rows.map((r) => ({
+    name: r.name as string,
+    category: r.category as string,
+  }));
+}

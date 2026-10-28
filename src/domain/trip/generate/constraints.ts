@@ -83,4 +83,4 @@ export const routeOf = (
  * Bumped whenever the prompt or the plan schema changes, so cached plans from
  * an older prompt are never served.
  */
-export const PROMPT_VERSION = 6;
+export const PROMPT_VERSION = 8;
