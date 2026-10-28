@@ -589,6 +589,24 @@ describe("road stops", () => {
     assert.deepEqual(fort?.areas, []);
   });
 
+  test("what travellers rate a place reaches the composer, and only when known", async () => {
+    let input: ComposeInput | undefined;
+    const rated = places.map((p, i) =>
+      i === 4 ? { ...p, rating: { value: 4.6, count: 2_400 } } : p,
+    );
+    await generate(trip, {
+      ...deps(async (seen) => {
+        input = seen;
+        throw new Error("only looking");
+      }),
+      candidates: rated,
+    });
+    const named = (name: string) =>
+      input?.candidates.find((c) => c.name === name);
+    assert.deepEqual(named("food 5")?.rating, { value: 4.6, count: 2_400 });
+    assert.equal(named("food 2")?.rating, undefined);
+  });
+
   test("a stop on the way splits the drive in two, and is not a day in a place", async () => {
     const { toRef } = candidateRefs(places);
     const r = (n: number) => toRef.get(places[n - 1].id) as string;

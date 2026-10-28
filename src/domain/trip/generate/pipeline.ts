@@ -47,6 +47,8 @@ export type CandidateRef = {
   areas: Candidate["areas"];
   /** The long drives it is a stop on, and how many minutes into each it lies. */
   roads: { road: string; after: number }[];
+  /** What travellers give it, when enough of them have. */
+  rating?: Candidate["rating"];
   /** Human-readable, e.g. "mon–sat 10:00–18:00; sun closed", or "unknown". */
   hours: string;
 };
@@ -405,6 +407,7 @@ export async function generate(
           : [];
       }),
       hours: deps.describeHours(p),
+      ...(p.rating ? { rating: p.rating } : {}),
     })),
     drives: drives.map((d) => ({
       road: driveLabel(d),
