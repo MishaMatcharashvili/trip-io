@@ -2,6 +2,7 @@ import type {
   EnrichOutcome,
   KeptContent,
 } from "../domain/catalogue/enrichment.ts";
+import type { KeptRatings, RatedOutcome } from "../domain/catalogue/ratings.ts";
 
 // Redis over Upstash's REST API, behind the domain's KeptContent port. HTTP and
 // not a TCP client: a serverless function that opens a socket per invocation
@@ -95,6 +96,48 @@ export function upstashContent(
         JSON.stringify({ v: VERSION, outcome }),
         "EX",
         ttl,
+      ]);
+    },
+  };
+}
+
+/** 1: a town's rated places, as RatedOutcome. Bumped like VERSION above. */
+const RATINGS_VERSION = 1;
+
+/**
+ * A town's rated places, behind the domain's KeptRatings port: one entry per
+ * provider, town and kind, never per traveller, and always with a lifetime.
+ */
+export function upstashRatings(
+  options: RedisOptions & { provider: string },
+): KeptRatings {
+  const { provider } = options;
+  const command = redis(options);
+  const keyFor = (key: string) =>
+    `place-ratings:v${RATINGS_VERSION}:${provider}:${key}`;
+
+  return {
+    async get(key) {
+      const raw = await command(["GET", keyFor(key)]);
+      if (typeof raw !== "string") return null;
+      try {
+        const kept = JSON.parse(raw) as { v?: number; outcome?: RatedOutcome };
+        return kept.v === RATINGS_VERSION &&
+          typeof kept.outcome?.ok === "boolean"
+          ? kept.outcome
+          : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async set(key, outcome, ttlSeconds) {
+      await command([
+        "SET",
+        keyFor(key),
+        JSON.stringify({ v: RATINGS_VERSION, outcome }),
+        "EX",
+        Math.max(1, Math.floor(ttlSeconds)),
       ]);
     },
   };

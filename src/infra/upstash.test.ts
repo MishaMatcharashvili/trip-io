@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { EnrichOutcome } from "../domain/catalogue/enrichment.ts";
-import { upstashContent } from "./upstash.ts";
+import type { RatedOutcome } from "../domain/catalogue/ratings.ts";
+import { upstashContent, upstashRatings } from "./upstash.ts";
 
 // MOCKED: a fake Upstash that keeps what it is sent and answers in its shape.
 
@@ -127,5 +128,44 @@ describe("upstash content", () => {
         timeoutMs: 10,
       }).get(PLACE),
     );
+  });
+});
+
+describe("upstash ratings", () => {
+  const town: RatedOutcome = {
+    ok: true,
+    places: [
+      {
+        id: "ChIJpalaty",
+        names: ["Palaty"],
+        lonLat: [42.7004, 42.2716],
+        rating: { value: 4.6, count: 2400 },
+      },
+    ],
+  };
+  const ratings = (f: ReturnType<typeof fake>) =>
+    upstashRatings({
+      url: "https://redis.example",
+      token: "tok",
+      provider: "google",
+      fetch: f.fetch,
+    });
+
+  test("a town's list comes back, under a versioned key of its own, with a lifetime", async () => {
+    const f = fake();
+    await ratings(f).set("kutaisi:restaurant", town, 86_400);
+    assert.deepEqual(await ratings(f).get("kutaisi:restaurant"), town);
+    const [set] = f.sent;
+    assert.equal(set.args[1], "place-ratings:v1:google:kutaisi:restaurant");
+    assert.deepEqual(set.args.slice(3), ["EX", 86_400]);
+  });
+
+  test("a place's enrichment is never read as a town's list", async () => {
+    const f = fake();
+    f.data.set(
+      "place-ratings:v1:google:kutaisi:hotel",
+      JSON.stringify({ v: 2, outcome }),
+    );
+    assert.equal(await ratings(f).get("kutaisi:hotel"), null);
   });
 });
