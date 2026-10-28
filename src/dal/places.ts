@@ -24,6 +24,7 @@ import {
   ROAD_SIGHT_DETOUR_M,
   ROAD_SIGHTS,
   ROAD_SIGHTS_PER_DRIVE,
+  ROAD_STOP_SPAN,
 } from "../domain/trip/generate/roads.ts";
 import type { PlaceInfo } from "../domain/trip/validate.ts";
 import { areaPredicate, list } from "./area-predicate.ts";
@@ -326,6 +327,8 @@ export async function roadsideCandidates(
             (p.category IN (${list(ROAD_SIGHTS)}) AND ST_DWithin(p.geom, road.g, ${ROAD_SIGHT_DETOUR_M}))
             OR (p.category IN (${list(ROAD_MEALS)}) AND ST_DWithin(p.geom, road.g, ${ROAD_MEAL_DETOUR_M}))
           )
+          AND ST_LineLocatePoint(road.g::geometry, p.geom::geometry)
+              BETWEEN ${ROAD_STOP_SPAN[0]}::float AND ${ROAD_STOP_SPAN[1]}::float
           ${sql.join(notAtEnds, sql` `)}
       ) found
     ) ranked

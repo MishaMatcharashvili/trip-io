@@ -61,6 +61,12 @@ export const ROAD_SIGHT_DETOUR_M = 10_000;
 export const ROAD_MEAL_DETOUR_M = 2_500;
 /** Closer than this to either end is still the town the drive left, or already the one it is going to. */
 export const ROAD_END_MARGIN_M = 15_000;
+/**
+ * How far along the road, as a share of it, a stop may lie: a break twenty
+ * minutes out of Tbilisi on a four-hour drive is not a break, and lunch there
+ * is at ten in the morning.
+ */
+export const ROAD_STOP_SPAN = [0.15, 0.85] as const;
 export const ROAD_SIGHTS_PER_DRIVE = 10;
 export const ROAD_MEALS_PER_DRIVE = 6;
 /** The road is sent to the database simplified to this, well inside the detours above. */
