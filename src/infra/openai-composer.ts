@@ -28,22 +28,9 @@ Rules:
   there. The first day begins with the drive from "start", and the last day ends with the drive
   to "finish", when those are not the place the day is in.
 - A day that moves on to the next place, or starts with the drive from "start", begins with the
-  drive there. When the two are far apart, the morning goes to the drive and its road stops (below),
-  and the day's stops in the new place are in the afternoon and evening.
-- "drives" lists the long drives on the route, each with its "road" and how many "minutes" it
-  takes. A candidate whose "roads" names one lies along that drive, "after" minutes into it, and in
-  no place: it is a stop on the way, not a day somewhere. Break each long drive with a road stop
-  when the day has room: the one sight that road is known for (a fortress, a cave town, a
-  monastery, a lake), 45-90 min, somewhere in the middle of the drive rather than in its first or
-  last half hour, and on a drive of three hours or more, lunch at a restaurant on the way too,
-  near that sight. A drive of three hours or more always has its road stop: shorten or drop a stop
-  at either end of the day to make room rather than leave it out. A day in "days" names in
-  "roads" the long drives it is known to take. Use a road stop only on the day that drives its
-  road, in the order of "after". A road driven there and back stops somewhere different each way. On a day that drives from "start"
-  or moves on, road stops come first (morning, then lunch at midday), before the day's stops in
-  the new place. On the last day, driving to "finish", they come last (afternoon), after the day's
-  stops in the last place. A road stop's time comes out of the day: it makes "arrives" later, or
-  the time to set off for "finish" earlier, by its duration.
+  drive there. When the two are far apart, leave the morning empty and put that day's stops in
+  the afternoon and evening. A long drive stops on its own for fuel and a rest: that is not a
+  stop to plan, and it is already counted in "arrives" and "leavesBy".
 - A day in "days" may have "arrives", when the drive from "start" gets there, and "leavesBy",
   when the drive to "finish" has to set off. Every stop that day fits between the two: add up
   the durations, with 20 minutes between stops and a quarter of an hour in hand, and leave
@@ -112,14 +99,12 @@ const userTurn = (input: ComposeInput) =>
       notes: input.constraints.notes,
     },
     days: input.days,
-    drives: input.drives.map(({ road, minutes }) => ({ road, minutes })),
     candidates: input.candidates.map((c) => ({
       ref: c.ref,
       name: c.name,
       kind: c.category,
       group: c.group,
       areas: c.areas,
-      ...(c.roads.length ? { roads: c.roads } : {}),
       ...(c.rating ? { rating: c.rating.value, reviews: c.rating.count } : {}),
       outdoor: c.outdoor,
       hours: c.hours,
