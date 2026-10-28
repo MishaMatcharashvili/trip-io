@@ -1,5 +1,7 @@
+import { destinationName } from "../../catalogue/destinations.ts";
 import { type Constraints, routeOf } from "./constraints.ts";
 import { type Leg, routeLegs } from "./feasibility.ts";
+import type { Candidate, Plan } from "./plan.ts";
 
 // Long drives, and what a traveller stops for on them. Tbilisi to Kutaisi is
 // four hours in a car, and nobody drives it without a break: the break is
@@ -63,3 +65,54 @@ export const ROAD_SIGHTS_PER_DRIVE = 10;
 export const ROAD_MEALS_PER_DRIVE = 6;
 /** The road is sent to the database simplified to this, well inside the detours above. */
 export const ROAD_SIMPLIFY_M = 250;
+
+/** A drive this long without a break is sent back to the composer, if there is anywhere to stop. */
+export const MUST_BREAK_DRIVE_MIN = 180;
+
+const hours = (minutes: number) => {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round((minutes % 60) / 5) * 5;
+  return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
+};
+
+/**
+ * Long drives the plan takes without stopping, when there was somewhere to
+ * stop: told it may break a drive, a model fills the afternoon in Kutaisi and
+ * sits in the car for four hours. Feedback for the composer, like balance.ts;
+ * a plan that cannot fit a stop in is still a plan.
+ */
+export function unbrokenDrives(
+  plan: Plan,
+  places: ReadonlyMap<string, Candidate>,
+  c: Pick<Constraints, "start" | "places" | "finish">,
+): { message: string }[] {
+  const stopped = new Set(
+    plan.days.flatMap((d) =>
+      d.stops.flatMap((s) => places.get(s.placeId)?.roads ?? []),
+    ),
+  );
+  const onThe = (label: string) =>
+    [...places.values()].filter(
+      (p) => p.roads?.includes(label) && p.group !== "food",
+    );
+  return longDrives(c).flatMap((drive) => {
+    const label = driveLabel(drive);
+    const sights = onThe(label);
+    if (
+      drive.minutes < MUST_BREAK_DRIVE_MIN ||
+      stopped.has(label) ||
+      !sights.length
+    ) {
+      return [];
+    }
+    const named = sights
+      .slice(0, 3)
+      .map((p) => `"${p.name}"`)
+      .join(", ");
+    return [
+      {
+        message: `the ${hours(drive.minutes)} drive from ${destinationName(drive.from)} to ${destinationName(drive.to)} has no stop on the way. Break it at a candidate on the road "${label}" (${named}), with lunch nearby, and shorten the day's other stops to make room`,
+      },
+    ];
+  });
+}
