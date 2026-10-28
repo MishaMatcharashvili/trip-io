@@ -52,12 +52,17 @@ import {
 } from "@/domain/trip/generate/intake.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
+import { mapboxDirections } from "@/infra/mapbox-directions.ts";
+import { env } from "@/lib/env.ts";
 import { requireSession, type SessionEnv } from "../auth.ts";
 
 // The trip document over HTTP. The work is done in src/bll/*; these handlers do
 // validation, status codes and nothing else.
 
 const params = z.object({ id: z.uuid() });
+
+/** Routes a trip's long drives, to find places to stop on the way. */
+const roads = mapboxDirections({ token: env.MAPBOX_DIRECTIONS_TOKEN });
 
 /** A point as `lon,lat`, the way the catalogue's `near` takes one. */
 const lonLat = z
@@ -212,7 +217,10 @@ export const trips = new Hono<SessionEnv>()
 
       let result: Awaited<ReturnType<typeof generateTrip>>;
       if (requestId) {
-        const outcome = await buildTripOnce(requestId, wanted, userId);
+        const outcome = await buildTripOnce(requestId, wanted, userId, {
+          generate: (w, u, options) =>
+            generateTrip(w, u, { ...options, roads }),
+        });
         if (outcome.kind === "existing") {
           return c.json({ id: outcome.tripId }, 200);
         }
@@ -224,7 +232,7 @@ export const trips = new Hono<SessionEnv>()
         }
         result = outcome.kind === "built" ? outcome.trip : outcome.failure;
       } else {
-        result = await generateTrip(wanted, userId);
+        result = await generateTrip(wanted, userId, { roads });
       }
 
       if (!result.ok) {
