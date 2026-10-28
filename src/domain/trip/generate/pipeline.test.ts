@@ -766,6 +766,33 @@ describe("fallbackPlan", () => {
     );
   });
 
+  test("lunch and the bed are where travellers rate them well, when as near", () => {
+    const first = fallbackPlan({ ...constraints, days: 1 }, curated);
+    const lunch = first.days[0].stops.find((s) => s.slot === "midday");
+    const bed = curated.find((p) => p.id === first.days[0].stayId);
+    const meal = curated.find((p) => p.id === lunch?.placeId);
+    assert.ok(meal && bed);
+    // The same doors, a few metres on, and rated: a better lunch and a
+    // better bed for no more walking.
+    const rating = { value: 4.7, count: 1_800 };
+    const better = (p: Candidate, n: number): Candidate => ({
+      ...p,
+      id: `60000000-0000-4000-8000-00000000000${n}`,
+      lonLat: [p.lonLat[0] + 0.0002, p.lonLat[1]],
+      rating,
+    });
+    const second = fallbackPlan({ ...constraints, days: 1 }, [
+      ...curated,
+      better(meal, 1),
+      better(bed, 2),
+    ]);
+    assert.equal(
+      second.days[0].stops.find((s) => s.slot === "midday")?.placeId,
+      better(meal, 1).id,
+    );
+    assert.equal(second.days[0].stayId, better(bed, 2).id);
+  });
+
   test("lunch is not at a coffee shop, and a stage or a hall is not a sight", () => {
     // Nearer to everything than the café and the church, so picked first if allowed.
     const at = (n: number, category: string, group: Candidate["group"]) => ({
