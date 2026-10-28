@@ -50,8 +50,8 @@ export const ROAD_SIGHTS = [
   "hot_springs",
 ] as const;
 
-/** Lunch on the road is a sit-down meal, not a coffee. */
-export const ROAD_MEALS = ["restaurant", "casual_eatery"] as const;
+/** Lunch on the road is a sit-down meal: a roadside "eatery" is as often a bakery or a doughnut stand. */
+export const ROAD_MEALS = ["restaurant"] as const;
 
 /** A sight may be this far off the road: Uplistsikhe is worth the detour. */
 export const ROAD_SIGHT_DETOUR_M = 10_000;
