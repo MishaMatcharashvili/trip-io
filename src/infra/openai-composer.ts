@@ -85,6 +85,11 @@ Rules:
   performing_arts_venue) are for a performance, in the evening, and only for a traveller who
   chose "culture". Never a daytime visit.
 - A meal is at a restaurant, an eatery or a café, never at a coffee shop or a market.
+- "rating" (out of 5) and "reviews" are what travellers give a candidate on Google Maps, when
+  enough have. Prefer what many rate well: a meal at a restaurant rated 4.3 or more by hundreds
+  over one nobody has rated; a night at the best-rated lodging near the day's stops; and a sight
+  with thousands of reviews is one the place is known for. Never choose a far-off place for its
+  rating alone: a day still keeps its stops close together.
 - Match the pace: relaxed means fewer stops.
 - Do not set clock times. Slots and durations are enough.
 - "notes" holds the traveller's own wishes, in their words. Treat them as preferences when
@@ -115,6 +120,7 @@ const userTurn = (input: ComposeInput) =>
       group: c.group,
       areas: c.areas,
       ...(c.roads.length ? { roads: c.roads } : {}),
+      ...(c.rating ? { rating: c.rating.value, reviews: c.rating.count } : {}),
       outdoor: c.outdoor,
       hours: c.hours,
       lon: Number(c.lonLat[0].toFixed(4)),
