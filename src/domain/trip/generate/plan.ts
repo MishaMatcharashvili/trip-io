@@ -96,7 +96,7 @@ export type Candidate = {
   openingHours: OpeningHours | null;
   /** Visited in the open: bound by daylight. */
   outdoor: boolean;
-  /** The first destination it was retrieved for; the fallback plans one at a time. */
+  /** The first destination (or, for a road stop, the drive) it was retrieved for. */
   area: string;
   /** Every requested destination it lies in: Telavi's cathedral is in Telavi and in Kakheti. */
   areas: readonly string[];

@@ -3,7 +3,12 @@ import { describe, test } from "node:test";
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { Queryable } from "./client.ts";
-import { placeFacts, placeNames } from "./places.ts";
+import {
+  lineWkt,
+  placeFacts,
+  placeNames,
+  roadsideCandidates,
+} from "./places.ts";
 
 // A place id arrives from outside more often than it looks: a patch body, a
 // model's swap proposal. `place.id` is a uuid column, and Postgres answers a
@@ -53,5 +58,67 @@ describe("place lookups", () => {
     const { conn, params } = recording();
     assert.equal((await placeNames(["somewhere indoors"], conn)).size, 0);
     assert.deepEqual(params, []);
+  });
+});
+
+describe("places along a road", () => {
+  const ends = [
+    {
+      lonLat: [44.8, 41.695] as [number, number],
+      match: { kind: "regions" as const, slugs: ["tbilisi"] },
+    },
+    {
+      lonLat: [42.663, 42.26] as [number, number],
+      match: { kind: "regions" as const, slugs: ["kutaisi"] },
+    },
+  ];
+
+  test("the road goes to PostGIS longitude first", () => {
+    assert.equal(
+      lineWkt([
+        [44.8, 41.695],
+        [44.11, 41.98],
+      ]),
+      "LINESTRING(44.8 41.695, 44.11 41.98)",
+    );
+  });
+
+  test("a road that is not a line is not looked along", async () => {
+    const { conn, params } = recording();
+    const found = await roadsideCandidates(
+      { label: "tbilisi > kutaisi", road: [[44.8, 41.695]], ends },
+      conn,
+    );
+    assert.deepEqual(found, []);
+    assert.deepEqual(params, []);
+  });
+
+  test("what is found is on the drive, and in no place of the trip", async () => {
+    const { conn } = recording([
+      {
+        id: PLACE,
+        name: "Gori Fortress",
+        category: "fort",
+        tier: "verified",
+        opening_hours: null,
+        lon: 44.108,
+        lat: 41.986,
+      },
+    ]);
+    const [fort] = await roadsideCandidates(
+      {
+        label: "tbilisi > kutaisi",
+        road: [
+          [44.8, 41.695],
+          [42.663, 42.26],
+        ],
+        ends,
+      },
+      conn,
+    );
+    assert.deepEqual(fort.roads, ["tbilisi > kutaisi"]);
+    assert.deepEqual(fort.areas, []);
+    assert.equal(fort.group, "heritage");
+    assert.equal(fort.outdoor, true);
   });
 });
