@@ -124,6 +124,9 @@ export type GenerateResult =
 
 const MAX_FALLBACK_ROUNDS = 12;
 
+/** On the road this long, rests included, a day has done its seeing from the car. */
+export const TRAVEL_DAY_MIN = 6 * 60;
+
 /**
  * What a plan leaves out of the places it was asked to visit. Every one is
  * visited: a plan that quietly skips one is a different trip, and is rejected
@@ -270,12 +273,22 @@ export async function generate(
     });
     const errors = violations.filter((v) => v.severity === "error");
 
-    // A rest at a station is part of a drive, not something to see.
-    const busyDays = new Set(
-      Object.values(nodes)
+    // A rest at a station is part of a drive, not something to see; and a
+    // day that much on the road is a travel day, with nothing to see owed.
+    const driving = new Map<string, number>();
+    for (const n of Object.values(nodes)) {
+      if (n.kind !== "transfer" && !n.meta.rest) continue;
+      const day = dayKey(n.startsAt);
+      driving.set(day, (driving.get(day) ?? 0) + n.durationMin);
+    }
+    const busyDays = new Set([
+      ...Object.values(nodes)
         .filter((n) => n.kind === "visit" && !n.meta.rest)
         .map((n) => dayKey(n.startsAt)),
-    );
+      ...[...driving]
+        .filter(([, minutes]) => minutes >= TRAVEL_DAY_MIN)
+        .map(([day]) => day),
+    ]);
     const empty = Array.from({ length: c.days }, (_, i) =>
       addDays(c.startDate, i),
     )

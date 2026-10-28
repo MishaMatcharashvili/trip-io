@@ -652,6 +652,44 @@ describe("the drive to Kutaisi", () => {
     ]);
   });
 
+  test("a day that much on the road is a travel day, not an empty one", async () => {
+    // Tbilisi to Batumi, nearly seven hours on the estimate, and dinner.
+    const batumi = town("batumi", 41.625, 41.624);
+    const plan: Plan = {
+      days: [
+        {
+          day: 1,
+          theme: "To Batumi",
+          stayId: batumi[0].id,
+          stops: [
+            {
+              placeId: batumi[4].id,
+              slot: "evening",
+              kind: "meal",
+              durationMin: 75,
+            },
+          ],
+        },
+      ],
+    };
+    const result = await generate(
+      {
+        ...trip,
+        days: 1,
+        places: ["batumi"],
+        finish: "batumi",
+        dayEnds: "21:00",
+      },
+      { ...deps(down), cache: memoryCache(plan), candidates: batumi },
+    );
+    const cached = result.attempts.find((a) => a.source === "cache");
+    assert.ok(cached, JSON.stringify(result.attempts));
+    assert.ok(
+      !cached.problems.some((p) => /nothing to see that day/.test(p)),
+      JSON.stringify(cached),
+    );
+  });
+
   test("a rest at a station is not something to see that day", async () => {
     const plan: Plan = {
       days: [1, 2].map((day) => ({
