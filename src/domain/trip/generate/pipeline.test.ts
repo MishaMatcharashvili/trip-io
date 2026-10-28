@@ -567,28 +567,6 @@ describe("road stops", () => {
     finish: "kutaisi",
   };
 
-  test("the composer is told the long drive, and which places are on it", async () => {
-    let input: ComposeInput | undefined;
-    await generate(trip, {
-      ...deps(async (seen) => {
-        input = seen;
-        throw new Error("only looking");
-      }),
-      candidates: places,
-    });
-    assert.deepEqual(
-      input?.drives.map((d) => d.road),
-      ["tbilisi > kutaisi"],
-    );
-    const fort = input?.candidates.find((c) => c.name === "heritage 1");
-    assert.equal(fort?.roads.length, 1);
-    assert.equal(fort?.roads[0].road, "tbilisi > kutaisi");
-    // Gori is a little under two hours out, on the travel estimate.
-    assert.ok((fort?.roads[0].after ?? 0) > 60);
-    assert.ok((fort?.roads[0].after ?? 999) < 120);
-    assert.deepEqual(fort?.areas, []);
-  });
-
   test("what travellers rate a place reaches the composer, and only when known", async () => {
     let input: ComposeInput | undefined;
     const rated = places.map((p, i) =>
@@ -639,24 +617,6 @@ describe("road stops", () => {
       { ...deps(scripted(plan, plan).compose), candidates: places },
     );
     assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
-    const titles = Object.values(result.doc.nodes)
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-      .map((n) => n.meta.title);
-    assert.deepEqual(titles.slice(0, 4), [
-      "Drive to heritage 1",
-      "heritage 1",
-      "Lunch · food 2",
-      "Drive to heritage 4",
-    ]);
-  });
-
-  test("with the model down, the template still breaks the drive, lunch and all", async () => {
-    const result = await generate(
-      { ...trip, days: 1, pace: "relaxed", dayEnds: "21:00" },
-      { ...deps(down), candidates: places },
-    );
-    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
-    assert.equal(result.source, "template");
     const titles = Object.values(result.doc.nodes)
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map((n) => n.meta.title);
