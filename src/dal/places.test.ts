@@ -7,6 +7,7 @@ import {
   lineWkt,
   placeFacts,
   placeNames,
+  plannableNear,
   roadsideCandidates,
 } from "./places.ts";
 
@@ -120,5 +121,51 @@ describe("places along a road", () => {
     assert.deepEqual(fort.areas, []);
     assert.equal(fort.group, "heritage");
     assert.equal(fort.outdoor, true);
+  });
+});
+
+describe("places near a review site's pins", () => {
+  const area = { kind: "regions" as const, slugs: ["kutaisi"] };
+
+  test("with nothing listed, nothing is asked", async () => {
+    const { conn, params } = recording();
+    const none = await plannableNear(
+      { near: [], radiusM: 250, categories: ["restaurant"], area },
+      conn,
+    );
+    assert.deepEqual(none, []);
+    assert.deepEqual(params, []);
+  });
+
+  test("every pin goes in one query, longitude first, with the Georgian name back", async () => {
+    const { conn, params } = recording([
+      {
+        id: PLACE,
+        name: "Palaty",
+        name_ka: "პალატი",
+        category: "restaurant",
+        tier: "verified",
+        opening_hours: null,
+        lon: 42.7004,
+        lat: 42.2716,
+      },
+    ]);
+    const [palaty] = await plannableNear(
+      {
+        near: [
+          [42.7004, 42.2716],
+          [42.71, 42.27],
+        ],
+        radiusM: 250,
+        categories: ["restaurant"],
+        area,
+      },
+      conn,
+    );
+    assert.ok(
+      params[0].includes("MULTIPOINT((42.7004 42.2716), (42.71 42.27))"),
+    );
+    assert.equal(palaty.nameKa, "პალატი");
+    assert.equal(palaty.group, "food");
   });
 });

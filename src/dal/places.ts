@@ -343,6 +343,40 @@ export async function roadsideCandidates(
   }));
 }
 
+export type NearbyQuery = {
+  /** Where a provider pinned the places it listed. */
+  near: readonly LonLat[];
+  radiusM: number;
+  categories: readonly string[];
+  area: AreaMatch;
+};
+
+/**
+ * Places a plan may use, of the given categories, in one area, within
+ * `radiusM` of any of the points: which catalogue places a review site's
+ * listings might be (src/domain/catalogue/ratings.ts decides which are).
+ */
+export async function plannableNear(
+  { near, radiusM, categories, area }: NearbyQuery,
+  conn: Queryable = db,
+): Promise<(Omit<Candidate, "area" | "areas"> & { nameKa: string | null })[]> {
+  if (!near.length || !categories.length) return [];
+  const points = `MULTIPOINT(${near.map(([lon, lat]) => `(${lon} ${lat})`).join(", ")})`;
+  const rows = await conn.execute(sql`
+    SELECT p.id, p.name, p.name_ka, p.category, p.tier, p.opening_hours,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
+    FROM place p
+    WHERE p.tier IN ('curated', 'verified')
+      AND p.category IN (${list(categories)})
+      AND ST_DWithin(p.geom, ST_GeogFromText(${points}), ${radiusM})
+      AND ${areaPredicate(area)}
+  `);
+  return rows.rows.map((r) => ({
+    ...candidateOf(r),
+    nameKa: (r.name_ka as string | null) ?? null,
+  }));
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
