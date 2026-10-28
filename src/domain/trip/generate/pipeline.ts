@@ -19,6 +19,7 @@ import {
   type RefPlan,
   resolveRefs,
 } from "./plan.ts";
+import { restedMinutes } from "./rests.ts";
 import { addDays, DAY_START, HOME_BY_MIN, schedule } from "./schedule.ts";
 
 // constraints → cache? → candidates → compose → resolve refs → schedule → validate
@@ -99,6 +100,8 @@ export type GenerateDeps = {
   travel: TravelEstimator;
   newId: () => string;
   describeHours: (c: Candidate) => string;
+  /** Fuel stations along the trip's long drives, where they rest (rests.ts). Never planned from. */
+  stations?: Candidate[];
 };
 
 export type GenerateResult =
@@ -199,12 +202,16 @@ const shifted = (hhmm: string, minutes: number) => {
 function dayLimits(
   c: Constraints,
   travel: TravelEstimator,
+  stations: readonly Candidate[],
 ): { arrives?: string; leavesBy?: string } {
+  // With its rests: a stop for fuel at Gori is half an hour the day does not have.
   const drive = (a: string, b: string) => {
     const from = destination(a)?.lonLat;
     const to = destination(b)?.lonLat;
     const minutes = from && to && a !== b ? travel.minutes(from, to) : 0;
-    return minutes > IMPLICIT_LEG_MAX_MIN ? minutes : 0;
+    return minutes > IMPLICIT_LEG_MAX_MIN && from && to
+      ? restedMinutes(from, to, stations, travel)
+      : 0;
   };
   const there = drive(c.start, c.places[0]);
   const home = drive(c.places[c.places.length - 1], c.finish);
@@ -233,6 +240,12 @@ export async function generate(
   }
 
   const places = new Map(deps.candidates.map((p) => [p.id, p]));
+  const stations = deps.stations ?? [];
+  /** What the validator may find on a day: the stations a drive rests at too. */
+  const known = new Map([
+    ...places,
+    ...stations.map((s) => [s.id, s] as const),
+  ]);
   const header = tripHeader(c);
 
   /** Schedule and validate. Problems are what a retry or the fallback acts on. */
@@ -247,18 +260,20 @@ export async function generate(
       start: destination(c.start)?.lonLat ?? null,
       finish: finishOf(c),
       dayEnds: c.dayEnds,
+      stations,
     });
     const doc: TripDoc = { trip: header, nodes };
     const violations = validateDoc(doc, {
-      places,
+      places: known,
       travel: deps.travel,
       author: "system",
     });
     const errors = violations.filter((v) => v.severity === "error");
 
+    // A rest at a station is part of a drive, not something to see.
     const busyDays = new Set(
       Object.values(nodes)
-        .filter((n) => n.kind === "visit")
+        .filter((n) => n.kind === "visit" && !n.meta.rest)
         .map((n) => dayKey(n.startsAt)),
     );
     const empty = Array.from({ length: c.days }, (_, i) =>
@@ -337,7 +352,7 @@ export async function generate(
         sorted.reduce((s, p) => s + p.lonLat[1], 0) / sorted.length,
       ]
     : [44.79, 41.72];
-  const limits = dayLimits(c, deps.travel);
+  const limits = dayLimits(c, deps.travel, stations);
   const input: ComposeInput = {
     constraints: c,
     candidates: sorted.map((p, i) => ({
@@ -443,7 +458,7 @@ export async function generate(
   const exclude = new Set<string>();
   for (let round = 0; round < MAX_FALLBACK_ROUNDS; round++) {
     const { value, ms } = await timed(() => {
-      const plan = fallbackPlan(c, deps.candidates, exclude);
+      const plan = fallbackPlan(c, deps.candidates, exclude, stations);
       return { plan, result: evaluate(plan) };
     });
     const { plan, result } = value;

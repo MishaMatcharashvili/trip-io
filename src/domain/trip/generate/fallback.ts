@@ -7,6 +7,7 @@ import { IMPLICIT_LEG_MAX_MIN } from "../validate.ts";
 import { NOT_A_MEAL, STAGES } from "./balance.ts";
 import type { Constraints } from "./constraints.ts";
 import type { Candidate, Plan, PlanDay, PlanStop, Slot } from "./plan.ts";
+import { restedMinutes } from "./rests.ts";
 import { DAY_START, HOME_BY_MIN, SLOT_WINDOW } from "./schedule.ts";
 
 // The plan of last resort, when the model has failed twice. No model, no
@@ -132,7 +133,13 @@ export function fallbackPlan(
   >,
   candidates: readonly Candidate[],
   exclude: ReadonlySet<string> = new Set(),
+  /** Where long drives rest, which makes them longer (rests.ts). */
+  stations: readonly Candidate[] = [],
 ): Plan {
+  const driving = (from: LonLat, to: LonLat) =>
+    straightLineTravel.minutes(from, to) > IMPLICIT_LEG_MAX_MIN
+      ? restedMinutes(from, to, stations, straightLineTravel)
+      : straightLineTravel.minutes(from, to);
   const pool = candidates.filter((p) => !exclude.has(p.id)).sort(byId);
   const visitable = (p: Candidate) =>
     VISIT_MINUTES[p.group] !== undefined && !notASight(p);
@@ -199,16 +206,14 @@ export function fallbackPlan(
           : null;
     const to = whereabouts(area);
     const arrives =
-      minutesOf(DAY_START[c.pace]) +
-      (from && to ? straightLineTravel.minutes(from, to) : 0);
+      minutesOf(DAY_START[c.pace]) + (from && to ? driving(from, to) : 0);
 
     // The last day ends with the drive to where the traveller leaves from,
     // which has to be over soon after the day ends: nothing is planned that
     // would run past it.
     const finishAt =
       i === dayAreas.length - 1 ? destination(c.finish)?.lonLat : undefined;
-    const homeward =
-      finishAt && to ? straightLineTravel.minutes(to, finishAt) : 0;
+    const homeward = finishAt && to ? driving(to, finishAt) : 0;
     const ends = minutesOf(c.dayEnds);
     const mustLeaveBy =
       homeward > IMPLICIT_LEG_MAX_MIN
