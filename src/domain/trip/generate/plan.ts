@@ -108,4 +108,6 @@ export type Candidate = {
   roads?: readonly string[];
   /** What travellers give it on a review site (catalogue/ratings.ts), when they rate it enough to say. */
   rating?: Rating;
+  /** The chain a fuel station belongs to, when the source says ("Rompetrol" for "Gori 1"). */
+  brand?: string;
 };
