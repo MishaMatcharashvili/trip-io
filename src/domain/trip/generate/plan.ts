@@ -100,4 +100,9 @@ export type Candidate = {
   area: string;
   /** Every requested destination it lies in: Telavi's cathedral is in Telavi and in Kakheti. */
   areas: readonly string[];
+  /**
+   * The long drives (roads.ts, driveLabel) it is a stop on: Gori's fortress
+   * is on "tbilisi > kutaisi". A place found only along a road is in no area.
+   */
+  roads?: readonly string[];
 };

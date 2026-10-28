@@ -19,6 +19,7 @@ import {
   type RefPlan,
   resolveRefs,
 } from "./plan.ts";
+import { driveLabel, longDrives } from "./roads.ts";
 import { addDays, DAY_START, HOME_BY_MIN, schedule } from "./schedule.ts";
 
 // constraints → cache? → candidates → compose → resolve refs → schedule → validate
@@ -39,6 +40,8 @@ export type CandidateRef = {
   area: Candidate["area"];
   /** Every place on the route it lies in. */
   areas: Candidate["areas"];
+  /** The long drives it is a stop on. */
+  roads: readonly string[];
   /** Human-readable, e.g. "mon–sat 10:00–18:00; sun closed", or "unknown". */
   hours: string;
 };
@@ -46,6 +49,8 @@ export type CandidateRef = {
 export type ComposeInput = {
   constraints: Constraints;
   candidates: CandidateRef[];
+  /** Drives long enough to break (roads.ts): the candidates whose `roads` name one are on the way. */
+  drives: { road: string; from: string; to: string; minutes: number }[];
   days: {
     day: number;
     date: string;
@@ -347,7 +352,14 @@ export async function generate(
       outdoor: p.outdoor,
       area: p.area,
       areas: p.areas,
+      roads: p.roads ?? [],
       hours: deps.describeHours(p),
+    })),
+    drives: longDrives(c).map((d) => ({
+      road: driveLabel(d),
+      from: d.from,
+      to: d.to,
+      minutes: d.minutes,
     })),
     days: Array.from({ length: c.days }, (_, i) => {
       const date = addDays(c.startDate, i);
