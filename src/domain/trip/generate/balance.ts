@@ -47,10 +47,10 @@ export function museumHeavy(
 }
 
 /** Somewhere to get a coffee or buy food, not to sit down to lunch or dinner. */
-const NOT_A_MEAL = new Set(["coffee_shop", "farmers_market"]);
+export const NOT_A_MEAL = new Set(["coffee_shop", "farmers_market"]);
 
 /** Stages: what they are for is a performance in the evening, not a look round. */
-const STAGES = new Set([
+export const STAGES = new Set([
   "theatre_venue",
   "music_venue",
   "performing_arts_venue",

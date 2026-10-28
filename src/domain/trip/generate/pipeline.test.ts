@@ -582,6 +582,36 @@ describe("fallbackPlan", () => {
     );
   });
 
+  test("lunch is not at a coffee shop, and a stage or a hall is not a sight", () => {
+    // Nearer to everything than the café and the church, so picked first if allowed.
+    const at = (n: number, category: string, group: Candidate["group"]) => ({
+      ...(candidates.get(P.gergeti) as Candidate),
+      id: `50000000-0000-4000-8000-00000000000${n}`,
+      name: category,
+      category,
+      group,
+      lonLat: [44.642, 42.6605] as [number, number],
+    });
+    const pool = [
+      ...curated,
+      at(1, "coffee_shop", "food"),
+      at(2, "theatre_venue", "culture"),
+      at(3, "cultural_center", "heritage"),
+    ];
+    const plan = fallbackPlan({ ...constraints, days: 1 }, pool);
+    const chosen = plan.days[0].stops.map(
+      (s) => pool.find((p) => p.id === s.placeId)?.category,
+    );
+    assert.ok(chosen.length);
+    for (const category of [
+      "coffee_shop",
+      "theatre_venue",
+      "cultural_center",
+    ]) {
+      assert.ok(!chosen.includes(category), category);
+    }
+  });
+
   test("never repeats a visit", () => {
     const plan = fallbackPlan(constraints, curated);
     const visits = plan.days.flatMap((d) =>

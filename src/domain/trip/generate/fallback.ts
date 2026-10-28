@@ -3,6 +3,7 @@ import { haversineM, type LonLat } from "../../geo.ts";
 import type { Pace } from "../document.ts";
 import { straightLineTravel } from "../travel.ts";
 import { IMPLICIT_LEG_MAX_MIN } from "../validate.ts";
+import { NOT_A_MEAL, STAGES } from "./balance.ts";
 import type { Constraints } from "./constraints.ts";
 import type { Candidate, Plan, PlanDay, PlanStop, Slot } from "./plan.ts";
 import { DAY_START, HOME_BY_MIN, SLOT_WINDOW } from "./schedule.ts";
@@ -61,6 +62,13 @@ const LONG_VISIT_MIN = 90;
 /** A stay is judged by how much there is to do within this radius of it. */
 const STAY_RADIUS_M = 15_000;
 
+/**
+ * Not something to go and look at, whatever its group: a stage is for a
+ * performance nobody booked, and a cultural centre is a hall.
+ */
+const notASight = (p: Candidate) =>
+  STAGES.has(p.category) || p.category === "cultural_center";
+
 const byId = (a: Candidate, b: Candidate) => (a.id < b.id ? -1 : 1);
 
 const minutesOf = (hhmm: string) =>
@@ -112,7 +120,8 @@ export function fallbackPlan(
   exclude: ReadonlySet<string> = new Set(),
 ): Plan {
   const pool = candidates.filter((p) => !exclude.has(p.id)).sort(byId);
-  const visitable = (p: Candidate) => VISIT_MINUTES[p.group] !== undefined;
+  const visitable = (p: Candidate) =>
+    VISIT_MINUTES[p.group] !== undefined && !notASight(p);
   const liked = (p: Candidate) =>
     c.interests.length === 0 ||
     (c.interests as readonly string[]).includes(p.group);
@@ -231,7 +240,9 @@ export function fallbackPlan(
             )
           : nearest(
               here,
-              inArea(area).filter((p) => p.group === "food"),
+              inArea(area).filter(
+                (p) => p.group === "food" && !NOT_A_MEAL.has(p.category),
+              ),
               // A good restaurant can come round again, but prefer a new one.
               (p) => (usedMeals.has(p.id) ? 1 : 0),
             );
