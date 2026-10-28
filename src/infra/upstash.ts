@@ -26,18 +26,22 @@ const VERSION = 2;
 const keyFor = (provider: string, placeId: string) =>
   `place-enrichment:v${VERSION}:${provider}:${placeId}`;
 
-export function upstashContent(options: {
+type RedisOptions = {
   url: string;
   token: string;
-  /** Whose content this holds: two providers' answers for one place are two entries. */
-  provider: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
-}): KeptContent {
-  const { url, token, provider, timeoutMs = TIMEOUT_MS } = options;
-  const send = options.fetch ?? fetch;
+};
 
-  async function command(args: (string | number)[]): Promise<unknown> {
+/** One command, sent as Upstash's REST API wants it; any failure throws. */
+function redis({
+  url,
+  token,
+  timeoutMs = TIMEOUT_MS,
+  ...options
+}: RedisOptions) {
+  const send = options.fetch ?? fetch;
+  return async function command(args: (string | number)[]): Promise<unknown> {
     const res = await send(url, {
       method: "POST",
       headers: {
@@ -53,7 +57,17 @@ export function upstashContent(options: {
     const body = (await res.json()) as { result?: unknown; error?: string };
     if (body.error) throw new Error("redis refused the command");
     return body.result ?? null;
-  }
+  };
+}
+
+export function upstashContent(
+  options: RedisOptions & {
+    /** Whose content this holds: two providers' answers for one place are two entries. */
+    provider: string;
+  },
+): KeptContent {
+  const { provider } = options;
+  const command = redis(options);
 
   return {
     async get(placeId) {
