@@ -19,7 +19,12 @@ import {
   type RefPlan,
   resolveRefs,
 } from "./plan.ts";
-import { driveLabel, longDrives, unbrokenDrives } from "./roads.ts";
+import {
+  breakDrives,
+  driveLabel,
+  longDrives,
+  unbrokenDrives,
+} from "./roads.ts";
 import { addDays, DAY_START, HOME_BY_MIN, schedule } from "./schedule.ts";
 
 // constraints → cache? → candidates → compose → resolve refs → schedule → validate
@@ -309,6 +314,26 @@ export async function generate(
     return { value, ms: Math.round(performance.now() - t0) };
   };
 
+  /**
+   * A valid plan with a stop on each long drive it sits through, where one
+   * fits and leaves the trip better than it was (roads.ts).
+   */
+  const withBreaks = (plan: Plan, result: ReturnType<typeof evaluate>) => {
+    let best = { plan, result };
+    breakDrives(plan, places, c, (next) => {
+      const tried = evaluate(next);
+      if (
+        tried.problems.length > 0 ||
+        tried.idle.length >= best.result.idle.length
+      ) {
+        return false;
+      }
+      best = { plan: next, result: tried };
+      return true;
+    });
+    return best;
+  };
+
   // 1. Warm-start cache. A hit is re-timed for these dates and re-validated.
   const key = cacheKey(c);
   const cached = await deps.cache.get(key);
@@ -465,12 +490,13 @@ export async function generate(
   // one than the template's: it is what the traveller gets, and it is not
   // cached, so the next request tries again.
   if (sparse) {
+    const { plan, result } = withBreaks(sparse.plan, sparse.result);
     return {
       ok: true,
       source: sparse.source,
-      doc: sparse.result.doc,
-      plan: sparse.plan,
-      warnings: sparse.result.warnings,
+      doc: result.doc,
+      plan,
+      warnings: result.warnings,
       attempts,
     };
   }
@@ -480,7 +506,10 @@ export async function generate(
   for (let round = 0; round < MAX_FALLBACK_ROUNDS; round++) {
     const { value, ms } = await timed(() => {
       const plan = fallbackPlan(c, deps.candidates, exclude);
-      return { plan, result: evaluate(plan) };
+      const result = evaluate(plan);
+      return result.problems.length
+        ? { plan, result }
+        : withBreaks(plan, result);
     });
     const { plan, result } = value;
     const ok = result.problems.length === 0;

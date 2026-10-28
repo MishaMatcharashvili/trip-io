@@ -631,6 +631,24 @@ describe("road stops", () => {
       "Drive to heritage 4",
     ]);
   });
+
+  test("with the model down, the template still breaks the drive, lunch and all", async () => {
+    const result = await generate(
+      { ...trip, days: 1, pace: "relaxed", dayEnds: "21:00" },
+      { ...deps(down), candidates: places },
+    );
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    assert.equal(result.source, "template");
+    const titles = Object.values(result.doc.nodes)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map((n) => n.meta.title);
+    assert.deepEqual(titles.slice(0, 4), [
+      "Drive to heritage 1",
+      "heritage 1",
+      "Lunch · food 2",
+      "Drive to heritage 4",
+    ]);
+  });
 });
 
 describe("the days the composer is given", () => {
