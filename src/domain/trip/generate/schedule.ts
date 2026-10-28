@@ -6,6 +6,7 @@ import type { TravelEstimator } from "../travel.ts";
 import { IMPLICIT_LEG_MAX_MIN, LEG_BUFFER_MIN } from "../validate.ts";
 import { DEFAULT_DAY_ENDS } from "./constraints.ts";
 import type { Candidate, Plan, Slot } from "./plan.ts";
+import { REST_STOP_MIN, restStops } from "./rests.ts";
 
 // Untimed plan → timed trip nodes. Deterministic: the model output, a cached
 // plan and the fallback plan all go through here, and the validator checks the
@@ -59,6 +60,12 @@ export function addDays(day: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** A station by its chain when its own name is a number: "Rompetrol · Gori 1". */
+const stationName = (s: Candidate) =>
+  s.brand && !s.name.toLowerCase().includes(s.brand.toLowerCase())
+    ? `${s.brand} · ${s.name}`
+    : s.name;
+
 const mealTitle: Record<Slot, string> = {
   morning: "Breakfast",
   midday: "Lunch",
@@ -85,6 +92,8 @@ export type ScheduleInput = {
   finish?: { lonLat: LonLat; name: string } | null;
   /** "HH:MM": no stop starts after it, and no drive ends more than HOME_BY_MIN past it. */
   dayEnds?: string;
+  /** Fuel stations along the trip's long drives, where a drive rests (rests.ts). */
+  stations?: readonly Candidate[];
 };
 
 export function schedule(input: ScheduleInput): {
@@ -103,9 +112,67 @@ export function schedule(input: ScheduleInput): {
   let lastPlaceId = "";
   const days = [...plan.days].sort((a, b) => a.day - b.day);
 
-  const node = (fields: Omit<TripNode, "meta"> & { title: string }) => {
-    const { title, ...rest } = fields;
-    nodes[newId()] = { ...rest, meta: { title, urban: false } };
+  const node = (
+    fields: Omit<TripNode, "meta"> & { title: string; rest?: boolean },
+  ) => {
+    const { title, rest, ...at } = fields;
+    nodes[newId()] = {
+      ...at,
+      meta: { title, urban: false, ...(rest ? { rest } : {}) },
+    };
+  };
+
+  const stations = input.stations ?? [];
+  /** A drive, broken where it rests: its legs, and how long it takes all told. */
+  const driveOf = (from: LonLat, to: LonLat) => {
+    let here = from;
+    const legs = [...restStops(from, to, stations, travel), null].map(
+      (station) => {
+        const at = station?.lonLat ?? to;
+        const ms = roundUp5(travel.minutes(here, at) * MIN);
+        here = at;
+        return { ms, at, station };
+      },
+    );
+    return {
+      legs,
+      ms: legs.reduce(
+        (sum, l) => sum + l.ms + (l.station ? REST_STOP_MIN * MIN : 0),
+        0,
+      ),
+    };
+  };
+  /** The drive as nodes from `start`: a transfer each leg, a rest stop between. */
+  const driveNodes = (
+    road: ReturnType<typeof driveOf>,
+    start: number,
+    name: string,
+  ) => {
+    let at = start;
+    for (const leg of road.legs) {
+      node({
+        kind: "transfer",
+        placeId: null,
+        lonLat: leg.at,
+        startsAt: new Date(at).toISOString(),
+        durationMin: leg.ms / MIN,
+        indoor: false,
+        title: `Drive to ${leg.station ? stationName(leg.station) : name}`,
+      });
+      at += leg.ms;
+      if (!leg.station) continue;
+      node({
+        kind: "visit",
+        placeId: leg.station.id,
+        lonLat: null,
+        startsAt: new Date(at).toISOString(),
+        durationMin: REST_STOP_MIN,
+        indoor: true,
+        title: `Rest stop · ${stationName(leg.station)}`,
+        rest: true,
+      });
+      at += REST_STOP_MIN * MIN;
+    }
   };
 
   for (const day of days) {
@@ -134,7 +201,9 @@ export function schedule(input: ScheduleInput): {
       }
 
       const leg = here ? travel.minutes(here, place.lonLat) : 0;
-      const drive = leg > IMPLICIT_LEG_MAX_MIN ? roundUp5(leg * MIN) : 0;
+      const road =
+        here && leg > IMPLICIT_LEG_MAX_MIN ? driveOf(here, place.lonLat) : null;
+      const drive = road?.ms ?? 0;
       const driveStart = roundUp5(cursor);
       const ready = drive
         ? driveStart + drive
@@ -184,17 +253,7 @@ export function schedule(input: ScheduleInput): {
         continue;
       }
 
-      if (drive) {
-        node({
-          kind: "transfer",
-          placeId: null,
-          lonLat: place.lonLat,
-          startsAt: new Date(driveStart).toISOString(),
-          durationMin: drive / MIN,
-          indoor: false,
-          title: `Drive to ${place.name}`,
-        });
-      }
+      if (road) driveNodes(road, driveStart, place.name);
       node({
         kind: stop.kind,
         placeId: place.id,
@@ -230,18 +289,10 @@ export function schedule(input: ScheduleInput): {
       }
       const leg = here ? travel.minutes(here, stay.lonLat) : 0;
       let checkIn = roundUp5(cursor);
-      if (leg > IMPLICIT_LEG_MAX_MIN) {
-        const drive = roundUp5(leg * MIN);
-        node({
-          kind: "transfer",
-          placeId: null,
-          lonLat: stay.lonLat,
-          startsAt: new Date(checkIn).toISOString(),
-          durationMin: drive / MIN,
-          indoor: false,
-          title: `Drive to ${stay.name}`,
-        });
-        checkIn += drive;
+      if (here && leg > IMPLICIT_LEG_MAX_MIN) {
+        const road = driveOf(here, stay.lonLat);
+        driveNodes(road, checkIn, stay.name);
+        checkIn += road.ms;
       } else if (leg > 0) {
         checkIn = roundUp5(cursor + (leg + LEG_BUFFER_MIN) * MIN);
       }
@@ -261,7 +312,8 @@ export function schedule(input: ScheduleInput): {
   if (tail?.here && finish) {
     const leg = travel.minutes(tail.here, finish.lonLat);
     if (leg > IMPLICIT_LEG_MAX_MIN) {
-      const drive = roundUp5(leg * MIN);
+      const road = driveOf(tail.here, finish.lonLat);
+      const drive = road.ms;
       const driveStart = roundUp5(tail.cursor);
       const homeBy = wall(tail.date, dayEnds) + HOME_BY_MIN * MIN;
       if (driveStart + drive > homeBy) {
@@ -273,15 +325,7 @@ export function schedule(input: ScheduleInput): {
           message: `the drive to ${finish.name} would end after ${hhmm(homeBy)}, too late in a day that ends at ${dayEnds}: it has to leave by ${hhmm(homeBy - drive)}, and the stops before it run until ${hhmm(driveStart)}. Drop or shorten stops so the last one ends by ${hhmm(homeBy - drive)}`,
         });
       }
-      node({
-        kind: "transfer",
-        placeId: null,
-        lonLat: finish.lonLat,
-        startsAt: new Date(driveStart).toISOString(),
-        durationMin: drive / MIN,
-        indoor: false,
-        title: `Drive to ${finish.name}`,
-      });
+      driveNodes(road, driveStart, finish.name);
     }
   }
 
