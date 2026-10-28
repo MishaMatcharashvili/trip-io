@@ -14,6 +14,7 @@ const messages: IntakeMessage[] = [
 
 const deps = (intake: PlanningDeps["intake"], used = 1): PlanningDeps => ({
   intake,
+  sights: async () => ({}),
   count: async () => used,
   now: () => NOW,
 });

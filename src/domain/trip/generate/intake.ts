@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type Category, categoryGroups } from "../../catalogue/categories.ts";
 import {
   destinationName,
   destinationSlugs,
@@ -11,6 +12,7 @@ import {
   constraints,
   DEFAULT_ENDPOINT,
   dayEnds,
+  type Interest,
   interests,
   NOTES_MAX_CHARS,
   routeOf,
@@ -146,11 +148,34 @@ export const intakeReply = z.object({
 
 type IntakeReply = z.infer<typeof intakeReply>;
 
+/**
+ * What the planner may recommend in a place, by what the traveller enjoys:
+ * things to go and see, never somewhere to eat or sleep, and no theatre, whose
+ * performances nobody can promise. A cultural centre is a hall, not a sight.
+ */
+export const sightCategories = {
+  heritage: categoryGroups.heritage.filter((c) => c !== "cultural_center"),
+  nature: categoryGroups.nature,
+  culture: ["museum", "art_gallery"],
+  food: ["winery", "farmers_market", "brewery", "distillery"],
+} as const satisfies Record<Interest, readonly Category[]>;
+
+/** How many sights of each kind the planner is told of in a place. */
+export const SIGHTS_PER_INTEREST = 6;
+
+/**
+ * The sights the catalogue has in the places in play, by place name and then
+ * by interest: what the planner recommends from, so that "what do you enjoy?"
+ * is asked about Kutaisi and not about Georgia.
+ */
+export type Sights = Record<string, Partial<Record<Interest, string[]>>>;
+
 export type IntakeInput = {
   /** YYYY-MM-DD in Tbilisi. */
   today: string;
   state: IntakeState;
   messages: IntakeMessage[];
+  sights: Sights;
 };
 
 /** The port the model call implements (src/infra/openai-intake.ts). */
