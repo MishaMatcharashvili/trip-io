@@ -206,9 +206,9 @@ export function nameSimilarity(a: string, b: string): number {
 }
 
 /** Closer than this and a name only has to be alike. */
-const NEAR_M = 250;
+export const NEAR_M = 250;
 /** Further than this is another place, whatever it is called. */
-const FAR_M = 1_500;
+export const FAR_M = 1_500;
 /** Alike enough when it is right there. */
 const NEAR_NAME = 0.6;
 /** Alike enough to forgive a mislocated pin: the name must all but agree. */
