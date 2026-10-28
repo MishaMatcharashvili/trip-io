@@ -39,7 +39,7 @@ Rules:
   near that sight. A drive of three hours or more always has its road stop: shorten or drop a stop
   at either end of the day to make room rather than leave it out. A day in "days" names in
   "roads" the long drives it is known to take. Use a road stop only on the day that drives its
-  road, in the order of "after". On a day that drives from "start"
+  road, in the order of "after". A road driven there and back stops somewhere different each way. On a day that drives from "start"
   or moves on, road stops come first (morning, then lunch at midday), before the day's stops in
   the new place. On the last day, driving to "finish", they come last (afternoon), after the day's
   stops in the last place. A road stop's time comes out of the day: it makes "arrives" later, or
