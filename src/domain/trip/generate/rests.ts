@@ -10,18 +10,24 @@ import type { Candidate } from "./plan.ts";
 // (src/dal/places.ts). A rest is not the composer's to plan: it is part of the
 // drive, like the drive's length.
 
-/** About this often a drive stops, on travel.ts's estimate. */
-export const REST_EVERY_MIN = 120;
+/**
+ * How often a drive stops, on travel.ts's estimate: about every two hours on
+ * the road, since the estimate runs a quarter long on the highway (it gives
+ * Tbilisi to Batumi 6h45, which is driven in 5h30).
+ */
+export const REST_EVERY_MIN = 150;
 /** For this long: fuel, a coffee, the toilet. */
 export const REST_STOP_MIN = 30;
 /** Closer than this to the end, it drives on: arriving is the rest. */
 export const REST_LAST_MIN = 60;
 /**
- * How far either side of when a rest falls due a station may be. Wide: the
- * Rikoti Pass has no station the catalogue knows, and Kutaisi to Tbilisi
- * rests at Gori, three hours in on the estimate, or not at all.
+ * How early and how late a station may be, against when a rest falls due.
+ * Later more than earlier: the Rikoti Pass has no station the catalogue
+ * knows, and Kutaisi to Tbilisi rests at Gori, three hours in on the
+ * estimate, or not at all; and a rest taken early is one more on the drive.
  */
-const REST_WINDOW_MIN = 75;
+const REST_EARLY_MIN = 45;
+const REST_LATE_MIN = 75;
 /** Further out of the way than this, a station is on some other road. */
 const DETOUR_FACTOR = 1.1;
 const DETOUR_SLACK_MIN = 10;
@@ -75,7 +81,8 @@ export function restStops(
       }))
       .filter(
         ({ out, on }) =>
-          Math.abs(out - REST_EVERY_MIN) <= REST_WINDOW_MIN &&
+          out >= REST_EVERY_MIN - REST_EARLY_MIN &&
+          out <= REST_EVERY_MIN + REST_LATE_MIN &&
           on >= REST_LAST_MIN &&
           on < ahead &&
           out + on <= ahead * DETOUR_FACTOR + DETOUR_SLACK_MIN,
