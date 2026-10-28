@@ -17,14 +17,6 @@ import type {
 import type { LonLat } from "../domain/geo.ts";
 import type { Candidate } from "../domain/trip/generate/plan.ts";
 import {
-  ROAD_END_MARGIN_M,
-  ROAD_MEAL_DETOUR_M,
-  ROAD_MEALS,
-  ROAD_MEALS_PER_DRIVE,
-  ROAD_SIGHT_DETOUR_M,
-  ROAD_SIGHTS,
-  ROAD_SIGHTS_PER_DRIVE,
-  ROAD_STOP_SPAN,
   STATION_OFF_ROAD_M,
   STATIONS_PER_ROAD,
 } from "../domain/trip/generate/roads.ts";
@@ -310,70 +302,6 @@ export async function stationsAlong(
     area: "",
     areas: [],
     ...(typeof r.brand === "string" && r.brand ? { brand: r.brand } : {}),
-  }));
-}
-
-export type RoadsideQuery = {
-  /** The drive's label (roads.ts, driveLabel), carried by every place found. */
-  label: string;
-  /** The road as routed, simplified. */
-  road: readonly LonLat[];
-  /** Where it leaves from and where it goes: nothing in or beside either is on the way. */
-  ends: readonly { lonLat: LonLat; match: AreaMatch }[];
-};
-
-/**
- * Places to stop at on a long drive (src/domain/trip/generate/roads.ts): sights
- * within a detour of the road and restaurants beside it, curated first, then
- * a spread of categories, most confident first. Nothing in the town the drive
- * leaves or the one it reaches: those are the trip's own places.
- */
-export async function roadsideCandidates(
-  { label, road, ends }: RoadsideQuery,
-  conn: Queryable = db,
-): Promise<Candidate[]> {
-  if (road.length < 2) return [];
-  const notAtEnds = ends.map(
-    (end) => sql`
-      AND NOT ST_DWithin(p.geom, ST_SetSRID(ST_MakePoint(${end.lonLat[0]}, ${end.lonLat[1]}), 4326)::geography, ${ROAD_END_MARGIN_M})
-      AND NOT (${areaPredicate(end.match)})`,
-  );
-  const rows = await conn.execute(sql`
-    WITH road AS (SELECT ST_GeogFromText(${lineWkt(road)}) AS g)
-    SELECT id, name, category, tier, opening_hours, lon, lat
-    FROM (
-      SELECT *, row_number() OVER (
-               PARTITION BY meal
-               ORDER BY tier = 'curated' DESC, spread, confidence DESC NULLS LAST, name
-             ) AS rank
-      FROM (
-        SELECT p.id, p.name, p.category, p.tier, p.opening_hours,
-               ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
-               p.category IN (${list(ROAD_MEALS)}) AS meal,
-               (p.attrs->>'confidence')::float AS confidence,
-               row_number() OVER (
-                 PARTITION BY p.category
-                 ORDER BY (p.attrs->>'confidence')::float DESC NULLS LAST, p.name
-               ) AS spread
-        FROM place p, road
-        WHERE p.tier IN ('curated', 'verified')
-          AND (
-            (p.category IN (${list(ROAD_SIGHTS)}) AND ST_DWithin(p.geom, road.g, ${ROAD_SIGHT_DETOUR_M}))
-            OR (p.category IN (${list(ROAD_MEALS)}) AND ST_DWithin(p.geom, road.g, ${ROAD_MEAL_DETOUR_M}))
-          )
-          AND ST_LineLocatePoint(road.g::geometry, p.geom::geometry)
-              BETWEEN ${ROAD_STOP_SPAN[0]}::float AND ${ROAD_STOP_SPAN[1]}::float
-          ${sql.join(notAtEnds, sql` `)}
-      ) found
-    ) ranked
-    WHERE rank <= CASE WHEN meal THEN ${ROAD_MEALS_PER_DRIVE}::int ELSE ${ROAD_SIGHTS_PER_DRIVE}::int END
-    ORDER BY meal, rank
-  `);
-  return rows.rows.map((r) => ({
-    ...candidateOf(r),
-    area: label,
-    areas: [],
-    roads: [label],
   }));
 }
 
