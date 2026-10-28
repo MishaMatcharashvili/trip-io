@@ -8,9 +8,8 @@ import {
   type BuildDeps,
   buildTripOnce,
   type GeneratedTrip,
-  loadRoadStops,
+  loadStations,
   merged,
-  type RoadStopDeps,
 } from "./trip-generation.ts";
 
 const wanted = initialState("2026-10-07").constraints;
@@ -126,25 +125,24 @@ describe("buildTripOnce", () => {
   });
 });
 
-describe("stops on the road", () => {
+describe("stations on the road", () => {
   const roundTrip = {
     start: "tbilisi",
     places: ["kutaisi"],
     finish: "tbilisi",
   };
-  const fort = (roads: string[]): Candidate => ({
-    id: "fort",
-    name: "Gori Fortress",
-    category: "fort",
-    group: "heritage",
+  const wissol: Candidate = {
+    id: "wissol",
+    name: "Wissol",
+    category: "gas_station",
+    group: "services",
     tier: "verified",
-    lonLat: [44.108, 41.986],
+    lonLat: [44.065, 42.016],
     openingHours: null,
-    outdoor: true,
-    area: roads[0],
+    outdoor: false,
+    area: "",
     areas: [],
-    roads,
-  });
+  };
 
   /** A straight road with a hundred bends too small to matter. */
   const wiggly = (from: LonLat, to: LonLat): LonLat[] =>
@@ -153,46 +151,43 @@ describe("stops on the road", () => {
       from[1] + ((to[1] - from[1]) * i) / 100 + (i % 2 ? 0.00001 : 0),
     ]);
 
-  test("a road driven there and back is routed once, and searched both ways", async () => {
+  test("a road driven there and back is routed and searched once", async () => {
     let routed = 0;
-    const asked: Parameters<RoadStopDeps["find"]>[0][] = [];
-    const stops = await loadRoadStops(roundTrip, {
+    const searched: (readonly LonLat[])[] = [];
+    const stations = await loadStations(roundTrip, {
       road: async (from, to) => {
         routed += 1;
         return wiggly(from, to);
       },
-      find: async (query) => {
-        asked.push(query);
-        return [fort([query.label])];
+      find: async (road) => {
+        searched.push(road);
+        return [wissol];
       },
     });
     assert.equal(routed, 1);
-    assert.deepEqual(
-      asked.map((q) => q.label),
-      ["tbilisi > kutaisi", "kutaisi > tbilisi"],
-    );
+    assert.equal(searched.length, 1);
     // Sent simplified: the bends are inside the tolerance.
-    assert.equal(asked[0].road.length, 2);
+    assert.equal(searched[0].length, 2);
     assert.deepEqual(
-      merged(stops).map((s) => s.roads),
-      [["tbilisi > kutaisi", "kutaisi > tbilisi"]],
+      stations.map((s) => s.id),
+      ["wissol"],
     );
   });
 
-  test("a road that cannot be routed, or searched, has no stops and fails nothing", async () => {
-    const none = await loadRoadStops(roundTrip, {
+  test("a road that cannot be routed, or searched, has no stations and fails nothing", async () => {
+    const none = await loadStations(roundTrip, {
       road: async () => null,
-      find: async () => [fort(["x"])],
+      find: async () => [wissol],
     });
     assert.deepEqual(none, []);
-    const thrown = await loadRoadStops(roundTrip, {
+    const thrown = await loadStations(roundTrip, {
       road: async () => {
         throw new Error("quota");
       },
-      find: async () => [fort(["x"])],
+      find: async () => [wissol],
     });
     assert.deepEqual(thrown, []);
-    const unsearched = await loadRoadStops(roundTrip, {
+    const unsearched = await loadStations(roundTrip, {
       road: async (from, to) => [from, to],
       find: async () => {
         throw new Error("database");
@@ -201,22 +196,34 @@ describe("stops on the road", () => {
     assert.deepEqual(unsearched, []);
   });
 
-  test("a rating found by one search is kept when another finds the place too", () => {
-    const rating = { value: 4.4, count: 900 };
-    const [one] = merged([
-      { ...fort(["tbilisi > kutaisi"]) },
-      { ...fort([]), roads: undefined, rating },
-    ]);
-    assert.deepEqual(one.rating, rating);
+  test("a trip with no long drive asks nothing", async () => {
+    let asked = 0;
+    await loadStations(
+      { start: "tbilisi", places: ["mtskheta"], finish: "tbilisi" },
+      {
+        road: async () => {
+          asked += 1;
+          return null;
+        },
+        find: async () => [],
+      },
+    );
+    assert.equal(asked, 0);
   });
 
-  test("a place in a town on the trip and on the road keeps both", () => {
+  test("a rating found by one search is kept when another finds the place too", () => {
+    const rating = { value: 4.4, count: 900 };
+    const restaurant = {
+      ...wissol,
+      category: "restaurant",
+      group: "food" as const,
+    };
     const [one] = merged([
-      { ...fort([]), roads: undefined, area: "gori", areas: ["gori"] },
-      fort(["tbilisi > kutaisi"]),
+      { ...restaurant, area: "kutaisi", areas: ["kutaisi"] },
+      { ...restaurant, area: "imereti", areas: ["imereti"], rating },
     ]);
-    assert.deepEqual(one.areas, ["gori"]);
-    assert.deepEqual(one.roads, ["tbilisi > kutaisi"]);
-    assert.equal(one.area, "gori");
+    assert.deepEqual(one.rating, rating);
+    assert.deepEqual(one.areas, ["kutaisi", "imereti"]);
+    assert.equal(one.area, "kutaisi");
   });
 });

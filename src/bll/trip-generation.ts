@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { candidatesInArea, roadsideCandidates } from "../dal/places.ts";
+import { candidatesInArea, stationsAlong } from "../dal/places.ts";
 import {
   cancelRequest,
   claimRequest,
@@ -32,11 +32,7 @@ import {
   tripHeader as tripHeaderFor,
 } from "../domain/trip/generate/pipeline.ts";
 import type { Candidate } from "../domain/trip/generate/plan.ts";
-import {
-  driveLabel,
-  longDrives,
-  ROAD_SIMPLIFY_M,
-} from "../domain/trip/generate/roads.ts";
+import { longDrives, ROAD_SIMPLIFY_M } from "../domain/trip/generate/roads.ts";
 import { straightLineTravel } from "../domain/trip/travel.ts";
 import type { Violation } from "../domain/trip/validate.ts";
 import { composeWithOpenAI } from "../infra/openai-composer.ts";
@@ -85,9 +81,8 @@ export async function loadCandidates(
 }
 
 /**
- * One candidate per place, knowing every area and road it was found for (the
- * fortress on the way to Kutaisi is on the way back too) and its rating,
- * whichever search found it.
+ * One candidate per place, knowing every area it was found for and its
+ * rating, whichever search found it.
  */
 export function merged(found: readonly Candidate[]): Candidate[] {
   const byId = new Map<string, Candidate>();
@@ -97,72 +92,56 @@ export function merged(found: readonly Candidate[]): Candidate[] {
       byId.set(c.id, c);
       continue;
     }
-    const roads = [...new Set([...(known.roads ?? []), ...(c.roads ?? [])])];
     const rating = known.rating ?? c.rating;
     byId.set(c.id, {
       ...known,
       areas: [...new Set([...known.areas, ...c.areas])],
-      ...(roads.length ? { roads } : {}),
       ...(rating ? { rating } : {}),
     });
   }
   return [...byId.values()];
 }
 
-export type RoadStopDeps = {
+export type StationDeps = {
   /** The road from one point to another, as driven; null when there is none to be had. */
   road: (from: LonLat, to: LonLat) => Promise<LonLat[] | null>;
-  find: typeof roadsideCandidates;
+  find: typeof stationsAlong;
 };
 
 /**
- * Places to stop at on the trip's long drives (roads.ts). Each road is routed
- * once, whichever way it is driven. A road that cannot be routed has no stops,
- * and the trip is planned without them: a break on the way is a nicety, never
- * a reason to fail.
+ * The fuel stations along the trip's long drives (roads.ts), where the
+ * scheduler rests them (rests.ts). Each road is routed and searched once,
+ * whichever way it is driven. A road that cannot be routed has no stations,
+ * and its drive goes without a rest: a rest is a kindness, never a reason to
+ * fail.
  */
-export async function loadRoadStops(
+export async function loadStations(
   c: Pick<Constraints, "start" | "places" | "finish">,
-  deps: RoadStopDeps,
+  deps: StationDeps,
 ): Promise<Candidate[]> {
-  const roads = new Map<string, Promise<LonLat[] | null>>();
-  const roadBetween = (a: string, b: string, from: LonLat, to: LonLat) => {
-    const key = [a, b].sort().join("|");
-    let road = roads.get(key);
-    if (!road) {
-      road = deps.road(from, to).catch(() => null);
-      roads.set(key, road);
-    }
-    return road;
-  };
-
-  const found = await Promise.all(
-    longDrives(c).map(async (drive) => {
-      const from = destination(drive.from);
-      const to = destination(drive.to);
-      if (!from || !to) return [];
-      const road = await roadBetween(
-        from.slug,
-        to.slug,
-        from.lonLat,
-        to.lonLat,
-      );
-      if (!road) return [];
-      return deps
-        .find({
-          label: driveLabel(drive),
-          road: simplifyLine(road, ROAD_SIMPLIFY_M),
-          ends: [from, to].map((d) => ({ lonLat: d.lonLat, match: d.match })),
-        })
-        .catch(() => []);
-    }),
-  );
-  return found.flat();
+  const roads = new Map<string, Promise<Candidate[]>>();
+  for (const drive of longDrives(c)) {
+    const from = destination(drive.from);
+    const to = destination(drive.to);
+    const key = [drive.from, drive.to].sort().join("|");
+    if (!from || !to || roads.has(key)) continue;
+    roads.set(
+      key,
+      deps
+        .road(from.lonLat, to.lonLat)
+        .then((road) =>
+          road ? deps.find(simplifyLine(road, ROAD_SIMPLIFY_M)) : [],
+        )
+        .catch(() => []),
+    );
+  }
+  const found = (await Promise.all(roads.values())).flat();
+  return [...new Map(found.map((s) => [s.id, s])).values()];
 }
 
 /** The road as the routing provider drives it, through the same limits as any route. */
 const routedRoad =
-  (provider: RoutesProvider, userId: string | null): RoadStopDeps["road"] =>
+  (provider: RoutesProvider, userId: string | null): StationDeps["road"] =>
   async (from, to) => {
     const outcome = await computeRoute(
       {
@@ -261,7 +240,7 @@ export async function generateTrip(
     compose?: Composer;
     /** Asked once the plan is ready and before anything is written. */
     stillWanted?: () => Promise<boolean>;
-    /** Routes the long drives, to find places to stop on the way. Without one there are none. */
+    /** Routes the long drives, to find the stations they rest at. Without one they do not rest. */
     roads?: RoutesProvider;
     /** What travellers rate the places in each destination. Without it nothing is rated. */
     ratings?: RatingDeps;
@@ -277,19 +256,20 @@ export async function generateTrip(
     return { ok: false, reason: "impossible", explanations: reasons(verdict) };
   }
 
-  const [inPlaces, onRoads] = await Promise.all([
+  const [candidates, stations] = await Promise.all([
     loadCandidates(wanted.places, CANDIDATE_LIMIT, ratings),
     roads
-      ? loadRoadStops(wanted, {
+      ? loadStations(wanted, {
           road: routedRoad(roads, userId),
-          find: roadsideCandidates,
+          find: stationsAlong,
         })
       : [],
   ]);
   const result = await generate(wanted, {
     compose,
     cache: planCache,
-    candidates: merged([...inPlaces, ...onRoads]),
+    candidates,
+    stations,
     travel: straightLineTravel,
     newId: randomUUID,
     describeHours,
