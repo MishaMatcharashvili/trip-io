@@ -223,7 +223,8 @@ export async function insertCurated(
 /**
  * What trip generation may compose from in one focus area: every curated place
  * first, then verified ones to fill in while the hand-verified catalogue is
- * still being built. Verified places are dealt round-robin across categories,
+ * still being built. Fuel stations are not among them: a drive stops at one, a
+ * day is not spent at one (roads.ts). Verified places are dealt round-robin across categories,
  * most confident first, so a dense category (Tbilisi has hundreds of cafés)
  * cannot fill the prompt on its own. The validator checks the tier again when
  * the plan is written (context/architecture.md, place.tier).
@@ -243,6 +244,7 @@ export async function candidatesInArea(
              ) AS rank
       FROM place p
       WHERE p.tier IN ('curated', 'verified')
+        AND p.category NOT IN (${list(categoryGroups.services)})
         AND ${areaPredicate(match)}
     ) ranked
     ORDER BY tier = 'curated' DESC, rank, name
