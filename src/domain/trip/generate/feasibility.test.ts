@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { Constraints } from "./constraints.ts";
-import { assess, assessAsked, reasons, routeLegs } from "./feasibility.ts";
+import {
+  advice,
+  assess,
+  assessAsked,
+  reasons,
+  routeLegs,
+} from "./feasibility.ts";
 
 const trip = (over: Partial<Constraints> = {}): Constraints => ({
   startDate: "2026-07-10",
@@ -92,12 +98,16 @@ describe("assess", () => {
     assert.ok(a.possible);
   });
 
-  test("a budget under what a day costs is refused, with the sum that works", () => {
+  test("a budget under what a day costs is advice, never a refusal", () => {
     const a = assess(trip({ budgetEur: 100 }));
-    assert.equal(a.budget.level, "impossible");
-    assert.match(a.budget.why ?? "", /€100 for 2 people over 7 days/);
-    assert.match(a.budget.why ?? "", /Raise the budget to €4\d0/);
-    assert.match(a.budget.why ?? "", /cut the trip to 2 days|€30/);
+    assert.equal(a.budget.level, "tight");
+    assert.ok(a.possible);
+    assert.deepEqual(reasons(a), []);
+    assert.match(a.budget.note, /Usually at least €4\d0/);
+    const [said] = advice(a);
+    assert.match(said ?? "", /€100 for 2 people over 7 days/);
+    assert.match(said ?? "", /tends to need about €4\d0/);
+    assert.match(said ?? "", /If you have a car or somewhere free to stay/);
   });
 
   test("a thin budget is tight; a child costs less than an adult", () => {
@@ -107,21 +117,45 @@ describe("assess", () => {
       party: { adults: 2, children: 2 },
       places: ["tbilisi"],
     });
-    assert.equal(assess(family).budget.level, "tight");
-    assert.equal(
-      assess({ ...family, party: { adults: 4, children: 0 } }).budget.level,
-      "impossible",
+    assert.equal(assess(family).budget.advice, undefined);
+    assert.ok(
+      assess({ ...family, party: { adults: 4, children: 0 } }).budget.advice,
     );
   });
 
   test("transport between far places counts against the budget", () => {
     const near = trip({ days: 4, budgetEur: 250, places: ["tbilisi"] });
-    assert.equal(assess(near).budget.level, "tight");
-    assert.equal(
+    assert.equal(assess(near).budget.advice, undefined);
+    assert.ok(
       assess({ ...near, places: ["tbilisi", "mestia", "batumi", "tbilisi"] })
-        .budget.level,
-      "impossible",
+        .budget.advice,
     );
+  });
+
+  test("a car of their own and free nights bring the sum down", () => {
+    const big = trip({
+      days: 2,
+      budgetEur: 160,
+      places: ["signagi"],
+      party: { adults: 7, children: 0 },
+    });
+    const least = (c: Constraints) =>
+      Number(assess(c).budget.note.replace(/\D/g, ""));
+    const usual = least(big);
+    const driving = least({ ...big, ownCar: true });
+    const staying = least({ ...big, ownCar: true, freeNights: 2 });
+    assert.ok(driving < usual);
+    assert.ok(staying < driving);
+    assert.match(
+      assess({ ...big, ownCar: true, freeNights: 2 }).budget.advice ?? "",
+      /even with your own car and 2 free nights/,
+    );
+  });
+
+  test("a budget that covers the floor once free nights are counted says nothing", () => {
+    const c = trip({ days: 4, budgetEur: 200, places: ["tbilisi"] });
+    assert.ok(assess(c).budget.advice);
+    assert.equal(assess({ ...c, freeNights: 4 }).budget.advice, undefined);
   });
 
   test("a place the season closes is refused for those months only", () => {
