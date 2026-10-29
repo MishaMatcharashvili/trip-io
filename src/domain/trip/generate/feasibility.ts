@@ -201,10 +201,16 @@ function judgeBudget(c: Constraints): Judgement {
       c.ownCar ? "your own car" : "",
       freeNights ? plural(freeNights, "free night") : "",
     ].filter(Boolean);
+    // What the floor is made of, less what the traveller already has.
+    const floor = [
+      freeNights < c.days ? "a dorm bed" : "",
+      "simple meals",
+      c.ownCar ? "entry fees" : "marshrutkas",
+    ].filter(Boolean);
     return {
       level: "tight",
       note: `Usually at least ${euros(least)}`,
-      advice: `${euros(c.budgetEur)} for ${plural(people, "person", "people")} over ${plural(c.days, "day")} is about ${euros(each)} each a day${transport >= 10 ? `, before ${euros(transport)} of ${c.ownCar ? "fuel" : "transport"} between places` : ""}. A day in Georgia usually costs at least ${euros(FLOOR_EUR_PER_DAY)} each — a dorm bed, simple meals and marshrutkas — so ${covered.length ? `even with ${covered.join(" and ")} ` : ""}a trip like this tends to need about ${euros(least)}.${covered.length ? "" : " If you have a car or somewhere free to stay, say so and I will count it."} You can still start planning with this budget.`,
+      advice: `${euros(c.budgetEur)} for ${plural(people, "person", "people")} over ${plural(c.days, "day")} is about ${euros(each)} each a day${transport >= 10 ? `, before ${euros(transport)} of ${c.ownCar ? "fuel" : "transport"} between places` : ""}. A day in Georgia usually costs at least ${euros(FLOOR_EUR_PER_DAY)} each — ${floor.slice(0, -1).join(", ")} and ${floor.at(-1)} — so ${covered.length ? `even with ${covered.join(" and ")} ` : ""}a trip like this tends to need about ${euros(least)}.${covered.length ? "" : " If you have a car or somewhere free to stay, say so and I will count it."} You can still start planning with this budget.`,
     };
   }
   if (daily < COMFORT_EUR_PER_DAY) {

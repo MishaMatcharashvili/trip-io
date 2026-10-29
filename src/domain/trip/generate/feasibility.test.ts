@@ -150,6 +150,14 @@ describe("assess", () => {
       assess({ ...big, ownCar: true, freeNights: 2 }).budget.advice ?? "",
       /even with your own car and 2 free nights/,
     );
+    assert.match(
+      assess({ ...big, ownCar: true, freeNights: 2 }).budget.advice ?? "",
+      /— simple meals and entry fees —/,
+    );
+    assert.match(
+      assess(big).budget.advice ?? "",
+      /— a dorm bed, simple meals and marshrutkas —/,
+    );
   });
 
   test("a budget that covers the floor once free nights are counted says nothing", () => {
