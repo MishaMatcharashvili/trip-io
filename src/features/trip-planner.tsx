@@ -331,7 +331,7 @@ export function TripPlanner({
                   disabled={waiting || !verdict.possible || !placed}
                   onClick={build}
                 >
-                  {ready ? "Looks right — plan every day" : "Plan it as it is"}
+                  {ready ? "Looks right — plan every day" : "Start planning"}
                   <Icon name="arrowRight" size={15} strokeWidth={1.8} />
                 </Button>
                 <Button
