@@ -76,6 +76,8 @@ const result = await generateTrip(
     party: { adults: 2, children: 0 },
     mobility: "moderate",
     budgetEur: 900,
+    ownCar: false,
+    freeNights: 0,
     notes: "",
   },
   owner.id,

@@ -29,6 +29,8 @@ const constraints: Constraints = {
   party: { adults: 2, children: 0 },
   mobility: "moderate",
   budgetEur: 700,
+  ownCar: false,
+  freeNights: 0,
   notes: "",
 };
 

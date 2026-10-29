@@ -377,6 +377,8 @@ export function understand(text: string, today: string): Understood {
       100_000,
       pick("budgetEur", readBudget(text), 90 * clampedDays * people),
     ),
+    ownCar: false,
+    freeNights: 0,
     notes: "",
   };
   return { constraints, said, refused: unreachable(text) };

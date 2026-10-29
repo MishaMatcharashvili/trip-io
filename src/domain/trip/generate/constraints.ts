@@ -58,6 +58,10 @@ export const constraints = z.object({
   mobility: z.enum(["low", "moderate", "high"]),
   /** Excluding flights, for the whole party and the whole trip. */
   budgetEur: z.number().int().min(0).max(100_000),
+  /** The party drives its own car: the road costs fuel, not fares. */
+  ownCar: z.boolean().default(false),
+  /** Nights the party sleeps for free, with family or friends. */
+  freeNights: z.number().int().min(0).max(21).default(0),
   /**
    * The traveller's wishes the fields above cannot hold ("vegetarian", "no
    * long drives"), in their own words, for the composer.
