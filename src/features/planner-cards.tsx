@@ -97,6 +97,7 @@ export function TripSketchCard({
   sketch,
   said,
   blockers,
+  advice = [],
   ready,
   onInterests,
   children,
@@ -106,6 +107,8 @@ export function TripSketchCard({
   said: (k: keyof Constraints) => boolean;
   /** Why the trip cannot be done as asked; the card turns red while any stand. */
   blockers: string[];
+  /** What is worth knowing before building; said, but never in the way. */
+  advice?: string[];
   /** The planner has nothing left to ask. */
   ready: boolean;
   /** What the traveller enjoys, chosen on the card. */
@@ -262,6 +265,16 @@ export function TripSketchCard({
           {blockers.map((why) => (
             <span key={why} className="text-small text-alert">
               {why}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {!blockers.length && advice.length ? (
+        <div className="flex flex-col gap-1">
+          {advice.map((said) => (
+            <span key={said} className="text-small text-assumed">
+              {said}
             </span>
           ))}
         </div>

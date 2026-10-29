@@ -431,17 +431,35 @@ export function ConstraintCards({
             </>
           ) : null}
           {editing === "budget" ? (
-            <label className="flex items-center gap-2 text-small">
-              € for the whole trip, excluding flights
-              <NumberField
-                min={0}
-                max={100_000}
-                step={50}
-                value={c.budgetEur}
-                onChange={(budgetEur) => set({ budgetEur })}
-                className="w-28"
-              />
-            </label>
+            <>
+              <label className="flex items-center gap-2 text-small">
+                € for the whole trip, excluding flights
+                <NumberField
+                  min={0}
+                  max={100_000}
+                  step={50}
+                  value={c.budgetEur}
+                  onChange={(budgetEur) => set({ budgetEur })}
+                  className="w-28"
+                />
+              </label>
+              <span className="h-5 w-px bg-hairline" />
+              <Toggle on={c.ownCar} onClick={() => set({ ownCar: !c.ownCar })}>
+                We have our own car
+              </Toggle>
+              {/* Not a <label>: it would hand its clicks to the − button. */}
+              <span className="flex items-center gap-2 text-small">
+                Free nights with family or friends
+                <NumberField
+                  stepper
+                  aria-label="free nights"
+                  min={0}
+                  max={c.days}
+                  value={Math.min(c.freeNights, c.days)}
+                  onChange={(freeNights) => set({ freeNights })}
+                />
+              </span>
+            </>
           ) : null}
           {editing === "interests" ? (
             <>

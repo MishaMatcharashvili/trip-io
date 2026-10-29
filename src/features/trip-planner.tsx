@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Constraints } from "@/domain/trip/generate/constraints";
-import { assessAsked, reasons } from "@/domain/trip/generate/feasibility";
+import {
+  advice,
+  assessAsked,
+  reasons,
+} from "@/domain/trip/generate/feasibility";
 import {
   applyEdit,
   INTAKE_MAX_CHARS,
@@ -299,6 +303,7 @@ export function TripPlanner({
               sketch={sketch}
               said={(k) => (state.said as (keyof Constraints)[]).includes(k)}
               blockers={reasons(verdict)}
+              advice={advice(verdict)}
               ready={ready}
               onInterests={(interests) => edit({ interests })}
             >
