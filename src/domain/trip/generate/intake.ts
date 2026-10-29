@@ -78,6 +78,8 @@ const stated = [
   "party",
   "mobility",
   "budgetEur",
+  "ownCar",
+  "freeNights",
 ] as const satisfies readonly (keyof Constraints)[];
 type Stated = (typeof stated)[number];
 
@@ -134,6 +136,10 @@ export const intakeReply = z.object({
   children: z.number().nullable(),
   mobility: z.enum(["low", "moderate", "high"]).nullable(),
   budgetEur: z.number().nullable(),
+  /** The party drives its own car. */
+  ownCar: z.boolean().nullable(),
+  /** Nights the party sleeps for free, with family or friends. */
+  freeNights: z.number().nullable(),
   /** The whole of the notes after this turn, not an addition to them. */
   notes: z.string().nullable(),
   /** Places the traveller asked for that no trip can go to. */
@@ -280,6 +286,8 @@ export function readIntake(
   }
   if (r.mobility !== null) patch.mobility = r.mobility;
   if (r.budgetEur !== null) patch.budgetEur = clamp(r.budgetEur, 0, 100_000);
+  if (r.ownCar !== null) patch.ownCar = r.ownCar;
+  if (r.freeNights !== null) patch.freeNights = clamp(r.freeNights, 0, 21);
 
   const next = applyEdit(state, patch);
   if (r.notes !== null) {

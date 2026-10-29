@@ -26,6 +26,8 @@ const unchanged = {
   children: null,
   mobility: null,
   budgetEur: null,
+  ownCar: null,
+  freeNights: null,
   notes: null,
   unsupported: [],
   ready: false,
@@ -237,6 +239,19 @@ describe("the route", () => {
       "batumi",
       "tbilisi",
     ]);
+  });
+});
+
+describe("a car of their own and free nights", () => {
+  test("are taken from the reply, and the nights clamped", () => {
+    const turn = readIntake(
+      { ...unchanged, ownCar: true, freeNights: 40 },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(turn?.state.constraints.ownCar, true);
+    assert.equal(turn?.state.constraints.freeNights, 21);
+    assert.ok(turn?.state.said.includes("ownCar"));
   });
 });
 
