@@ -16,6 +16,7 @@ import type { Assessment, Judgement } from "@/domain/trip/generate/feasibility";
 import { Card } from "@/ui/card";
 import { cx } from "@/ui/cx";
 import { Icon } from "@/ui/icon";
+import { NumberField } from "@/ui/number-field";
 import { Eyebrow } from "@/ui/text";
 import { interestNames } from "./constraint-labels";
 
@@ -227,9 +228,6 @@ function EndpointsEditor({
   );
 }
 
-const numberInput =
-  "h-9 w-20 rounded-control border border-control bg-surface px-2 text-small";
-
 export function ConstraintCards({
   constraints: c,
   said,
@@ -397,17 +395,11 @@ export function ConstraintCards({
             <>
               <label className="flex items-center gap-2 text-small">
                 Days
-                <input
-                  type="number"
+                <NumberField
                   min={1}
                   max={21}
                   value={c.days}
-                  onChange={(e) =>
-                    set({
-                      days: Math.min(21, Math.max(1, Number(e.target.value))),
-                    })
-                  }
-                  className={numberInput}
+                  onChange={(days) => set({ days })}
                 />
               </label>
               <label className="flex items-center gap-2 text-small">
@@ -441,15 +433,13 @@ export function ConstraintCards({
           {editing === "budget" ? (
             <label className="flex items-center gap-2 text-small">
               € for the whole trip, excluding flights
-              <input
-                type="number"
+              <NumberField
                 min={0}
+                max={100_000}
                 step={50}
                 value={c.budgetEur}
-                onChange={(e) =>
-                  set({ budgetEur: Math.max(0, Number(e.target.value)) })
-                }
-                className={cx(numberInput, "w-28")}
+                onChange={(budgetEur) => set({ budgetEur })}
+                className="w-28"
               />
             </label>
           ) : null}
@@ -488,48 +478,31 @@ export function ConstraintCards({
           ) : null}
           {editing === "party" ? (
             <>
-              <label className="flex items-center gap-2 text-small">
+              {/* Not a <label>: it would hand its clicks to the − button. */}
+              <span className="flex items-center gap-2 text-small">
                 Adults
-                <input
-                  type="number"
+                <NumberField
+                  stepper
+                  aria-label="adults"
                   min={1}
                   max={12}
                   value={c.party.adults}
-                  onChange={(e) =>
-                    set({
-                      party: {
-                        ...c.party,
-                        adults: Math.min(
-                          12,
-                          Math.max(1, Number(e.target.value)),
-                        ),
-                      },
-                    })
-                  }
-                  className={numberInput}
+                  onChange={(adults) => set({ party: { ...c.party, adults } })}
                 />
-              </label>
-              <label className="flex items-center gap-2 text-small">
+              </span>
+              <span className="flex items-center gap-2 text-small">
                 Children
-                <input
-                  type="number"
+                <NumberField
+                  stepper
+                  aria-label="children"
                   min={0}
                   max={12}
                   value={c.party.children}
-                  onChange={(e) =>
-                    set({
-                      party: {
-                        ...c.party,
-                        children: Math.min(
-                          12,
-                          Math.max(0, Number(e.target.value)),
-                        ),
-                      },
-                    })
+                  onChange={(children) =>
+                    set({ party: { ...c.party, children } })
                   }
-                  className={numberInput}
                 />
-              </label>
+              </span>
               <span className="h-5 w-px bg-hairline" />
               {(["relaxed", "moderate", "packed"] as const).map((p) => (
                 <Toggle
