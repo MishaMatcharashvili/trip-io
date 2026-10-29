@@ -67,7 +67,10 @@ export function NumberField({
       }}
       className={cx(
         "h-9 w-20 rounded-control border border-control bg-surface px-2 text-small",
-        stepper && "w-12 text-center",
+        // The browser's own arrows would sit under the thumb in a box this
+        // narrow, and change the number on the tap meant to focus it.
+        stepper &&
+          "w-12 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
         className,
       )}
       {...input}
