@@ -131,4 +131,4 @@ export const sightsOnRoute = (
  * Bumped whenever the prompt or the plan schema changes, so cached plans from
  * an older prompt are never served.
  */
-export const PROMPT_VERSION = 10;
+export const PROMPT_VERSION = 11;
