@@ -28,10 +28,12 @@ import {
 } from "../domain/trip/generate/candidates.ts";
 import {
   type Constraints,
+  type Interest,
   type MustSee,
   sightsOnRoute,
 } from "../domain/trip/generate/constraints.ts";
 import { assess, reasons } from "../domain/trip/generate/feasibility.ts";
+import { sightCategories } from "../domain/trip/generate/intake.ts";
 import {
   type Attempt,
   type Composer,
@@ -70,7 +72,9 @@ export async function loadCandidates(
   limit = CANDIDATE_LIMIT,
   ratings?: RatingDeps,
   mustSee: readonly MustSee[] = [],
+  interests: readonly Interest[] = [],
 ): Promise<Candidate[]> {
+  const liked = interests.flatMap((i) => sightCategories[i]);
   // A round trip names its start twice; it is still one place to retrieve.
   const wanted = [...new Set(places)].flatMap(
     (slug) => destination(slug) ?? [],
@@ -85,7 +89,7 @@ export async function loadCandidates(
     Promise.all(
       wanted.flatMap((d) => [
         ratings ? ratedInArea(d, ratings) : [],
-        candidatesInArea(d, perArea),
+        candidatesInArea(d, perArea, liked),
       ]),
     ),
     candidatesByIds(mustSee.map((s) => s.id)),
@@ -279,6 +283,7 @@ export async function generateTrip(
       CANDIDATE_LIMIT,
       ratings,
       sightsOnRoute(wanted),
+      wanted.interests,
     ),
     roads
       ? loadStations(wanted, {

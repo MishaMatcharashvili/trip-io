@@ -226,7 +226,15 @@ export async function insertCurated(
 export async function candidatesInArea(
   { slug, match }: { slug: string; match: AreaMatch },
   limit: number,
+  /**
+   * Categories the traveller came for: dealt LIKED_SHARE turns for every one
+   * the rest get, so a town's cafés cannot crowd its churches out.
+   */
+  liked: readonly string[] = [],
 ): Promise<Candidate[]> {
+  const turn = liked.length
+    ? sql`rank::float / CASE WHEN category IN (${list(liked)}) THEN ${LIKED_SHARE} ELSE 1 END`
+    : sql`rank`;
   const rows = await db.execute(sql`
     SELECT id, name, category, tier, opening_hours, lon, lat
     FROM (
@@ -241,7 +249,7 @@ export async function candidatesInArea(
         AND p.category NOT IN (${list(categoryGroups.services)})
         AND ${areaPredicate(match)}
     ) ranked
-    ORDER BY tier = 'curated' DESC, rank, name
+    ORDER BY tier = 'curated' DESC, ${turn}, name
     LIMIT ${limit}
   `);
   return rows.rows.map((r) => ({
@@ -270,6 +278,9 @@ export async function candidatesByIds(
   `);
   return rows.rows.map(candidateOf);
 }
+
+/** Turns a liked category gets for each one of the others' (candidatesInArea). */
+const LIKED_SHARE = 3;
 
 /** A candidate row as the planner sees it, before it is told where it is. */
 function candidateOf(
