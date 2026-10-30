@@ -33,6 +33,8 @@ const answer = {
   children: null,
   mobility: null,
   budgetEur: null,
+  ownCar: null,
+  freeNights: null,
   notes: null,
   unsupported: [],
   ready: false,
