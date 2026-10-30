@@ -102,3 +102,49 @@ export function misplaced(
     });
   });
 }
+
+/**
+ * Days that do not lean on what the traveller came for: of a day's visits,
+ * fewer than half are of the interests they chose. Only when the day's places
+ * hold more of those that the plan has not used, so the composer is never
+ * asked for what is not there. A must-see counts as wanted, whatever it is.
+ */
+export function offInterest(
+  plan: Plan,
+  places: ReadonlyMap<string, Candidate>,
+  c: {
+    interests: readonly Interest[];
+    startDate: string;
+    mustSee: readonly { id: string }[];
+  },
+): Imbalance[] {
+  if (c.interests.length === 0) return [];
+  const wanted = (p: Candidate) =>
+    (c.interests as readonly string[]).includes(p.group) ||
+    c.mustSee.some((s) => s.id === p.id);
+  const used = new Set(plan.days.flatMap((d) => d.stops.map((s) => s.placeId)));
+  return plan.days.flatMap((d) => {
+    const visits = d.stops
+      .filter((s) => s.kind === "visit")
+      .map((s) => places.get(s.placeId))
+      .filter((p): p is Candidate => !!p);
+    if (visits.length < 2) return [];
+    const liked = visits.filter(wanted).length;
+    if (liked * 2 >= visits.length) return [];
+    const areas = new Set(visits.flatMap((v) => v.areas));
+    const spare = [...places.values()].filter(
+      (p) => wanted(p) && !used.has(p.id) && p.areas.some((a) => areas.has(a)),
+    );
+    if (spare.length === 0) return [];
+    const day = addDays(c.startDate, d.day - 1);
+    return [
+      {
+        day,
+        message: `${day}: only ${liked} of ${visits.length} visits are ${c.interests.join(" or ")}, which is what the traveller chose. Swap the others for candidates such as ${spare
+          .slice(0, 3)
+          .map((p) => `"${p.name}"`)
+          .join(", ")}`,
+      },
+    ];
+  });
+}

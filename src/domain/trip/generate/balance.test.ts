@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { candidates, P } from "../test-fixtures.ts";
-import { MAX_MUSEUMS_A_DAY, misplaced, museumHeavy } from "./balance.ts";
+import {
+  MAX_MUSEUMS_A_DAY,
+  misplaced,
+  museumHeavy,
+  offInterest,
+} from "./balance.ts";
 import type { Candidate, Plan, PlanStop } from "./plan.ts";
 
 const museum = (n: number): Candidate => ({
@@ -126,6 +131,47 @@ describe("misplaced", () => {
     );
     assert.deepEqual(
       misplaced(day({ ...visit(stage.id), slot: "evening" }), pool, culture),
+      [],
+    );
+  });
+});
+
+describe("offInterest", () => {
+  const heritage = {
+    interests: ["heritage" as const],
+    startDate: "2026-09-14",
+    mustSee: [],
+  };
+
+  test("a day of museums for a traveller who chose heritage, with churches to spare", () => {
+    const [found] = offInterest(twoMuseums, places, heritage);
+    assert.match(found.message, /only 0 of 2 visits are heritage/);
+    assert.match(found.message, /Gergeti Trinity Church/);
+  });
+
+  test("half the day on what they chose is enough", () => {
+    const mixed = day(visit(P.gergeti), visit(museum(1).id));
+    assert.deepEqual(offInterest(mixed, places, heritage), []);
+  });
+
+  test("nothing chosen, nothing asked", () => {
+    assert.deepEqual(
+      offInterest(twoMuseums, places, { ...heritage, interests: [] }),
+      [],
+    );
+  });
+
+  test("a must-see is wanted, whatever kind of place it is", () => {
+    const asked = {
+      ...heritage,
+      mustSee: [{ id: museum(1).id }, { id: museum(2).id }],
+    };
+    assert.deepEqual(offInterest(twoMuseums, places, asked), []);
+  });
+
+  test("a town with nothing of the kind is never asked for it", () => {
+    assert.deepEqual(
+      offInterest(twoMuseums, places, { ...heritage, interests: ["nature"] }),
       [],
     );
   });

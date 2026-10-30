@@ -8,7 +8,7 @@ import {
   type Violation,
   validateDoc,
 } from "../validate.ts";
-import { misplaced, museumHeavy } from "./balance.ts";
+import { misplaced, museumHeavy, offInterest } from "./balance.ts";
 import { cacheKey } from "./cache-key.ts";
 import {
   type Constraints,
@@ -343,6 +343,7 @@ export async function generate(
         ...idleGaps(doc, c.dayEnds),
         ...museumHeavy(plan, places, c),
         ...misplaced(plan, places, c),
+        ...offInterest(plan, places, c),
       ].map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
