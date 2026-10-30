@@ -50,6 +50,8 @@ export function StopSuggestions({
   const [wish, setWish] = useState("");
   const [answer, setAnswer] = useState<Answer>({ status: "idle" });
   const [applying, startApplying] = useTransition();
+  // Which option is being applied: only its button says so.
+  const [applyingId, setApplyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function ask() {
@@ -92,6 +94,7 @@ export function StopSuggestions({
 
   function apply(item: Suggestion) {
     setError(null);
+    setApplyingId(item.id);
     startApplying(async () => {
       const res = await apiClient.api.trips[":id"].patches.$post({
         param: { id: tripId },
@@ -199,7 +202,9 @@ export function StopSuggestions({
                       disabled={applying}
                       onClick={() => apply(item)}
                     >
-                      {applying ? "Applying…" : "Do this"}
+                      {applying && applyingId === item.id
+                        ? "Applying…"
+                        : "Do this"}
                     </Button>
                     <Button
                       size="sm"
