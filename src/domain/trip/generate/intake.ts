@@ -16,6 +16,7 @@ import {
   interests,
   NOTES_MAX_CHARS,
   routeOf,
+  sightsOnRoute,
 } from "./constraints.ts";
 import { understand } from "./request.ts";
 
@@ -80,6 +81,7 @@ const stated = [
   "budgetEur",
   "ownCar",
   "freeNights",
+  "mustSee",
 ] as const satisfies readonly (keyof Constraints)[];
 type Stated = (typeof stated)[number];
 
@@ -218,13 +220,16 @@ export function initialState(today: string): IntakeState {
 function withDefaults(c: Constraints, said: readonly Stated[]): Constraints {
   const has = (k: Stated) => said.includes(k);
   const people = c.party.adults + c.party.children;
+  const places = has("places")
+    ? c.places
+    : c.days >= 4
+      ? ["tbilisi", "kazbegi"]
+      : ["tbilisi"];
   return {
     ...c,
-    places: has("places")
-      ? c.places
-      : c.days >= 4
-        ? ["tbilisi", "kazbegi"]
-        : ["tbilisi"],
+    places,
+    // A sight goes with its destination: taken off the route, it is let go.
+    mustSee: sightsOnRoute({ places, mustSee: c.mustSee }),
     start: has("start") ? c.start : DEFAULT_ENDPOINT,
     // Said where it starts and not where it finishes: it finishes where it started.
     finish: has("finish")

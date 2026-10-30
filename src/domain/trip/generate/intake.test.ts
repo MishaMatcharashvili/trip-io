@@ -255,6 +255,25 @@ describe("a car of their own and free nights", () => {
   });
 });
 
+describe("must-sees", () => {
+  const bodbe = {
+    id: "7f3c1a52-0b8e-4c3e-9a1d-2f6b8e4d1c90",
+    name: "Bodbe Monastery",
+    place: "signagi",
+  };
+
+  test("a sight goes with its destination when the route changes", () => {
+    const pinned = applyEdit(initialState(TODAY), {
+      places: ["tbilisi", "signagi"],
+      mustSee: [bodbe],
+    });
+    assert.deepEqual(pinned.constraints.mustSee, [bodbe]);
+    assert.ok(pinned.said.includes("mustSee"));
+    const moved = applyEdit(pinned, { places: ["tbilisi"] });
+    assert.deepEqual(moved.constraints.mustSee, []);
+  });
+});
+
 describe("applyEdit", () => {
   test("a hand correction survives a later turn that does not touch it", () => {
     const edited = applyEdit(initialState(TODAY), { budgetEur: 1200 });
