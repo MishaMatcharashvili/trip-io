@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { destinations, mentions, unreachable } from "./destinations.ts";
+import {
+  destinations,
+  mentions,
+  searchDestinations,
+  unreachable,
+} from "./destinations.ts";
 
 const slugs = (text: string) => mentions(text).map((m) => m.slug);
 
@@ -67,5 +72,24 @@ describe("unreachable", () => {
     assert.equal(found.name, "Sukhumi");
     assert.match(found.why, /Abkhazia/);
     assert.deepEqual(unreachable("Tbilisi and Batumi"), []);
+  });
+});
+
+describe("searchDestinations", () => {
+  const names = (q: string) => searchDestinations(q).map((d) => d.name);
+
+  test("a few letters find the place, its name before an alias", () => {
+    assert.equal(names("sig")[0], "Sighnaghi");
+    assert.equal(names("kaz")[0], "Kazbegi");
+  });
+
+  test("a word inside a name counts, and so does an alias", () => {
+    assert.ok(names("gareja").includes("David Gareja"));
+    assert.ok(names("stepan").includes("Kazbegi"));
+  });
+
+  test("nothing typed, or nothing like it, is nothing", () => {
+    assert.deepEqual(names("  "), []);
+    assert.deepEqual(names("zzzz"), []);
   });
 });

@@ -326,6 +326,34 @@ export function mentions(text: string): Mention[] {
   return found.sort((a, b) => a.index - b.index);
 }
 
+/**
+ * Destinations for a few typed letters, as a search box shows them: a name or
+ * an alias that starts with what was typed, or has a word that does ("gareja"
+ * finds David Gareja), names before aliases, then alphabetically.
+ */
+export function searchDestinations(query: string, limit = 6): Destination[] {
+  const q = words(query);
+  if (!q) return [];
+  const rank = (d: Destination) => {
+    const name = words(d.name);
+    if (name.startsWith(q)) return 0;
+    if (name.split(" ").some((w) => w.startsWith(q))) return 1;
+    const aliases = (d.aliases ?? []).map(words);
+    if (aliases.some((a) => a.startsWith(q))) return 2;
+    if (aliases.some((a) => a.split(" ").some((w) => w.startsWith(q))))
+      return 3;
+    return null;
+  };
+  return destinations
+    .flatMap((d) => {
+      const r = rank(d);
+      return r === null ? [] : [{ d, r }];
+    })
+    .sort((a, b) => a.r - b.r || a.d.name.localeCompare(b.d.name))
+    .slice(0, limit)
+    .map(({ d }) => d);
+}
+
 /** Places a sentence names that a trip cannot go to, with why. */
 export function unreachable(text: string): { name: string; why: string }[] {
   const haystack = ` ${words(text)} `;
