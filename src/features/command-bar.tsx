@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/hono-client";
 import { Chip } from "@/ui/chip";
@@ -31,7 +32,7 @@ export function CommandBar({
 }: {
   /** The trip questions are about. Without one the bar is the reference render's. */
   tripId?: string;
-  /** Asked as the bar mounts: "Ask about it" from a stop lands here. */
+  /** Asked when it arrives: "Ask about it" from a stop lands here. */
   initialQuestion?: string;
   suggestions?: string[];
   placeholder?: string;
@@ -40,7 +41,7 @@ export function CommandBar({
 }) {
   const [value, setValue] = useState("");
   const [exchange, setExchange] = useState<Exchange | null>(null);
-  const asked = useRef(false);
+  const router = useRouter();
   const root = useRef<HTMLDivElement>(null);
 
   const ask = async (question: string) => {
@@ -69,16 +70,20 @@ export function CommandBar({
     }
   };
 
-  // Asked once, on mount — and only by the bar that is showing: the desktop
-  // and phone layouts both render one, and one question is one answer.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: asked once, on mount
+  // Asked whenever the address brings a question, not only on mount: "Ask
+  // about it" from a stop lands on a screen that is often already showing.
+  // Only the bar that is visible asks — the desktop and phone layouts both
+  // render one, and one question is one answer — and it then takes the
+  // question out of the address, so the same one asked again is asked again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: asked when the question changes
   useEffect(() => {
     const visible = root.current?.offsetParent !== null;
-    if (initialQuestion && visible && !asked.current) {
-      asked.current = true;
-      void ask(initialQuestion);
-    }
-  }, []);
+    if (!initialQuestion || !visible) return;
+    void ask(initialQuestion);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ask");
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }, [initialQuestion]);
 
   return (
     <div
