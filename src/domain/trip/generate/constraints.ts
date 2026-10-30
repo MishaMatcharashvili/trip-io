@@ -11,6 +11,22 @@ export type Interest = (typeof interests)[number];
 
 export const NOTES_MAX_CHARS = 500;
 
+/** Sights a traveller may insist on: a few they came for, not an itinerary. */
+export const MAX_MUST_SEE = 8;
+
+/**
+ * A catalogue place the trip must visit, with what the screen and the
+ * feasibility check need without asking the database: its name, and the
+ * destination it lies in. The server loads the place again by id and trusts
+ * nothing else here.
+ */
+export const mustSee = z.object({
+  id: z.uuid(),
+  name: z.string().trim().min(1).max(120),
+  place: z.enum(destinationSlugs),
+});
+export type MustSee = z.infer<typeof mustSee>;
+
 /** Where trips start and finish unless the traveller says otherwise: the capital, where most of them land. */
 export const DEFAULT_ENDPOINT = "tbilisi";
 
@@ -62,6 +78,8 @@ export const constraints = z.object({
   ownCar: z.boolean().default(false),
   /** Nights the party sleeps for free, with family or friends. */
   freeNights: z.number().int().min(0).max(21).default(0),
+  /** Sights the plan must include, each on a day spent in its destination. */
+  mustSee: z.array(mustSee).max(MAX_MUST_SEE).default([]),
   /**
    * The traveller's wishes the fields above cannot hold ("vegetarian", "no
    * long drives"), in their own words, for the composer.
@@ -82,6 +100,32 @@ export const routeOf = (
   [c.start, ...c.places, c.finish].filter(
     (slug, i, all) => slug !== all[i - 1],
   );
+
+/**
+ * The trip with a sight pinned: its destination joins the route when the
+ * route does not pass through it yet, and a sight pinned twice is pinned once.
+ * Past MAX_MUST_SEE, or when the route has no room for another place, the
+ * trip is returned as it was.
+ */
+export function pinSight<C extends Pick<Constraints, "places" | "mustSee">>(
+  c: C,
+  sight: MustSee,
+): C {
+  if (c.mustSee.some((s) => s.id === sight.id)) return c;
+  if (c.mustSee.length >= MAX_MUST_SEE) return c;
+  // A sight in the place the trip only starts or finishes in still needs a
+  // day there: the start and the finish are drives, not days.
+  const places = c.places.includes(sight.place)
+    ? c.places
+    : [...c.places, sight.place];
+  if (places.length > MAX_PLACES) return c;
+  return { ...c, places, mustSee: [...c.mustSee, sight] };
+}
+
+/** The sights whose destination is still a day of the trip; the rest are let go. */
+export const sightsOnRoute = (
+  c: Pick<Constraints, "places" | "mustSee">,
+): MustSee[] => c.mustSee.filter((s) => c.places.includes(s.place));
 
 /**
  * Bumped whenever the prompt or the plan schema changes, so cached plans from

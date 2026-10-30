@@ -379,6 +379,7 @@ export function understand(text: string, today: string): Understood {
     ),
     ownCar: false,
     freeNights: 0,
+    mustSee: [],
     notes: "",
   };
   return { constraints, said, refused: unreachable(text) };

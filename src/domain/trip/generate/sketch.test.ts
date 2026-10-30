@@ -17,6 +17,7 @@ const trip = (over: Partial<Constraints> = {}): Constraints => ({
   budgetEur: 300,
   ownCar: false,
   freeNights: 0,
+  mustSee: [],
   notes: "",
   ...over,
 });

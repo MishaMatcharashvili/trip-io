@@ -78,6 +78,7 @@ const result = await generateTrip(
     budgetEur: 900,
     ownCar: false,
     freeNights: 0,
+    mustSee: [],
     notes: "",
   },
   owner.id,
