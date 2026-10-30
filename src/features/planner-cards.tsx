@@ -166,6 +166,12 @@ export function TripSketchCard({
             ? routeOf(c).map(destinationName).join(" → ")
             : "Where in Georgia? Not said yet"}
         </span>
+        {c.mustSee.length ? (
+          <span className="text-small text-ink-muted">
+            <span className="font-medium text-ink">Must see:</span>{" "}
+            {c.mustSee.map((s) => s.name).join(", ")}
+          </span>
+        ) : null}
         <span className="text-mini text-ink-muted">
           <Num>
             {said("days") || placed

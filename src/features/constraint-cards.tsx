@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import {
-  destinationName,
-  destinations,
-  MAX_PLACES,
-} from "@/domain/catalogue/destinations";
+import { destinationName, MAX_PLACES } from "@/domain/catalogue/destinations";
 import {
   type Constraints,
   DAY_ENDS_RANGE,
   type Interest,
+  MAX_MUST_SEE,
+  type MustSee,
+  pinSight,
   routeOf,
+  sightsOnRoute,
 } from "@/domain/trip/generate/constraints";
 import type { Assessment, Judgement } from "@/domain/trip/generate/feasibility";
 import { Card } from "@/ui/card";
@@ -19,6 +19,7 @@ import { Icon } from "@/ui/icon";
 import { NumberField } from "@/ui/number-field";
 import { Eyebrow } from "@/ui/text";
 import { interestNames } from "./constraint-labels";
+import { PlaceSearch } from "./place-search";
 
 // What the trip will be built from, as five cards. Any card can be corrected
 // by hand.
@@ -27,8 +28,6 @@ import { interestNames } from "./constraint-labels";
 // green is the traveller's own word, and red is something that cannot be done
 // (src/domain/trip/generate/feasibility.ts). Why it cannot is said once, on
 // the sketch above them (planner-cards.tsx).
-
-const byName = [...destinations].sort((a, b) => a.name.localeCompare(b.name));
 
 const interests: Interest[] = ["heritage", "nature", "culture", "food"];
 
@@ -93,22 +92,31 @@ function Toggle({
   );
 }
 
+const chip =
+  "inline-flex h-8 items-center gap-1 rounded-full border border-control bg-surface pl-3 pr-1 text-mini font-medium";
+const chipButton =
+  "flex size-6 items-center justify-center rounded-full text-ink-faint hover:bg-fill hover:text-ink";
+
 /**
- * The places the trip visits, in the order it visits them. Any place in
- * Georgia can be added, and any moved earlier. Each is a day of its own; where
- * the trip starts and finishes is `EndpointsEditor`'s.
+ * The places the trip visits, in the order it visits them, and the sights in
+ * them the traveller insists on. Both are found by typing: a town or region
+ * is a day of its own, a sight brings its town along (`pinSight`). Any place
+ * can be moved earlier; where the trip starts and finishes is
+ * `EndpointsEditor`'s.
  */
 function PlacesEditor({
   places,
+  sights,
   onChange,
 }: {
   places: string[];
-  onChange: (places: string[]) => void;
+  sights: MustSee[];
+  onChange: (patch: Pick<Constraints, "places" | "mustSee">) => void;
 }) {
   const earlier = (i: number) => {
     const next = [...places];
     [next[i - 1], next[i]] = [next[i], next[i - 1]];
-    onChange(next);
+    onChange({ places: next, mustSee: sights });
   };
   return (
     <>
@@ -116,7 +124,7 @@ function PlacesEditor({
         <span
           // biome-ignore lint/suspicious/noArrayIndexKey: a round trip names a place twice
           key={`${slug}-${i}`}
-          className="inline-flex h-8 items-center gap-1 rounded-full border border-control bg-surface pl-3 pr-1 text-mini font-medium"
+          className={chip}
         >
           {destinationName(slug)}
           {i > 0 ? (
@@ -124,7 +132,7 @@ function PlacesEditor({
               type="button"
               aria-label={`Visit ${destinationName(slug)} earlier`}
               onClick={() => earlier(i)}
-              className="flex size-6 items-center justify-center rounded-full text-ink-faint hover:bg-fill hover:text-ink"
+              className={chipButton}
             >
               <Icon name="chevronLeft" size={13} />
             </button>
@@ -133,30 +141,53 @@ function PlacesEditor({
             <button
               type="button"
               aria-label={`Remove ${destinationName(slug)}`}
-              onClick={() => onChange(places.filter((_, j) => j !== i))}
-              className="flex size-6 items-center justify-center rounded-full text-ink-faint hover:bg-fill hover:text-ink"
+              onClick={() => {
+                const next = places.filter((_, j) => j !== i);
+                onChange({
+                  places: next,
+                  mustSee: sightsOnRoute({ places: next, mustSee: sights }),
+                });
+              }}
+              className={chipButton}
             >
               ×
             </button>
           ) : null}
         </span>
       ))}
-      {places.length < MAX_PLACES ? (
-        <select
-          aria-label="Add a place"
-          value=""
-          onChange={(e) =>
-            e.target.value && onChange([...places, e.target.value])
-          }
-          className="h-8 rounded-control border border-control bg-surface px-2 text-mini text-ink-muted"
+      {sights.map((s) => (
+        <span
+          key={s.id}
+          className={cx(chip, "border-agent-line bg-agent-tint")}
         >
-          <option value="">Add a place…</option>
-          {byName.map((d) => (
-            <option key={d.slug} value={d.slug}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+          <Icon name="bookmark" size={12} className="text-agent" />
+          {s.name}
+          <button
+            type="button"
+            aria-label={`No need to see ${s.name}`}
+            onClick={() =>
+              onChange({ places, mustSee: sights.filter((x) => x.id !== s.id) })
+            }
+            className={chipButton}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {places.length < MAX_PLACES || sights.length < MAX_MUST_SEE ? (
+        <PlaceSearch
+          label="Add a place or a sight"
+          placeholder="Add a town or a sight…"
+          onDestination={(slug) => {
+            if (places.length < MAX_PLACES) {
+              onChange({ places: [...places, slug], mustSee: sights });
+            }
+          }}
+          onSight={(sight) => {
+            const next = pinSight({ places, mustSee: sights }, sight);
+            onChange({ places: next.places, mustSee: next.mustSee });
+          }}
+        />
       ) : null}
     </>
   );
@@ -165,11 +196,51 @@ function PlacesEditor({
 const selectClass =
   "h-8 rounded-control border border-control bg-surface px-2 text-mini text-ink";
 
+/** One end of the trip: its town, and a search to change it when asked. */
+function EndpointField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (slug: string) => void;
+}) {
+  const [changing, setChanging] = useState(false);
+  return (
+    <span className="flex items-center gap-2 text-small">
+      {label}
+      {changing ? (
+        <PlaceSearch
+          label={`${label} in`}
+          placeholder="Type a town…"
+          destinationsOnly
+          autoFocus
+          onDestination={(slug) => {
+            onChange(slug);
+            setChanging(false);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setChanging(true)}
+          aria-label={`${label}: ${destinationName(value)}. Change`}
+          className={cx(chip, "pr-3 hover:text-ink")}
+        >
+          {destinationName(value)}
+          <Icon name="chevronDown" size={12} className="text-ink-faint" />
+        </button>
+      )}
+    </span>
+  );
+}
+
 /**
  * Where the traveller arrives and leaves from: Tbilisi unless they change it.
  * Neither is a stop, so a trip that starts and finishes in Tbilisi to see
  * Sighnaghi is one place and two drives. Finishing where they started is the
- * usual case and the default; the second select is there when it is not.
+ * usual case and the default; the second field is there when it is not.
  */
 function EndpointsEditor({
   start,
@@ -181,28 +252,15 @@ function EndpointsEditor({
   onChange: (patch: Pick<Constraints, "start" | "finish">) => void;
 }) {
   const [separate, setSeparate] = useState(start !== finish);
-  const options = byName.map((d) => (
-    <option key={d.slug} value={d.slug}>
-      {d.name}
-    </option>
-  ));
   return (
     <>
-      <label className="flex items-center gap-2 text-small">
-        Start
-        <select
-          value={start}
-          onChange={(e) =>
-            onChange({
-              start: e.target.value,
-              finish: separate ? finish : e.target.value,
-            })
-          }
-          className={selectClass}
-        >
-          {options}
-        </select>
-      </label>
+      <EndpointField
+        label="Start"
+        value={start}
+        onChange={(slug) =>
+          onChange({ start: slug, finish: separate ? finish : slug })
+        }
+      />
       <Toggle
         on={!separate}
         onClick={() => {
@@ -213,16 +271,11 @@ function EndpointsEditor({
         Finish where I start
       </Toggle>
       {separate ? (
-        <label className="flex items-center gap-2 text-small">
-          Finish
-          <select
-            value={finish}
-            onChange={(e) => onChange({ start, finish: e.target.value })}
-            className={selectClass}
-          >
-            {options}
-          </select>
-        </label>
+        <EndpointField
+          label="Finish"
+          value={finish}
+          onChange={(slug) => onChange({ start, finish: slug })}
+        />
       ) : null}
     </>
   );
@@ -273,9 +326,11 @@ export function ConstraintCards({
         verdict.places,
         !said("places")
           ? "Assumed — tap to choose"
-          : c.start === c.finish
-            ? `Start and finish in ${destinationName(c.start)}`
-            : `Start in ${destinationName(c.start)}, finish in ${destinationName(c.finish)}`,
+          : `${
+              c.start === c.finish
+                ? `Start and finish in ${destinationName(c.start)}`
+                : `Start in ${destinationName(c.start)}, finish in ${destinationName(c.finish)}`
+            }${c.mustSee.length ? ` · seeing ${c.mustSee.map((s) => s.name).join(", ")}` : ""}`,
       ),
       standing:
         verdict.places.level === "impossible"
@@ -382,7 +437,8 @@ export function ConstraintCards({
               <span className="text-small text-ink-muted">Visit</span>
               <PlacesEditor
                 places={c.places}
-                onChange={(places) => set({ places })}
+                sights={c.mustSee}
+                onChange={set}
               />
               <EndpointsEditor
                 start={c.start}
