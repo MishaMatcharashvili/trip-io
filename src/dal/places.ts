@@ -251,6 +251,26 @@ export async function candidatesInArea(
   }));
 }
 
+/**
+ * Places by id, as candidates, when a plan may use them: curated or verified,
+ * and not a fuel station. What the traveller asked for by name; the caller
+ * says which destination each is for.
+ */
+export async function candidatesByIds(
+  ids: readonly string[],
+): Promise<Omit<Candidate, "area" | "areas">[]> {
+  if (ids.length === 0) return [];
+  const rows = await db.execute(sql`
+    SELECT p.id, p.name, p.category, p.tier, p.opening_hours,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
+    FROM place p
+    WHERE p.id IN (${list(ids)})
+      AND p.tier IN ('curated', 'verified')
+      AND p.category NOT IN (${list(categoryGroups.services)})
+  `);
+  return rows.rows.map(candidateOf);
+}
+
 /** A candidate row as the planner sees it, before it is told where it is. */
 function candidateOf(
   r: Record<string, unknown>,

@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { candidatesInArea, stationsAlong } from "../dal/places.ts";
+import {
+  candidatesByIds,
+  candidatesInArea,
+  stationsAlong,
+} from "../dal/places.ts";
 import {
   cancelRequest,
   claimRequest,
@@ -22,7 +26,11 @@ import {
   CANDIDATES_PER_AREA_MIN,
   describeHours,
 } from "../domain/trip/generate/candidates.ts";
-import type { Constraints } from "../domain/trip/generate/constraints.ts";
+import {
+  type Constraints,
+  type MustSee,
+  sightsOnRoute,
+} from "../domain/trip/generate/constraints.ts";
 import { assess, reasons } from "../domain/trip/generate/feasibility.ts";
 import {
   type Attempt,
@@ -54,12 +62,14 @@ import {
  * in — spread evenly so one dense destination can't crowd the others out of the
  * prompt, with the places travellers rate best in each on top. A place that
  * lies in two of them (Telavi, when Kakheti was asked for too) comes back
- * once, and knows both.
+ * once, and knows both. The sights the traveller asked for by name are
+ * candidates on top of the share, for the destination they asked for them in.
  */
 export async function loadCandidates(
   places: readonly string[],
   limit = CANDIDATE_LIMIT,
   ratings?: RatingDeps,
+  mustSee: readonly MustSee[] = [],
 ): Promise<Candidate[]> {
   // A round trip names its start twice; it is still one place to retrieve.
   const wanted = [...new Set(places)].flatMap(
@@ -71,13 +81,20 @@ export async function loadCandidates(
   );
   // What travellers rate best comes first, and on top of the share: a town's
   // best restaurant is a candidate whether or not its category's turn came.
-  const perAreaResults = await Promise.all(
-    wanted.flatMap((d) => [
-      ratings ? ratedInArea(d, ratings) : [],
-      candidatesInArea(d, perArea),
-    ]),
-  );
-  return merged(perAreaResults.flat());
+  const [perAreaResults, asked] = await Promise.all([
+    Promise.all(
+      wanted.flatMap((d) => [
+        ratings ? ratedInArea(d, ratings) : [],
+        candidatesInArea(d, perArea),
+      ]),
+    ),
+    candidatesByIds(mustSee.map((s) => s.id)),
+  ]);
+  const sights = asked.flatMap((c) => {
+    const place = mustSee.find((s) => s.id === c.id)?.place;
+    return place ? [{ ...c, area: place, areas: [place] }] : [];
+  });
+  return merged([...perAreaResults.flat(), ...sights]);
 }
 
 /**
@@ -257,7 +274,12 @@ export async function generateTrip(
   }
 
   const [candidates, stations] = await Promise.all([
-    loadCandidates(wanted.places, CANDIDATE_LIMIT, ratings),
+    loadCandidates(
+      wanted.places,
+      CANDIDATE_LIMIT,
+      ratings,
+      sightsOnRoute(wanted),
+    ),
     roads
       ? loadStations(wanted, {
           road: routedRoad(roads, userId),
