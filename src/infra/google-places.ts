@@ -16,6 +16,11 @@ import type {
   RatedOutcome,
   RatingSource,
 } from "../domain/catalogue/ratings.ts";
+import type {
+  SightDetails,
+  SightFinder,
+  SightSuggestion,
+} from "../domain/catalogue/sight-search.ts";
 
 // Google's Places API (New), behind the domain's PlaceEnricher port, beside
 // Tripadvisor's: the only file that knows its URL, its parameters or its response
@@ -138,6 +143,63 @@ const ratedResponse = z.object({
     )
     .default([]),
 });
+
+const autocompleteResponse = z.object({
+  suggestions: z
+    .array(
+      z.object({
+        placePrediction: z
+          .object({
+            placeId: z.string(),
+            text: z.object({ text: z.string() }),
+            structuredFormat: z
+              .object({
+                mainText: z.object({ text: z.string() }),
+                secondaryText: z.object({ text: z.string() }).optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+      }),
+    )
+    .default([]),
+});
+
+const sightResponse = z.object({
+  id: z.string(),
+  displayName: localised,
+  location: z.object({ latitude: z.number(), longitude: z.number() }),
+  primaryType: z.string().optional(),
+  types: z.array(z.string()).default([]),
+});
+
+/** Autocomplete's list as suggestions; a query prediction (no place) is left out. */
+export function toSuggestions(body: unknown): SightSuggestion[] {
+  return autocompleteResponse.parse(body).suggestions.flatMap((s) => {
+    const p = s.placePrediction;
+    if (!p) return [];
+    return [
+      {
+        externalId: p.placeId,
+        name: p.structuredFormat?.mainText.text ?? p.text.text,
+        where: p.structuredFormat?.secondaryText?.text ?? "",
+      },
+    ];
+  });
+}
+
+/** One place's details as a sight, its primary type first. */
+export function toSight(body: unknown): SightDetails {
+  const p = sightResponse.parse(body);
+  return {
+    externalId: p.id,
+    name: p.displayName?.text ?? "",
+    lonLat: [p.location.longitude, p.location.latitude],
+    types: [
+      ...new Set([...(p.primaryType ? [p.primaryType] : []), ...p.types]),
+    ],
+  };
+}
 
 /** A town's rated places; one nobody has rated is left out. */
 export function toRated(body: unknown): RatedListing[] {
@@ -426,6 +488,77 @@ export function googleRatings(options: CallOptions): RatingSource {
         return { ok: true, places: toRated(reply.body) };
       } catch {
         return { ok: false, reason: "malformed" };
+      }
+    },
+  };
+}
+
+/** Enough to choose from while typing; each is one line of a billed session. */
+const SUGGESTIONS = 5;
+/** Ids are spliced into a path, so they are held to the shape Google gives them. */
+const placeId = /^[\w-]+$/;
+
+/**
+ * Sights by name, for the traveller to pick from on /new: Autocomplete held to
+ * Georgia while they type, then one Place Details call for the one they pick,
+ * asking only for what the catalogue keeps (its name, where it is and what kind
+ * of place it is). The same session token on both makes the typing free and
+ * bills the pick once (docs/google-places.md).
+ */
+export function googleSights(options: CallOptions): SightFinder {
+  const call = caller(options);
+  return {
+    provider: "google",
+    configured: Boolean(options.key),
+
+    async suggest(query, session) {
+      const reply = await call(
+        "/places:autocomplete",
+        null,
+        {},
+        {
+          input: query.slice(0, 100),
+          sessionToken: session,
+          includedRegionCodes: ["ge"],
+          languageCode: "en",
+        },
+      );
+      if (!reply.ok) {
+        return {
+          ok: false,
+          reason:
+            reply.reason === "not-configured" ? reply.reason : "unavailable",
+        };
+      }
+      try {
+        return {
+          ok: true,
+          value: toSuggestions(reply.body).slice(0, SUGGESTIONS),
+        };
+      } catch {
+        return { ok: false, reason: "unavailable" };
+      }
+    },
+
+    async details(externalId, session) {
+      if (!placeId.test(externalId)) return { ok: true, value: null };
+      const reply = await call(
+        `/places/${externalId}`,
+        "id,displayName,location,primaryType,types",
+        { sessionToken: session, languageCode: "en" },
+      );
+      if (!reply.ok) {
+        if (reply.reason === "no-match") return { ok: true, value: null };
+        return {
+          ok: false,
+          reason:
+            reply.reason === "not-configured" ? reply.reason : "unavailable",
+        };
+      }
+      try {
+        return { ok: true, value: toSight(reply.body) };
+      } catch {
+        return { ok: false, reason: "unavailable" };
       }
     },
   };
