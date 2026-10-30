@@ -30,10 +30,18 @@ function covering(page: string): string | null {
   return null;
 }
 
+// The popup slot's empty pages, which close the popup on a link out of it: they
+// draw nothing, so there is nothing to show while they load.
+const EMPTY_SLOTS = new Set([
+  "trips/[tripId]/@modal/page.tsx",
+  "trips/[tripId]/@modal/[...rest]/page.tsx",
+]);
+
 test("every screen of a trip has a loading state inside the trip", () => {
   const uncovered = pages(TRIPS)
     .filter((page) => covering(page) === null)
-    .map((page) => relative(APP, page));
+    .map((page) => relative(APP, page))
+    .filter((page) => !EMPTY_SLOTS.has(page));
   assert.deepEqual(uncovered, []);
 });
 
