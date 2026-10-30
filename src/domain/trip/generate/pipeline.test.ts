@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import { nodeEnd } from "../document.ts";
 import { candidates, idSequence, P, PREV } from "../test-fixtures.ts";
 import { straightLineTravel } from "../travel.ts";
+import { cacheKey } from "./cache-key.ts";
 import type { Constraints } from "./constraints.ts";
 import { fallbackPlan, splitDays } from "./fallback.ts";
 import {
@@ -11,10 +12,16 @@ import {
   type Composer,
   candidateRefs,
   generate,
+  mustSeeProblems,
   type PlanCache,
   routeProblems,
 } from "./pipeline.ts";
-import type { Candidate, Plan, RefPlan } from "./plan.ts";
+import {
+  type Candidate,
+  type Plan,
+  type RefPlan,
+  resolveRefs,
+} from "./plan.ts";
 
 const constraints: Constraints = {
   startDate: PREV, // Tuesday; day 2 is Wednesday, when the museum is closed
@@ -403,6 +410,57 @@ const acrossGeorgia = [
 const down: Composer = async () => {
   throw new Error("down");
 };
+
+describe("must-sees", () => {
+  const sight = { id: P.noHours, name: "No-hours place", place: "kazbegi" };
+  const wanting: Constraints = { ...constraints, mustSee: [sight] };
+  const byId = new Map(curated.map((p) => [p.id, p]));
+  const resolve = (refPlan: RefPlan) =>
+    resolveRefs(refPlan, candidateRefs(curated).toId).plan;
+
+  test("a plan that leaves one out says which", () => {
+    const plan = resolve(fullPlan());
+    assert.deepEqual(mustSeeProblems(plan, [sight], byId), [
+      "No-hours place is a must-see but no day visits it",
+    ]);
+  });
+
+  test("one the catalogue does not hold is never asked of a plan", () => {
+    const plan = resolve(fullPlan());
+    assert.deepEqual(mustSeeProblems(plan, [sight], new Map()), []);
+  });
+
+  test("the composer is told which candidates are must-sees", async () => {
+    let given: ComposeInput | undefined;
+    const compose: Composer = async (input) => {
+      given = input;
+      throw new Error("down");
+    };
+    await generate(wanting, deps(compose));
+    const flagged = given?.candidates.filter((c) => c.mustSee);
+    assert.deepEqual(
+      flagged?.map((c) => c.name),
+      ["No-hours place"],
+    );
+  });
+
+  test("the model is sent back for it, and the fallback visits it", async () => {
+    const { compose, seen } = scripted(fullPlan(), new Error("down"));
+    const result = await generate(wanting, deps(compose));
+    assert.ok(
+      seen[1]?.problems.some((p) => /No-hours place is a must-see/.test(p)),
+    );
+    assert.ok(result.ok, JSON.stringify(result.attempts, null, 1));
+    assert.equal(result.source, "template");
+    assert.ok(
+      Object.values(result.doc.nodes).some((n) => n.placeId === P.noHours),
+    );
+  });
+
+  test("a plan cached without it is not served with it", () => {
+    assert.notEqual(cacheKey(wanting), cacheKey(constraints));
+  });
+});
 
 describe("the route", () => {
   const route: Constraints = {

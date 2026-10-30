@@ -47,6 +47,8 @@ const VISIT_MINUTES: Partial<Record<Candidate["group"], number>> = {
   culture: 90,
   nature: 150,
 };
+/** A must-see of a kind not otherwise visited (a winery, a market): an hour. */
+const MUST_SEE_MINUTES = 60;
 const MEAL_MINUTES: Partial<Record<Slot, number>> = {
   morning: 45,
   midday: 75,
@@ -130,6 +132,7 @@ export function fallbackPlan(
     | "finish"
     | "startDate"
     | "dayEnds"
+    | "mustSee"
   >,
   candidates: readonly Candidate[],
   exclude: ReadonlySet<string> = new Set(),
@@ -141,8 +144,11 @@ export function fallbackPlan(
       ? restedMinutes(from, to, stations, straightLineTravel)
       : straightLineTravel.minutes(from, to);
   const pool = candidates.filter((p) => !exclude.has(p.id)).sort(byId);
+  // Asked for by name: visited first, whatever kind of place it is.
+  const required = new Set(c.mustSee.map((s) => s.id));
   const visitable = (p: Candidate) =>
-    VISIT_MINUTES[p.group] !== undefined && !notASight(p);
+    required.has(p.id) ||
+    (VISIT_MINUTES[p.group] !== undefined && !notASight(p));
   const liked = (p: Candidate) =>
     c.interests.length === 0 ||
     (c.interests as readonly string[]).includes(p.group);
@@ -258,7 +264,10 @@ export function fallbackPlan(
           ? nearest(
               here,
               inArea(area).filter((p) => visitable(p) && !usedVisits.has(p.id)),
-              (p) => (liked(p) ? 0 : 2) + (moreInSlot && long(p) ? 1 : 0),
+              (p) =>
+                (required.has(p.id) ? -4 : 0) +
+                (liked(p) ? 0 : 2) +
+                (moreInSlot && long(p) ? 1 : 0),
             )
           : nearest(
               here,
@@ -274,7 +283,7 @@ export function fallbackPlan(
       if (!pick) continue;
       const durationMin =
         kind === "visit"
-          ? (VISIT_MINUTES[pick.group] as number)
+          ? (VISIT_MINUTES[pick.group] ?? MUST_SEE_MINUTES)
           : (MEAL_MINUTES[slot] ?? 60);
       const begins = Math.max(
         free,
