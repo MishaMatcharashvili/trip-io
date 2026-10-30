@@ -37,6 +37,7 @@ const answer = {
   freeNights: null,
   notes: null,
   unsupported: [],
+  sights: [],
   ready: false,
   suggestions: [],
   options: [],

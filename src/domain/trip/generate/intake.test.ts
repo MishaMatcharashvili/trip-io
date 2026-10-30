@@ -30,6 +30,7 @@ const unchanged = {
   freeNights: null,
   notes: null,
   unsupported: [],
+  sights: [],
   ready: false,
   suggestions: [],
   options: [],
@@ -256,6 +257,18 @@ describe("a car of their own and free nights", () => {
 });
 
 describe("must-sees", () => {
+  test("the sights a message names are passed on, trimmed, few and once each", () => {
+    const turn = readIntake(
+      {
+        ...unchanged,
+        sights: [" Bodbe Monastery ", "Bodbe Monastery", "", "a", "b", "c"],
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.deepEqual(turn?.sights, ["Bodbe Monastery", "a", "b"]);
+  });
+
   const bodbe = {
     id: "7f3c1a52-0b8e-4c3e-9a1d-2f6b8e4d1c90",
     name: "Bodbe Monastery",

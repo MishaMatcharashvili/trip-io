@@ -146,6 +146,8 @@ export const intakeReply = z.object({
   notes: z.string().nullable(),
   /** Places the traveller asked for that no trip can go to. */
   unsupported: z.array(z.string()),
+  /** Sights the latest message asks to see, by the names the traveller used. */
+  sights: z.array(z.string()),
   /** Nothing left that the planner needs to ask. */
   ready: z.boolean(),
   /** Two to four short answers to the question the reply ends on; none when it asks nothing. */
@@ -186,6 +188,9 @@ export type IntakeInput = {
   sights: Sights;
 };
 
+/** A message names a sight or two; more is a list to search, not a wish. */
+export const SIGHTS_PER_TURN = 3;
+
 /** The port the model call implements (src/infra/openai-intake.ts). */
 export type Intaker = (input: IntakeInput) => Promise<unknown>;
 
@@ -193,6 +198,11 @@ export type IntakeTurn = {
   reply: string;
   state: IntakeState;
   unsupported: string[];
+  /**
+   * Sights the traveller asked for by name, for the use case to find and pin
+   * (src/bll/sight-search.ts): the domain cannot look them up.
+   */
+  sights: string[];
   ready: boolean;
   /** Answers to offer as one-tap replies. Empty once the planner has nothing to ask. */
   suggestions: string[];
@@ -317,6 +327,9 @@ export function readIntake(
     reply: r.reply,
     state: next,
     unsupported: r.unsupported.slice(0, 5),
+    sights: [
+      ...new Set(r.sights.map((s) => s.trim().slice(0, 100)).filter(Boolean)),
+    ].slice(0, SIGHTS_PER_TURN),
     ready,
     suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
     options,
@@ -534,6 +547,7 @@ export function fallbackTurn(
     reply,
     state: next,
     unsupported: read.refused.map((r) => r.name),
+    sights: [],
     ready: essentials && !follow,
     suggestions: follow?.suggestions ?? [],
     options: [],
