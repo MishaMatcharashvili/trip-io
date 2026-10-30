@@ -162,3 +162,56 @@ export async function takeSight(
   });
   return { ok: true, sight: { id, name: details.name, place: place.slug } };
 }
+
+const wordsOf = (s: string) =>
+  s
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 3);
+
+/** Whether a name found is the one asked for: every word asked is in it. */
+const sameSight = (asked: string, found: string) => {
+  const have = wordsOf(found);
+  const want = wordsOf(asked);
+  return (
+    want.length > 0 && want.every((w) => have.some((h) => h.startsWith(w)))
+  );
+};
+
+/**
+ * A sight the traveller named in conversation ("we must see Bodbe"), as a
+ * must-see, or null when it cannot be told which place they mean. The
+ * catalogue first, one on the trip's route before one elsewhere; then
+ * Google's first suggestion, taken in only when its name is the one asked for.
+ */
+export async function sightNamed(
+  finder: SightFinder,
+  userId: string,
+  name: string,
+  route: readonly string[],
+  overrides: Partial<SightSearchDeps> = {},
+): Promise<MustSee | null> {
+  const deps = { ...defaults(), ...overrides };
+  const held = (await deps.find(name, FROM_CATALOGUE))
+    .filter((h) => sameSight(name, h.name))
+    .flatMap(asMustSee)
+    .sort(
+      (a, b) =>
+        Number(route.includes(b.place)) - Number(route.includes(a.place)),
+    );
+  if (held[0]) return held[0];
+  if (!finder.configured) return null;
+
+  const session = crypto.randomUUID();
+  const suggested = await finder.suggest(name, session);
+  const first = suggested.ok ? suggested.value[0] : undefined;
+  if (!first || !sameSight(name, first.name)) return null;
+  const taken = await takeSight(
+    finder,
+    userId,
+    first.externalId,
+    session,
+    deps,
+  );
+  return taken.ok ? taken.sight : null;
+}

@@ -5,6 +5,7 @@ import type { SightFinder } from "../domain/catalogue/sight-search.ts";
 import {
   type SightSearchDeps,
   searchSights,
+  sightNamed,
   takeSight,
 } from "./sight-search.ts";
 
@@ -198,6 +199,38 @@ describe("takeSight", () => {
       ok: false,
       reason: "outside",
     });
+    assert.deepEqual(taken, []);
+  });
+});
+
+describe("sightNamed", () => {
+  test("the catalogue's own, on the route first", async () => {
+    const { finder: f, calls } = finder();
+    const elsewhere = hit("Jvari Monastery", "mtskheta");
+    const onRoute = hit("Jvari Monastery", "signagi");
+    const sight = await sightNamed(
+      f,
+      "u1",
+      "Jvari",
+      ["signagi"],
+      deps({ find: async () => [elsewhere, onRoute] }).deps,
+    );
+    assert.equal(sight?.id, onRoute.id);
+    assert.deepEqual(calls, []);
+  });
+
+  test("a name the catalogue lacks is Google's first suggestion, taken in", async () => {
+    const { finder: f } = finder();
+    const { deps: d, taken } = deps();
+    const sight = await sightNamed(f, "u1", "Bodbe", ["signagi"], d);
+    assert.equal(sight?.name, "Bodbe Monastery");
+    assert.equal(taken.length, 1);
+  });
+
+  test("a suggestion by another name is not taken for the one asked", async () => {
+    const { finder: f } = finder();
+    const { deps: d, taken } = deps();
+    assert.equal(await sightNamed(f, "u1", "Ananuri", [], d), null);
     assert.deepEqual(taken, []);
   });
 });
