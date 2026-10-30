@@ -16,7 +16,9 @@ import { addDays } from "./schedule.ts";
 // make it work, never quietly bent into a different trip.
 //
 // The numbers are deliberately on the generous side of possible: a "no" here
-// has to be one a traveller who knows Georgia would agree with.
+// has to be one a traveller who knows Georgia would agree with. Money is never
+// a "no": a family's spare room or a friend's car are things only the
+// traveller knows, so a thin budget is advice they may overrule.
 
 export type Judgement = {
   /** `tight` can be done and is worth a warning; `impossible` cannot. */
@@ -25,6 +27,8 @@ export type Judgement = {
   note: string;
   /** Why not, and what would work. Only when `impossible`. */
   why?: string;
+  /** What is worth knowing before building, when it can still be done. */
+  advice?: string;
 };
 
 export type Assessment = {
@@ -50,6 +54,8 @@ const HEAVY_DRIVING_MIN_PER_DAY = 3 * 60;
  * three simple meals (€13) and getting around town with an entry fee (€5).
  */
 const FLOOR_EUR_PER_DAY = 30;
+/** The dorm bed in the floor, which a night with family or friends saves. */
+const BED_EUR_PER_NIGHT = 12;
 /** Below this a day is hostels and marshrutkas; above it, guesthouses and restaurants. */
 const COMFORT_EUR_PER_DAY = 45;
 /** Above this, hotels and private drivers. */
@@ -57,6 +63,10 @@ const GENEROUS_EUR_PER_DAY = 120;
 const CHILD_SHARE = 0.6;
 /** A marshrutka seat: Tbilisi–Mestia is about 470 km and 50 lari. */
 const TRANSPORT_EUR_PER_KM = 0.04;
+/** Fuel for one car: 8 l/100 km at about 3 lari a litre. */
+const FUEL_EUR_PER_KM = 0.09;
+/** Seats in a car, for how many cars a party of its own needs. */
+const SEATS_PER_CAR = 5;
 
 const euros = (n: number) => `€${Math.round(n).toLocaleString("en-GB")}`;
 const hours = (min: number) => {
@@ -174,21 +184,33 @@ function judgeBudget(c: Constraints): Judgement {
   const people = adults + children;
   const shares = adults + children * CHILD_SHARE;
   const km = routeLegs(routeOf(c)).reduce((sum, l) => sum + l.km, 0);
-  const transport = km * TRANSPORT_EUR_PER_KM * people;
-  const daily = (c.budgetEur - transport) / c.days / shares;
+  const transport = c.ownCar
+    ? km * FUEL_EUR_PER_KM * Math.ceil(people / SEATS_PER_CAR)
+    : km * TRANSPORT_EUR_PER_KM * people;
+  const freeNights = Math.min(c.freeNights, c.days);
+  const saved = BED_EUR_PER_NIGHT * freeNights * shares;
+  const daily = (c.budgetEur - transport + saved) / c.days / shares;
 
   if (daily < FLOOR_EUR_PER_DAY) {
     const least =
-      Math.ceil((FLOOR_EUR_PER_DAY * c.days * shares + transport) / 10) * 10;
-    // What the money does stretch to, if the traveller would rather cut days.
-    const affordable = Math.floor(
-      (c.budgetEur - transport) / shares / FLOOR_EUR_PER_DAY,
-    );
+      Math.ceil(
+        (FLOOR_EUR_PER_DAY * c.days * shares + transport - saved) / 10,
+      ) * 10;
     const each = Math.max(0, Math.floor(c.budgetEur / c.days / people));
+    const covered = [
+      c.ownCar ? "your own car" : "",
+      freeNights ? plural(freeNights, "free night") : "",
+    ].filter(Boolean);
+    // What the floor is made of, less what the traveller already has.
+    const floor = [
+      freeNights < c.days ? "a dorm bed" : "",
+      "simple meals",
+      c.ownCar ? "entry fees" : "marshrutkas",
+    ].filter(Boolean);
     return {
-      level: "impossible",
-      note: `Needs at least ${euros(least)}`,
-      why: `${euros(c.budgetEur)} for ${plural(people, "person", "people")} over ${plural(c.days, "day")} is about ${euros(each)} each a day${transport >= 10 ? `, before ${euros(transport)} of transport between places` : ""}. The least a day costs in Georgia — a dorm bed, simple meals and marshrutkas — is about ${euros(FLOOR_EUR_PER_DAY)}. Raise the budget to ${euros(least)}${affordable >= c.places.length ? `, or cut the trip to ${plural(affordable, "day")}` : ""}.`,
+      level: "tight",
+      note: `Usually at least ${euros(least)}`,
+      advice: `${euros(c.budgetEur)} for ${plural(people, "person", "people")} over ${plural(c.days, "day")} is about ${euros(each)} each a day${transport >= 10 ? `, before ${euros(transport)} of ${c.ownCar ? "fuel" : "transport"} between places` : ""}. A day in Georgia usually costs at least ${euros(FLOOR_EUR_PER_DAY)} each — ${floor.slice(0, -1).join(", ")} and ${floor.at(-1)} — so ${covered.length ? `even with ${covered.join(" and ")} ` : ""}a trip like this tends to need about ${euros(least)}.${covered.length ? "" : " If you have a car or somewhere free to stay, say so and I will count it."} You can still start planning with this budget.`,
     };
   }
   if (daily < COMFORT_EUR_PER_DAY) {
@@ -234,6 +256,12 @@ export function assessAsked(
     })),
   );
 }
+
+/** What to know before building a trip that can be done, in card order. */
+export const advice = (a: Assessment): string[] =>
+  [a.places, a.days, a.budget].flatMap((j) =>
+    j.level !== "impossible" && j.advice ? [j.advice] : [],
+  );
 
 /** Every reason a request cannot work, in the order the cards are shown. */
 export const reasons = (a: Assessment): string[] =>

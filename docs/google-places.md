@@ -28,6 +28,8 @@ what is used.
 | Find the place (once per place; the id is kept in `place_external`) | Text Search, biased to the place's pin, 5 results | `id`, `displayName`, `location` |
 | Open a place | Place Details | `id`, `rating`, `userRatingCount`, `googleMapsUri`, `reviews`, `photos` |
 | Each photograph shown (at most 6) | Place Photos with `skipHttpRedirect=true`, 1200px wide | the keyless `photoUri` |
+| Typing a sight's name on /new, when the catalogue has fewer than five matches | Autocomplete (New), `includedRegionCodes: ["ge"]`, with a session token | `placeId`, the main and secondary text |
+| Picking one of those | Place Details, under the same session token | `id`, `displayName`, `location`, `primaryType`, `types` |
 | Plan a trip: a destination's best-rated places (once per destination and kind, kept, see below) | Text Search, "best restaurants in Kutaisi, Georgia" with `includedType` `restaurant`, `lodging` or `tourist_attraction`, biased 20 km around the destination, a page of 20 | `id`, `displayName`, `location`, `rating`, `userRatingCount` |
 
 As with Tripadvisor, `chooseMatch` (domain) needs the name and the pin to agree before a result is
@@ -59,6 +61,24 @@ ratings, as before.
   `usage_window` as `ratings:google`), counted only when a search is made. With Redis, a destination
   costs three searches once per 60 days.
 
+### Sights the catalogue lacks
+
+The catalogue is thin in places: Sighnaghi holds one heritage place, and not Bodbe Monastery. A
+traveller who types a sight's name on /new, or names one to the planner, can pin it as a
+**must-see** (`src/bll/sight-search.ts`, port `SightFinder`, adapter `googleSights`):
+
+- The catalogue answers first (curated and verified sights by name). Google is asked only when it
+  has fewer than five; a suggestion whose id is already held is not offered again.
+- A pick is fetched once and **kept in Postgres as a verified `place`** (`source = 'google'`,
+  `source_id` = Google's id, unique on the pair), with its `place_external` row: its name, its
+  position and a category from its types (`sightCategory`). A hotel, a shop or a bare point of
+  interest is refused, and so is anywhere outside the destinations a trip can go.
+- From then on it is a catalogue place like any other, and every plan for that trip must visit it.
+- In conversation the planner returns the sights a message names; the first Google suggestion is
+  taken in only when its name holds every word asked for.
+- **Billed:** Autocomplete is free within a session that ends in Place Details, which is billed
+  once. Ceilings per user: 40 searches a minute, 400 a day, 30 picks a day.
+
 ## Terms, and what this build does about them
 
 As the terms were read when this was written (re-read them: they change):
@@ -66,6 +86,7 @@ As the terms were read when this was written (re-read them: they change):
 | Term | Where it bites |
 |---|---|
 | **Only a place's identifier may be stored.** Other content — reviews, photographs, ratings — may not be cached or stored beyond what serving a request needs. | **This build keeps the content anyway**, in Redis, for **60 days**, on the owner's decision of 2026-10-03. The id is kept in Postgres as before. It is a known departure from the letter, as Tripadvisor's 12-hour cache is (`docs/tripadvisor.md`), and a longer one. |
+| **Only the place id may be kept indefinitely**; coordinates may be cached for at most 30 days, and other content (a name included) not beyond serving the request. | **A pinned sight's name, position and category are kept in Postgres indefinitely**, on the owner's decision of 2026-10-29: a plan cannot be built from a place it does not hold. Nothing else of Google's — no rating, review or photograph — goes into `place`. This is a further departure from the letter than the 60-day cache, and the one to revisit first. |
 | **Attribution.** Google-sourced content must show "Google Maps", and reviews and photographs credit their authors. | The source is named "Google Maps" in the section heading and the "See all" link; each review shows its author and links to Google Maps; each photograph is credited `Author · Google Maps` and links to the author's profile. |
 | **Place ids can go stale.** | A `404` on a stored id reads as "nothing to show". It is not yet re-resolved; if it starts to show in `places.enrich` logs, clear the `place_external` row for `provider = 'google'` or add a re-search on `no-match` from `read`. |
 

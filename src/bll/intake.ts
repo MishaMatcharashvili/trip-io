@@ -1,6 +1,12 @@
 import { countUse } from "../dal/usage.ts";
 import { dayKey } from "../domain/trip/document.ts";
 import {
+  type MustSee,
+  pinSight,
+  routeOf,
+} from "../domain/trip/generate/constraints.ts";
+import {
+  applyEdit,
   fallbackTurn,
   type IntakeMessage,
   type Intaker,
@@ -21,6 +27,14 @@ export type PlanningDeps = {
   sights: (state: IntakeState, latest: string) => Promise<Sights>;
   count: (key: string, windowSeconds: number, now: Date) => Promise<number>;
   now: () => Date;
+  /**
+   * A sight the traveller named, as a must-see (sight-search.ts), or null.
+   * Without one, a named sight stays in the planner's notes.
+   */
+  sightNamed?: (
+    name: string,
+    route: readonly string[],
+  ) => Promise<MustSee | null>;
 };
 
 export type PlanningResult =
@@ -64,7 +78,14 @@ export async function planningTurn(
       messages.filter((m) => m.role === "planner").length,
       latest,
     );
-    if (turn) return { ok: true, source: "model", ...turn };
+    if (turn) {
+      return {
+        ok: true,
+        source: "model",
+        ...turn,
+        state: await withSights(turn.state, turn.sights, deps.sightNamed),
+      };
+    }
   } catch {
     // Falls through: a turn without the model is better than no turn.
   }
@@ -73,4 +94,26 @@ export async function planningTurn(
     source: "fallback",
     ...fallbackTurn(messages, state, today),
   };
+}
+
+/**
+ * The state with the sights a turn named pinned, each bringing its town onto
+ * the route. One that cannot be found is left to the notes, where the planner
+ * keeps a must-see it has no place for; one that fails to be looked up is too.
+ */
+async function withSights(
+  state: IntakeState,
+  names: readonly string[],
+  find: PlanningDeps["sightNamed"],
+): Promise<IntakeState> {
+  if (!find || names.length === 0) return state;
+  const found = await Promise.all(
+    names.map((n) => find(n, routeOf(state.constraints)).catch(() => null)),
+  );
+  const pinned = found.reduce(
+    (c, sight) => (sight ? pinSight(c, sight) : c),
+    state.constraints,
+  );
+  if (pinned === state.constraints) return state;
+  return applyEdit(state, { places: pinned.places, mustSee: pinned.mustSee });
 }

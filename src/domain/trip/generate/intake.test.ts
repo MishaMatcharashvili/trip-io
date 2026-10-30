@@ -26,8 +26,11 @@ const unchanged = {
   children: null,
   mobility: null,
   budgetEur: null,
+  ownCar: null,
+  freeNights: null,
   notes: null,
   unsupported: [],
+  sights: [],
   ready: false,
   suggestions: [],
   options: [],
@@ -237,6 +240,50 @@ describe("the route", () => {
       "batumi",
       "tbilisi",
     ]);
+  });
+});
+
+describe("a car of their own and free nights", () => {
+  test("are taken from the reply, and the nights clamped", () => {
+    const turn = readIntake(
+      { ...unchanged, ownCar: true, freeNights: 40 },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(turn?.state.constraints.ownCar, true);
+    assert.equal(turn?.state.constraints.freeNights, 21);
+    assert.ok(turn?.state.said.includes("ownCar"));
+  });
+});
+
+describe("must-sees", () => {
+  test("the sights a message names are passed on, trimmed, few and once each", () => {
+    const turn = readIntake(
+      {
+        ...unchanged,
+        sights: [" Bodbe Monastery ", "Bodbe Monastery", "", "a", "b", "c"],
+      },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.deepEqual(turn?.sights, ["Bodbe Monastery", "a", "b"]);
+  });
+
+  const bodbe = {
+    id: "7f3c1a52-0b8e-4c3e-9a1d-2f6b8e4d1c90",
+    name: "Bodbe Monastery",
+    place: "signagi",
+  };
+
+  test("a sight goes with its destination when the route changes", () => {
+    const pinned = applyEdit(initialState(TODAY), {
+      places: ["tbilisi", "signagi"],
+      mustSee: [bodbe],
+    });
+    assert.deepEqual(pinned.constraints.mustSee, [bodbe]);
+    assert.ok(pinned.said.includes("mustSee"));
+    const moved = applyEdit(pinned, { places: ["tbilisi"] });
+    assert.deepEqual(moved.constraints.mustSee, []);
   });
 });
 

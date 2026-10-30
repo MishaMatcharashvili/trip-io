@@ -4,6 +4,7 @@ import {
   classify,
   googlePlaces,
   googleRatings,
+  googleSights,
   parseDetails,
   toCandidates,
   toRated,
@@ -371,5 +372,109 @@ describe("a town's best-rated places", () => {
       { ok: false, reason: "not-configured" },
     );
     assert.equal(none.calls.length, 0);
+  });
+});
+
+describe("sights by name", () => {
+  const typed = {
+    suggestions: [
+      {
+        placePrediction: {
+          place: "places/ChIJbodbe",
+          placeId: "ChIJbodbe",
+          text: { text: "Bodbe Monastery, Sighnaghi, Georgia" },
+          structuredFormat: {
+            mainText: { text: "Bodbe Monastery" },
+            secondaryText: { text: "Sighnaghi, Georgia" },
+          },
+        },
+      },
+      { queryPrediction: { text: { text: "bodbe hotels" } } },
+    ],
+  };
+  const picked = {
+    id: "ChIJbodbe",
+    displayName: { text: "Bodbe Monastery", languageCode: "en" },
+    location: { latitude: 41.6064, longitude: 45.9331 },
+    primaryType: "church",
+    types: ["church", "place_of_worship", "tourist_attraction"],
+  };
+
+  test("typing asks Autocomplete, in Georgia, under the session, with the key in a header", async () => {
+    const { fetch, calls } = fake({ "/places:autocomplete": typed });
+    const result = await googleSights({ key: "secret", fetch }).suggest(
+      "Bodbe",
+      "s-1",
+    );
+    assert.deepEqual(result, {
+      ok: true,
+      value: [
+        {
+          externalId: "ChIJbodbe",
+          name: "Bodbe Monastery",
+          where: "Sighnaghi, Georgia",
+        },
+      ],
+    });
+    const { url, init } = calls[0];
+    const body = JSON.parse(String(init.body));
+    assert.equal(body.input, "Bodbe");
+    assert.equal(body.sessionToken, "s-1");
+    assert.deepEqual(body.includedRegionCodes, ["ge"]);
+    assert.equal(
+      (init.headers as Record<string, string>)["X-Goog-Api-Key"],
+      "secret",
+    );
+    assert.ok(!url.href.includes("secret"));
+  });
+
+  test("a pick asks only for the name, the position and the kind, under the same session", async () => {
+    const { fetch, calls } = fake({ "/places/ChIJbodbe": picked });
+    const result = await googleSights({ key: "secret", fetch }).details(
+      "ChIJbodbe",
+      "s-1",
+    );
+    assert.deepEqual(result, {
+      ok: true,
+      value: {
+        externalId: "ChIJbodbe",
+        name: "Bodbe Monastery",
+        lonLat: [45.9331, 41.6064],
+        types: ["church", "place_of_worship", "tourist_attraction"],
+      },
+    });
+    const { url, init } = calls[0];
+    assert.equal(
+      (init.headers as Record<string, string>)["X-Goog-FieldMask"],
+      "id,displayName,location,primaryType,types",
+    );
+    assert.equal(url.searchParams.get("sessionToken"), "s-1");
+  });
+
+  test("an id that is not Google's shape is never put in a path", async () => {
+    const { fetch, calls } = fake({});
+    const result = await googleSights({ key: "secret", fetch }).details(
+      "../places:searchText",
+      "s-1",
+    );
+    assert.deepEqual(result, { ok: true, value: null });
+    assert.equal(calls.length, 0);
+  });
+
+  test("without a key nothing is sent; a place Google no longer has is none", async () => {
+    const none = fake({});
+    assert.deepEqual(
+      await googleSights({ key: undefined, fetch: none.fetch }).suggest(
+        "Bodbe",
+        "s",
+      ),
+      { ok: false, reason: "not-configured" },
+    );
+    assert.equal(none.calls.length, 0);
+    const gone = fake({});
+    assert.deepEqual(
+      await googleSights({ key: "k", fetch: gone.fetch }).details("ChIJx", "s"),
+      { ok: true, value: null },
+    );
   });
 });

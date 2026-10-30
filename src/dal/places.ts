@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { type SQL, sql } from "drizzle-orm";
 import {
   type CategoryGroup,
   categoryGroup,
@@ -226,7 +226,15 @@ export async function insertCurated(
 export async function candidatesInArea(
   { slug, match }: { slug: string; match: AreaMatch },
   limit: number,
+  /**
+   * Categories the traveller came for: dealt LIKED_SHARE turns for every one
+   * the rest get, so a town's cafés cannot crowd its churches out.
+   */
+  liked: readonly string[] = [],
 ): Promise<Candidate[]> {
+  const turn = liked.length
+    ? sql`rank::float / CASE WHEN category IN (${list(liked)}) THEN ${LIKED_SHARE} ELSE 1 END`
+    : sql`rank`;
   const rows = await db.execute(sql`
     SELECT id, name, category, tier, opening_hours, lon, lat
     FROM (
@@ -241,7 +249,7 @@ export async function candidatesInArea(
         AND p.category NOT IN (${list(categoryGroups.services)})
         AND ${areaPredicate(match)}
     ) ranked
-    ORDER BY tier = 'curated' DESC, rank, name
+    ORDER BY tier = 'curated' DESC, ${turn}, name
     LIMIT ${limit}
   `);
   return rows.rows.map((r) => ({
@@ -250,6 +258,29 @@ export async function candidatesInArea(
     areas: [slug],
   }));
 }
+
+/**
+ * Places by id, as candidates, when a plan may use them: curated or verified,
+ * and not a fuel station. What the traveller asked for by name; the caller
+ * says which destination each is for.
+ */
+export async function candidatesByIds(
+  ids: readonly string[],
+): Promise<Omit<Candidate, "area" | "areas">[]> {
+  if (ids.length === 0) return [];
+  const rows = await db.execute(sql`
+    SELECT p.id, p.name, p.category, p.tier, p.opening_hours,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat
+    FROM place p
+    WHERE p.id IN (${list(ids)})
+      AND p.tier IN ('curated', 'verified')
+      AND p.category NOT IN (${list(categoryGroups.services)})
+  `);
+  return rows.rows.map(candidateOf);
+}
+
+/** Turns a liked category gets for each one of the others' (candidatesInArea). */
+const LIKED_SHARE = 3;
 
 /** A candidate row as the planner sees it, before it is told where it is. */
 function candidateOf(
@@ -524,6 +555,109 @@ export async function searchPlaces(search: PlaceSearch): Promise<PlaceHit[]> {
       websites: Number(r.websites ?? 0),
     };
   });
+}
+
+/** A sight a traveller can pin, with the municipality or city it lies in. */
+export type SightHit = {
+  id: string;
+  name: string;
+  category: string;
+  lonLat: LonLat;
+  /** The region's slug, or null outside every region the catalogue knows. */
+  region: string | null;
+};
+
+/** The region a point lies in, a city before the municipality around it. */
+const regionOf = (geom: SQL) => sql`(
+  SELECT r.slug FROM region r WHERE ST_Intersects(r.geom, ${geom})
+  ORDER BY r.kind = 'city' DESC LIMIT 1
+)`;
+
+/** Sight groups: somewhere to spend part of a day, not a bed or a pump. */
+const SIGHT_GROUPS = ["heritage", "culture", "nature", "food"] as const;
+
+/**
+ * Sights the catalogue holds by name, in either script, that a plan may use:
+ * curated or verified. Curated first, then names that start with the query,
+ * then the ones the source is surest of.
+ */
+export async function findSights(
+  q: string,
+  limit: number,
+): Promise<SightHit[]> {
+  const pattern = `%${escapeLike(q)}%`;
+  const prefix = `${escapeLike(q)}%`;
+  const categories = SIGHT_GROUPS.flatMap(
+    (g) => categoryGroups[g] as readonly string[],
+  );
+  const rows = await db.execute(sql`
+    SELECT p.id, p.name, p.category,
+           ST_X(p.geom::geometry) AS lon, ST_Y(p.geom::geometry) AS lat,
+           ${regionOf(sql`p.geom`)} AS region
+    FROM place p
+    WHERE p.tier IN ('curated', 'verified')
+      AND p.category IN (${list(categories)})
+      AND (p.name ILIKE ${pattern} OR p.name_ka ILIKE ${pattern})
+    ORDER BY p.tier = 'curated' DESC,
+             (p.name ILIKE ${prefix}) DESC,
+             (p.attrs->>'confidence')::float DESC NULLS LAST,
+             p.name
+    LIMIT ${limit}
+  `);
+  return rows.rows.map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    category: r.category as string,
+    lonLat: [Number(r.lon), Number(r.lat)] as LonLat,
+    region: (r.region as string | null) ?? null,
+  }));
+}
+
+/** Which of these provider ids the catalogue already holds a place for. */
+export async function sourcedIds(
+  source: string,
+  sourceIds: readonly string[],
+): Promise<Set<string>> {
+  if (sourceIds.length === 0) return new Set();
+  const rows = await db.execute(sql`
+    SELECT source_id FROM place
+    WHERE source = ${source} AND source_id IN (${list(sourceIds)})
+  `);
+  return new Set(rows.rows.map((r) => r.source_id as string));
+}
+
+/** The region a point lies in, or null outside every one. */
+export async function regionAt([lon, lat]: LonLat): Promise<string | null> {
+  const rows = await db.execute(sql`
+    SELECT ${regionOf(sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography`)} AS region
+  `);
+  return (rows.rows[0]?.region as string | null) ?? null;
+}
+
+/**
+ * A sight a traveller pinned from a provider, as a verified catalogue place:
+ * the provider's id, its name, where it is and what kind of place it is, and
+ * nothing more (docs/google-places.md). Pinned twice, it is one place: the
+ * second pin updates the name and returns the same id.
+ */
+export async function importSight(input: {
+  source: string;
+  sourceId: string;
+  name: string;
+  category: string;
+  lonLat: LonLat;
+}): Promise<string> {
+  const [lon, lat] = input.lonLat;
+  const rows = await db.execute(sql`
+    INSERT INTO place (id, name, category, geom, tier, source, source_id, attrs, verified_at)
+    VALUES (${crypto.randomUUID()}, ${input.name}, ${input.category},
+            ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography,
+            'verified', ${input.source}, ${input.sourceId},
+            ${JSON.stringify({ addedVia: "traveller-search" })}::jsonb, now())
+    ON CONFLICT (source, source_id) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id
+  `);
+  return rows.rows[0].id as string;
 }
 
 /** How many places the catalogue holds in one area, by tier a plan may use. */

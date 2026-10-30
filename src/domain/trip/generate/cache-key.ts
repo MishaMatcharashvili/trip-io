@@ -42,6 +42,8 @@ export function cacheKey(c: Constraints): string {
     // Wishes change which places suit, so a plan composed for other wishes
     // is never served for these.
     notes: c.notes.trim().toLowerCase().replace(/\s+/g, " "),
+    // A plan composed without a sight the traveller insists on is not theirs.
+    mustSee: c.mustSee.map((s) => s.id).sort(),
   };
   return createHash("sha256").update(JSON.stringify(shape)).digest("hex");
 }

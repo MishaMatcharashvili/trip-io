@@ -8,9 +8,13 @@ import {
   type Violation,
   validateDoc,
 } from "../validate.ts";
-import { misplaced, museumHeavy } from "./balance.ts";
+import { misplaced, museumHeavy, offInterest } from "./balance.ts";
 import { cacheKey } from "./cache-key.ts";
-import type { Constraints } from "./constraints.ts";
+import {
+  type Constraints,
+  type MustSee,
+  sightsOnRoute,
+} from "./constraints.ts";
 import { fallbackPlan } from "./fallback.ts";
 import { idleGaps } from "./idle.ts";
 import {
@@ -42,6 +46,8 @@ export type CandidateRef = {
   areas: Candidate["areas"];
   /** What travellers give it, when enough of them have. */
   rating?: Candidate["rating"];
+  /** The traveller asked for it by name: every plan visits it. */
+  mustSee?: true;
   /** Human-readable, e.g. "mon–sat 10:00–18:00; sun closed", or "unknown". */
   hours: string;
 };
@@ -151,6 +157,24 @@ export function routeProblems(
     );
 }
 
+/**
+ * The sights the traveller asked for by name that a plan leaves out. Only
+ * those among the candidates count: one the catalogue no longer holds, or
+ * holds at a tier a plan may not use, is not something any plan could visit.
+ */
+export function mustSeeProblems(
+  plan: Plan,
+  sights: readonly MustSee[],
+  places: ReadonlyMap<string, Candidate>,
+): string[] {
+  const visited = new Set(
+    plan.days.flatMap((d) => d.stops.map((s) => s.placeId)),
+  );
+  return sights
+    .filter((s) => places.has(s.id) && !visited.has(s.id))
+    .map((s) => `${s.name} is a must-see but no day visits it`);
+}
+
 /** Where the traveller leaves from, as the scheduler drives there. */
 const finishOf = (c: Constraints) => {
   const at = destination(c.finish);
@@ -250,9 +274,15 @@ export async function generate(
     ...stations.map((s) => [s.id, s] as const),
   ]);
   const header = tripHeader(c);
+  const sights = sightsOnRoute(c);
+  const required = new Set(sights.map((s) => s.id));
 
-  /** Schedule and validate. Problems are what a retry or the fallback acts on. */
-  const evaluate = (plan: Plan) => {
+  /**
+   * Schedule and validate. Problems are what a retry or the fallback acts on.
+   * `excused` are must-sees the fallback had to drop because no day could
+   * hold them: a trip without one is still a trip, where none at all is not.
+   */
+  const evaluate = (plan: Plan, excused: ReadonlySet<string> = new Set()) => {
     const { nodes, problems } = schedule({
       plan,
       startDate: c.startDate,
@@ -313,12 +343,18 @@ export async function generate(
         ...idleGaps(doc, c.dayEnds),
         ...museumHeavy(plan, places, c),
         ...misplaced(plan, places, c),
+        ...offInterest(plan, places, c),
       ].map((g) => g.message),
       problems: [
         ...problems.map((p) => `${p.day}: ${p.message}`),
         ...errors.map((v) => `${v.day}: ${v.message}`),
         ...empty,
         ...routeProblems(plan, c.places, places),
+        ...mustSeeProblems(
+          plan,
+          sights.filter((s) => !excused.has(s.id)),
+          places,
+        ),
       ],
       offending,
     };
@@ -379,6 +415,7 @@ export async function generate(
       areas: p.areas,
       hours: deps.describeHours(p),
       ...(p.rating ? { rating: p.rating } : {}),
+      ...(required.has(p.id) ? { mustSee: true as const } : {}),
     })),
     days: Array.from({ length: c.days }, (_, i) => {
       const date = addDays(c.startDate, i);
@@ -472,7 +509,7 @@ export async function generate(
   for (let round = 0; round < MAX_FALLBACK_ROUNDS; round++) {
     const { value, ms } = await timed(() => {
       const plan = fallbackPlan(c, deps.candidates, exclude, stations);
-      return { plan, result: evaluate(plan) };
+      return { plan, result: evaluate(plan, exclude) };
     });
     const { plan, result } = value;
     const ok = result.problems.length === 0;

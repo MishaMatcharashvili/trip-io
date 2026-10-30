@@ -33,8 +33,11 @@ const answer = {
   children: null,
   mobility: null,
   budgetEur: null,
+  ownCar: null,
+  freeNights: null,
   notes: null,
   unsupported: [],
+  sights: [],
   ready: false,
   suggestions: [],
   options: [],
@@ -93,5 +96,41 @@ describe("planningTurn", () => {
     );
     assert.deepEqual(turn, { ok: false, reason: "rate-limited" });
     assert.equal(asked, false);
+  });
+});
+
+describe("sights named in conversation", () => {
+  const bodbe = {
+    id: "7f3c1a52-0b8e-4c3e-9a1d-2f6b8e4d1c90",
+    name: "Bodbe Monastery",
+    place: "signagi",
+  };
+
+  test("are found and pinned, bringing their town onto the route", async () => {
+    const asked: string[] = [];
+    const turn = await planningTurn("u1", state, messages, {
+      ...deps(async () => ({ ...answer, sights: ["Bodbe"] })),
+      sightNamed: async (name) => {
+        asked.push(name);
+        return bodbe;
+      },
+    });
+    assert.ok(turn.ok);
+    assert.deepEqual(asked, ["Bodbe"]);
+    assert.deepEqual(turn.state.constraints.mustSee, [bodbe]);
+    assert.deepEqual(turn.state.constraints.places, ["svaneti", "signagi"]);
+  });
+
+  test("one that cannot be found, or fails to be looked up, changes nothing", async () => {
+    const turn = await planningTurn("u1", state, messages, {
+      ...deps(async () => ({ ...answer, sights: ["Nowhere", "Broken"] })),
+      sightNamed: async (name) => {
+        if (name === "Broken") throw new Error("down");
+        return null;
+      },
+    });
+    assert.ok(turn.ok);
+    assert.deepEqual(turn.state.constraints.mustSee, []);
+    assert.deepEqual(turn.state.constraints.places, ["svaneti"]);
   });
 });

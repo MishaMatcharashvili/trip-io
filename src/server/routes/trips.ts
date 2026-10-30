@@ -7,6 +7,7 @@ import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { GOOGLE_CONTENT_TTL_S } from "@/bll/place-enrichment.ts";
 import { type RatingDeps, ratingDefaults } from "@/bll/ratings.ts";
+import { searchSights, sightNamed, takeSight } from "@/bll/sight-search.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
 import { submitSurvey } from "@/bll/survey.ts";
 import {
@@ -54,7 +55,7 @@ import {
 } from "@/domain/trip/generate/intake.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
-import { googleRatings } from "@/infra/google-places.ts";
+import { googleRatings, googleSights } from "@/infra/google-places.ts";
 import { mapboxDirections } from "@/infra/mapbox-directions.ts";
 import { upstashRatings } from "@/infra/upstash.ts";
 import { env } from "@/lib/env.ts";
@@ -86,6 +87,12 @@ const ratings: RatingDeps = {
       : undefined,
   ttlSeconds: env.GOOGLE_PLACES_CONTENT_TTL_S ?? GOOGLE_CONTENT_TTL_S,
 };
+
+/** Sights by name for /new: the catalogue's, then Google's (docs/google-places.md). */
+const sightFinder = googleSights({ key: env.GOOGLE_PLACES_API_KEY });
+
+/** One search session on the page: what ties Google's typing to the pick it ends in. */
+const sightSession = z.uuid();
 
 /** A point as `lon,lat`, the way the catalogue's `near` takes one. */
 const lonLat = z
@@ -215,13 +222,69 @@ export const trips = new Hono<SessionEnv>()
     ),
     async (c) => {
       const { state, messages } = c.req.valid("json");
-      const turn = await planningTurn(c.get("userId"), state, messages);
+      const userId = c.get("userId");
+      const turn = await planningTurn(userId, state, messages, {
+        sightNamed: (name, route) =>
+          sightNamed(sightFinder, userId, name, route),
+      });
       return turn.ok
         ? c.json({
             ...turn,
             assessment: assessAsked(turn.state.constraints, turn.unsupported),
           })
         : c.json({ ok: false as const, reason: turn.reason }, 429);
+    },
+  )
+
+  // A sight typed on /new (src/bll/sight-search.ts): the catalogue's matches,
+  // and Google's when the catalogue has too few. Builds nothing.
+  .get(
+    "/intake/sights",
+    zValidator(
+      "query",
+      z.object({ q: z.string().max(100), session: sightSession }),
+    ),
+    async (c) => {
+      const { q, session } = c.req.valid("query");
+      const found = await searchSights(
+        sightFinder,
+        c.get("userId"),
+        q,
+        session,
+      );
+      return found.ok
+        ? c.json(found)
+        : c.json({ ok: false as const, reason: found.reason }, 429);
+    },
+  )
+
+  // One of Google's suggestions, picked: taken into the catalogue, and the
+  // must-see the page pins.
+  .post(
+    "/intake/sights",
+    zValidator(
+      "json",
+      z.object({
+        externalId: z.string().min(1).max(300),
+        session: sightSession,
+      }),
+    ),
+    async (c) => {
+      const { externalId, session } = c.req.valid("json");
+      const picked = await takeSight(
+        sightFinder,
+        c.get("userId"),
+        externalId,
+        session,
+      );
+      if (picked.ok) return c.json(picked);
+      const status =
+        picked.reason === "rate-limited"
+          ? 429
+          : picked.reason === "unavailable"
+            ? 503
+            : 422;
+      return c.json({ ok: false as const, reason: picked.reason }, status);
     },
   )
 

@@ -16,6 +16,7 @@ import {
   interests,
   NOTES_MAX_CHARS,
   routeOf,
+  sightsOnRoute,
 } from "./constraints.ts";
 import { understand } from "./request.ts";
 
@@ -78,6 +79,9 @@ const stated = [
   "party",
   "mobility",
   "budgetEur",
+  "ownCar",
+  "freeNights",
+  "mustSee",
 ] as const satisfies readonly (keyof Constraints)[];
 type Stated = (typeof stated)[number];
 
@@ -134,10 +138,16 @@ export const intakeReply = z.object({
   children: z.number().nullable(),
   mobility: z.enum(["low", "moderate", "high"]).nullable(),
   budgetEur: z.number().nullable(),
+  /** The party drives its own car. */
+  ownCar: z.boolean().nullable(),
+  /** Nights the party sleeps for free, with family or friends. */
+  freeNights: z.number().nullable(),
   /** The whole of the notes after this turn, not an addition to them. */
   notes: z.string().nullable(),
   /** Places the traveller asked for that no trip can go to. */
   unsupported: z.array(z.string()),
+  /** Sights the latest message asks to see, by the names the traveller used. */
+  sights: z.array(z.string()),
   /** Nothing left that the planner needs to ask. */
   ready: z.boolean(),
   /** Two to four short answers to the question the reply ends on; none when it asks nothing. */
@@ -178,6 +188,9 @@ export type IntakeInput = {
   sights: Sights;
 };
 
+/** A message names a sight or two; more is a list to search, not a wish. */
+export const SIGHTS_PER_TURN = 3;
+
 /** The port the model call implements (src/infra/openai-intake.ts). */
 export type Intaker = (input: IntakeInput) => Promise<unknown>;
 
@@ -185,6 +198,11 @@ export type IntakeTurn = {
   reply: string;
   state: IntakeState;
   unsupported: string[];
+  /**
+   * Sights the traveller asked for by name, for the use case to find and pin
+   * (src/bll/sight-search.ts): the domain cannot look them up.
+   */
+  sights: string[];
   ready: boolean;
   /** Answers to offer as one-tap replies. Empty once the planner has nothing to ask. */
   suggestions: string[];
@@ -212,13 +230,16 @@ export function initialState(today: string): IntakeState {
 function withDefaults(c: Constraints, said: readonly Stated[]): Constraints {
   const has = (k: Stated) => said.includes(k);
   const people = c.party.adults + c.party.children;
+  const places = has("places")
+    ? c.places
+    : c.days >= 4
+      ? ["tbilisi", "kazbegi"]
+      : ["tbilisi"];
   return {
     ...c,
-    places: has("places")
-      ? c.places
-      : c.days >= 4
-        ? ["tbilisi", "kazbegi"]
-        : ["tbilisi"],
+    places,
+    // A sight goes with its destination: taken off the route, it is let go.
+    mustSee: sightsOnRoute({ places, mustSee: c.mustSee }),
     start: has("start") ? c.start : DEFAULT_ENDPOINT,
     // Said where it starts and not where it finishes: it finishes where it started.
     finish: has("finish")
@@ -280,6 +301,8 @@ export function readIntake(
   }
   if (r.mobility !== null) patch.mobility = r.mobility;
   if (r.budgetEur !== null) patch.budgetEur = clamp(r.budgetEur, 0, 100_000);
+  if (r.ownCar !== null) patch.ownCar = r.ownCar;
+  if (r.freeNights !== null) patch.freeNights = clamp(r.freeNights, 0, 21);
 
   const next = applyEdit(state, patch);
   if (r.notes !== null) {
@@ -304,6 +327,9 @@ export function readIntake(
     reply: r.reply,
     state: next,
     unsupported: r.unsupported.slice(0, 5),
+    sights: [
+      ...new Set(r.sights.map((s) => s.trim().slice(0, 100)).filter(Boolean)),
+    ].slice(0, SIGHTS_PER_TURN),
     ready,
     suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
     options,
@@ -521,6 +547,7 @@ export function fallbackTurn(
     reply,
     state: next,
     unsupported: read.refused.map((r) => r.name),
+    sights: [],
     ready: essentials && !follow,
     suggestions: follow?.suggestions ?? [],
     options: [],

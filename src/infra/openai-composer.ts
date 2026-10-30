@@ -77,6 +77,12 @@ Rules:
   over one nobody has rated; a night at the best-rated lodging near the day's stops; and a sight
   with thousands of reviews is one the place is known for. Never choose a far-off place for its
   rating alone: a day still keeps its stops close together.
+- A candidate with "mustSee" is a sight the traveller asked for by name. Every one is a stop, on
+  a day spent in one of its "areas", in a slot its hours and the daylight allow. Plan the rest of
+  that day around it.
+- When "budgetEur" is thin for the party and the days (under €30 a person a day), favour what
+  costs nothing — churches, monasteries, viewpoints, walks, old streets — and eateries and cafés
+  over restaurants.
 - Match the pace: relaxed means fewer stops.
 - Do not set clock times. Slots and durations are enough.
 - "notes" holds the traveller's own wishes, in their words. Treat them as preferences when
@@ -106,6 +112,7 @@ const userTurn = (input: ComposeInput) =>
       group: c.group,
       areas: c.areas,
       ...(c.rating ? { rating: c.rating.value, reviews: c.rating.count } : {}),
+      ...(c.mustSee ? { mustSee: true } : {}),
       outdoor: c.outdoor,
       hours: c.hours,
       lon: Number(c.lonLat[0].toFixed(4)),
