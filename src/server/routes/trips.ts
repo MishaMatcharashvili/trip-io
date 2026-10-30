@@ -7,7 +7,7 @@ import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { GOOGLE_CONTENT_TTL_S } from "@/bll/place-enrichment.ts";
 import { type RatingDeps, ratingDefaults } from "@/bll/ratings.ts";
-import { searchSights, takeSight } from "@/bll/sight-search.ts";
+import { searchSights, sightNamed, takeSight } from "@/bll/sight-search.ts";
 import { suggestForStop } from "@/bll/suggestions.ts";
 import { submitSurvey } from "@/bll/survey.ts";
 import {
@@ -222,7 +222,11 @@ export const trips = new Hono<SessionEnv>()
     ),
     async (c) => {
       const { state, messages } = c.req.valid("json");
-      const turn = await planningTurn(c.get("userId"), state, messages);
+      const userId = c.get("userId");
+      const turn = await planningTurn(userId, state, messages, {
+        sightNamed: (name, route) =>
+          sightNamed(sightFinder, userId, name, route),
+      });
       return turn.ok
         ? c.json({
             ...turn,
