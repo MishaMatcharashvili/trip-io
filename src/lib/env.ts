@@ -31,6 +31,12 @@ export const env = createEnv({
      */
     TRIPADVISOR_API_KEY: z.string().min(1).optional(),
     /**
+     * Apify's API token (src/infra/apify-tripadvisor.ts), for reading
+     * Tripadvisor's destination lists of restaurants and things to do. Server-
+     * only, sent in a header to Apify. Unset, places are rated by Google alone.
+     */
+    APIFY_TOKEN: z.string().min(1).optional(),
+    /**
      * What the place-enrichment use case will spend (src/bll/place-enrichment.ts).
      * Each open place is about three billable calls, so these are what stand
      * between a busy day and the bill. Unset, the defaults apply.

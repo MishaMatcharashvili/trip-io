@@ -152,6 +152,18 @@ export const railReminder = schedules.task({
   run: async () => runStages(["rail-reminder"]),
 });
 
+/**
+ * Once a month, 04:00 Tbilisi on the 1st: read every destination's Tripadvisor
+ * lists again. `tripadvisor-lists` queues a job per list; the drains, this one
+ * and the hourly pass's, start the reads and keep them when they finish.
+ */
+export const tripadvisorLists = schedules.task({
+  id: "tripadvisor-lists",
+  cron: { pattern: "0 4 1 * *", timezone: "Asia/Tbilisi" },
+  maxDuration: 600,
+  run: async () => runStages(["tripadvisor-lists", "drain"]),
+});
+
 /** The same pass on demand, for the mornings you want to read before they happen. */
 export const runMorningBriefing = task({
   id: "run-morning-briefing",

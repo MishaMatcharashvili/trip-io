@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { destination } from "../domain/catalogue/destinations.ts";
+import type { Listing } from "../domain/catalogue/listings.ts";
 import type {
   RatedOutcome,
   RatingSource,
@@ -145,5 +146,127 @@ describe("rated places in a destination", () => {
       },
     });
     assert.equal(kept.size, 0);
+  });
+});
+
+describe("Tripadvisor's lists", () => {
+  const listing = (over: Partial<Listing> = {}): Listing => ({
+    id: "t-palaty",
+    kind: "restaurant",
+    destination: "kutaisi",
+    name: "Palaty",
+    lonLat: [42.7005, 42.2716],
+    rating: 4.5,
+    count: 1_900,
+    ranking: { rank: 2, of: 410 },
+    url: null,
+    ...over,
+  });
+
+  const withLists = (
+    lists: Partial<Record<Listing["kind"], Listing[]>>,
+    requested: string[] = [],
+  ) => ({
+    lists: async (_d: string, kind: Listing["kind"]) => lists[kind] ?? [],
+    request: async (d: { slug: string }) => {
+      requested.push(d.slug);
+    },
+  });
+
+  test("a place both rate takes Tripadvisor's rating, with its rank in the town", async () => {
+    const { deps } = world();
+    const rated = await ratedInArea(kutaisi, {
+      ...deps,
+      tripadvisor: withLists({
+        restaurant: [listing()],
+        attraction: [
+          listing({
+            id: "t-x",
+            kind: "attraction",
+            name: "Elsewhere",
+            lonLat: [42.5, 42.1],
+          }),
+        ],
+      }),
+    });
+    assert.deepEqual(rated[0].rating, {
+      value: 4.5,
+      count: 1_900,
+      rank: { rank: 2, of: 410 },
+    });
+  });
+
+  test("a place Google alone found is still rated, by Google", async () => {
+    const { deps } = world();
+    const rated = await ratedInArea(kutaisi, {
+      ...deps,
+      tripadvisor: withLists({
+        restaurant: [
+          listing({
+            id: "t-other",
+            name: "Somewhere Else",
+            lonLat: [42.5, 42.1],
+          }),
+        ],
+        attraction: [
+          listing({
+            id: "t-x",
+            kind: "attraction",
+            name: "Elsewhere",
+            lonLat: [42.5, 42.1],
+          }),
+        ],
+      }),
+    });
+    assert.deepEqual(rated[0].rating, { value: 4.6, count: 2_400 });
+  });
+
+  test("a place only Tripadvisor lists is rated even when Google is off", async () => {
+    const { deps, searched } = world();
+    const rated = await ratedInArea(kutaisi, {
+      ...deps,
+      source: { ...deps.source, configured: false },
+      tripadvisor: withLists({ restaurant: [listing()] }),
+    });
+    assert.equal(rated.length, 1);
+    assert.equal(rated[0].rating?.rank?.rank, 2);
+    assert.deepEqual(searched, []);
+  });
+
+  test("a destination without lists has them asked for; one with them does not", async () => {
+    const asked: string[] = [];
+    const { deps } = world();
+    await ratedInArea(kutaisi, { ...deps, tripadvisor: withLists({}, asked) });
+    assert.deepEqual(asked, ["kutaisi"]);
+
+    const none: string[] = [];
+    await ratedInArea(kutaisi, {
+      ...deps,
+      tripadvisor: withLists(
+        {
+          restaurant: [listing()],
+          attraction: [listing({ id: "t-x", kind: "attraction" })],
+        },
+        none,
+      ),
+    });
+    // Hotels are never read, so their missing list asks for nothing.
+    assert.deepEqual(none, []);
+  });
+
+  test("lists that cannot be read cost Tripadvisor's ratings, not the trip", async () => {
+    const { deps } = world();
+    const rated = await ratedInArea(kutaisi, {
+      ...deps,
+      tripadvisor: {
+        lists: async () => {
+          throw new Error("database");
+        },
+        request: async () => {
+          throw new Error("queue");
+        },
+      },
+    });
+    assert.deepEqual(rated[0].rating, { value: 4.6, count: 2_400 });
   });
 });

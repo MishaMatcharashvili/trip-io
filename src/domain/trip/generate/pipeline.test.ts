@@ -908,6 +908,31 @@ describe("fallbackPlan", () => {
     assert.equal(second.days[0].stayId, better(bed, 2).id);
   });
 
+  test("between two well-rated lunches in walking distance, the one its town ranks higher", () => {
+    const first = fallbackPlan({ ...constraints, days: 1 }, curated);
+    const lunch = first.days[0].stops.find((s) => s.slot === "midday");
+    const meal = curated.find((p) => p.id === lunch?.placeId);
+    assert.ok(meal);
+    const at = (n: number, east: number, rank: number): Candidate => ({
+      ...meal,
+      id: `70000000-0000-4000-8000-00000000000${n}`,
+      lonLat: [meal.lonLat[0] + east, meal.lonLat[1]],
+      rating: { value: 4.6, count: 1_200, rank: { rank, of: 410 } },
+    });
+    // The nearer is #180 in its town, the one a few hundred metres on is #3.
+    const nearer = at(1, 0.0002, 180);
+    const higher = at(2, 0.004, 3);
+    const plan = fallbackPlan({ ...constraints, days: 1 }, [
+      ...curated,
+      nearer,
+      higher,
+    ]);
+    assert.equal(
+      plan.days[0].stops.find((s) => s.slot === "midday")?.placeId,
+      higher.id,
+    );
+  });
+
   test("lunch is not at a coffee shop, and a stage or a hall is not a sight", () => {
     // Nearer to everything than the café and the church, so picked first if allowed.
     const at = (n: number, category: string, group: Candidate["group"]) => ({

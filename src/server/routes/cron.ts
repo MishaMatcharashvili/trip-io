@@ -6,6 +6,7 @@ import { runMatch } from "@/bll/match.ts";
 import { senseNews } from "@/bll/news.ts";
 import { senseRoadNotices } from "@/bll/road-proposals.ts";
 import { senseWeather } from "@/bll/sense.ts";
+import { scheduleListingRefresh } from "@/bll/tripadvisor-listings.ts";
 import { requireCronSecret } from "../cron.ts";
 import { announceProposals } from "../telegram/proposals.ts";
 import { remindOperators } from "../telegram/reminder.ts";
@@ -54,4 +55,10 @@ export const cron = new Hono()
 
   // 30 3 * * * — 07:30 in Tbilisi. One job per live trip-day; the model call
   // itself happens in the drain, like every other one.
-  .get("/briefing", async (c) => c.json(await scheduleBriefings()));
+  .get("/briefing", async (c) => c.json(await scheduleBriefings()))
+
+  // 0 4 1 * * — monthly. Every destination with Tripadvisor lists has them read
+  // again; the drain does the reading (docs/tripadvisor-lists.md).
+  .get("/tripadvisor-lists", async (c) =>
+    c.json(await scheduleListingRefresh()),
+  );

@@ -79,6 +79,9 @@ the credit link stays with the picture.
 
 Google Maps now sits beside this in the same panel: `docs/google-places.md`.
 
+Trip generation also rates places by Tripadvisor's own destination lists, read through a scraper
+rather than this key: `docs/tripadvisor-lists.md`.
+
 ## The flow
 
 ```
