@@ -86,6 +86,7 @@ POST         /api/telegram/webhook     road reports → world_event             
 0 * * * *    /api/cron/sense-roads     Roads Department notices → queued reads      built (hourly, in the pipeline task)
 0 * * * *    /api/cron/road-proposals  tell operators what the model proposed       built (hourly, in the pipeline task)
 0 * * * *    /api/cron/outcomes        mark un-actioned interventions `ignored`     built
+0 4 1 * *    /api/cron/tripadvisor-lists  read every listed destination's Tripadvisor lists again  built (monthly, its own task)
 ```
 
 The five built cron handlers are written and behind `CRON_SECRET`; the Telegram webhook is behind
@@ -213,6 +214,7 @@ npm run catalogue:extract   Overture S3 → data/overture/<release>/*.parquet (b
                             → regions + gate + tier → data/catalogue/<release>/*.parquet
 npm run catalogue:corridors OSRM → src/domain/catalogue/corridors.geo.json (checked in)
 npm run catalogue:load      regions, corridors, places → Postgres (idempotent upsert)
+npm run catalogue:tripadvisor  Tripadvisor destination lists (Apify) → tripadvisor_listing
 /curate                     hand-verification queue → `curated` tier + opening_hours
 ```
 

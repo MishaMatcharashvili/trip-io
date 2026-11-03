@@ -49,7 +49,8 @@ same name-and-pin test as above, and the composer sees `rating` and `reviews` on
 candidates; the template plan prefers them for lunch and the night when they are as near. A place
 the catalogue does not hold is never planned, however well rated, and fewer than 30 reviews is no
 rating. Without the key, over the day's searches or with Google down, the trip is planned without
-ratings, as before.
+ratings, as before. Tripadvisor's destination lists, where read, rate the same destinations in more
+depth and take precedence where both rate a place: `docs/tripadvisor-lists.md`.
 
 - **Billed tier.** Asking for `rating` and `userRatingCount` puts these searches in a dearer Text
   Search tier than the place-finding search, which asks for neither. Check the price for the account.
