@@ -574,3 +574,44 @@ describe("fallbackTurn", () => {
     assert.match(turn.state.constraints.notes, /vegetarian/);
   });
 });
+
+describe("a trip given by its weekdays", () => {
+  // 2026-10-07 is a Wednesday.
+  const latest =
+    "A weekend in Guria. Start on Friday morning and get back on Monday morning";
+
+  test("counts the days the weekdays span, over the model's count of nights", () => {
+    const turn = readIntake(
+      { ...unchanged, days: 3, places: ["guria"], startDate: "2026-10-09" },
+      initialState(TODAY),
+      TODAY,
+      0,
+      latest,
+    );
+    assert.equal(turn?.state.constraints.days, 4);
+    assert.equal(turn?.state.constraints.startDate, "2026-10-09");
+  });
+
+  test("keeps a start the model put on that weekday a week later", () => {
+    const turn = readIntake(
+      { ...unchanged, days: 3, places: ["guria"], startDate: "2026-10-16" },
+      initialState(TODAY),
+      TODAY,
+      0,
+      `Next ${latest.toLowerCase()}`,
+    );
+    assert.equal(turn?.state.constraints.startDate, "2026-10-16");
+  });
+
+  test("moves a start that is not on the first weekday to the next one", () => {
+    const turn = readIntake(
+      { ...unchanged, days: 3, places: ["guria"], startDate: "2026-10-10" },
+      initialState(TODAY),
+      TODAY,
+      0,
+      latest,
+    );
+    assert.equal(turn?.state.constraints.startDate, "2026-10-09");
+    assert.ok(turn?.state.said.includes("startDate"));
+  });
+});

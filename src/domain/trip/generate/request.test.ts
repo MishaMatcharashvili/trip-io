@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { constraints } from "./constraints.ts";
-import { understand } from "./request.ts";
+import { readWeekdaySpan, understand } from "./request.ts";
 
 const TODAY = "2026-09-26";
 
@@ -200,5 +200,47 @@ describe("understand", () => {
   test("a family", () => {
     const { constraints: c } = understand("family trip with 2 kids", TODAY);
     assert.deepEqual(c.party, { adults: 2, children: 2 });
+  });
+
+  test("a weekend named by its weekdays counts the last day too", () => {
+    // 2026-09-26 is a Saturday: the next Friday is 2 October.
+    const { constraints: c, said } = understand(
+      "A weekend in Guria, start Friday morning and get back on Monday morning",
+      TODAY,
+    );
+    assert.equal(c.days, 4);
+    assert.equal(c.startDate, "2026-10-02");
+    assert.ok(said.includes("days") && said.includes("startDate"));
+  });
+
+  test("a date the traveller gives wins over the weekday's next occurrence", () => {
+    const { constraints: c } = understand(
+      "Friday 9 October to Sunday in Kakheti",
+      TODAY,
+    );
+    assert.equal(c.startDate, "2026-10-09");
+    assert.equal(c.days, 3);
+  });
+});
+
+describe("readWeekdaySpan", () => {
+  test("both ends included, wrapping over the week's end", () => {
+    assert.deepEqual(readWeekdaySpan("friday to monday", TODAY), {
+      startDate: "2026-10-02",
+      days: 4,
+      firstWeekday: 5,
+    });
+    assert.equal(readWeekdaySpan("Saturday and Sunday", TODAY)?.days, 2);
+    // Today is a Saturday, and counts.
+    assert.equal(
+      readWeekdaySpan("saturday to tuesday", TODAY)?.startDate,
+      TODAY,
+    );
+  });
+
+  test("one weekday, or the same one twice, is no span", () => {
+    assert.equal(readWeekdaySpan("leave on Friday", TODAY), null);
+    assert.equal(readWeekdaySpan("Friday, back the next Friday", TODAY), null);
+    assert.equal(readWeekdaySpan("a weekend in Batumi", TODAY), null);
   });
 });

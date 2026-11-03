@@ -18,7 +18,7 @@ import {
   routeOf,
   sightsOnRoute,
 } from "./constraints.ts";
-import { understand } from "./request.ts";
+import { readWeekdaySpan, understand, weekdayOf } from "./request.ts";
 
 // The conversation on /new. The traveller says what they want, a planner
 // replies and keeps the constraints generation will run on, and nothing is
@@ -291,6 +291,7 @@ export function readIntake(
   if (r.startDate !== null && realDate(r.startDate) && r.startDate >= today) {
     patch.startDate = r.startDate;
   }
+  Object.assign(patch, spanned(patch, state, latest, today));
   if (r.start !== null) patch.start = r.start;
   if (r.finish !== null) patch.finish = r.finish;
   if (r.adults !== null || r.children !== null) {
@@ -368,6 +369,33 @@ function missed(
     patch.days = read.constraints.days;
   }
   return patch;
+}
+
+/**
+ * The length and start the latest message gives by its weekdays, over the
+ * model's: "Friday morning to Monday morning" is four days, and a model
+ * counting nights makes it three and leaves Monday out. A start date already
+ * on the first weekday is kept, since "next Friday" may be a week further than
+ * the nearest one.
+ */
+function spanned(
+  patch: Partial<Constraints>,
+  state: IntakeState,
+  latest: string,
+  today: string,
+): Partial<Constraints> {
+  const span = readWeekdaySpan(latest, today);
+  if (!span) return {};
+  // The default start is nobody's date, even when it falls on a Friday.
+  const startDate =
+    patch.startDate ??
+    (state.said.includes("startDate") ? state.constraints.startDate : null);
+  return {
+    days: span.days,
+    ...(startDate && weekdayOf(startDate) === span.firstWeekday
+      ? {}
+      : { startDate: span.startDate }),
+  };
 }
 
 /**
