@@ -137,6 +137,25 @@ export function pinSight<C extends Pick<Constraints, "places" | "mustSee">>(
   return { ...c, places, mustSee: [...c.mustSee, sight] };
 }
 
+/**
+ * The route with the traveller's home on it: the home's place stands in for a
+ * wider one on the route that holds it (Guria, for a house in Chokhatauri, whose
+ * best-rated sights are on the coast an hour away), and joins the end of the
+ * route when none does. `within` are the route's places the home lies in.
+ */
+export function routeWithHome(
+  places: readonly string[],
+  at: Home,
+  within: readonly string[],
+): string[] {
+  if (places.includes(at.place)) return [...places];
+  const wider = places.findIndex((p) => within.includes(p));
+  if (wider >= 0) {
+    return places.map((p, i) => (i === wider ? at.place : p));
+  }
+  return places.length < MAX_PLACES ? [...places, at.place] : [...places];
+}
+
 /** The sights whose destination is still a day of the trip; the rest are let go. */
 export const sightsOnRoute = (
   c: Pick<Constraints, "places" | "mustSee">,

@@ -7,6 +7,7 @@ import {
   MAX_MUST_SEE,
   pinSight,
   routeOf,
+  routeWithHome,
   sightsOnRoute,
 } from "./constraints.ts";
 
@@ -148,5 +149,33 @@ describe("sightsOnRoute", () => {
     const pinned = pinSight(base, bodbe);
     assert.deepEqual(sightsOnRoute(pinned), [bodbe]);
     assert.deepEqual(sightsOnRoute({ ...pinned, places: ["tbilisi"] }), []);
+  });
+});
+
+describe("routeWithHome", () => {
+  const house = {
+    name: "Amaghleba",
+    lonLat: [42.1892, 42.0358] as [number, number],
+    place: "chokhatauri",
+  };
+
+  test("stands in for the wider place that holds it", () => {
+    assert.deepEqual(routeWithHome(["guria"], house, ["guria"]), [
+      "chokhatauri",
+    ]);
+    assert.deepEqual(
+      routeWithHome(["kutaisi", "guria", "batumi"], house, ["guria"]),
+      ["kutaisi", "chokhatauri", "batumi"],
+    );
+  });
+
+  test("is left alone when the route has it, and joins the end when nothing holds it", () => {
+    assert.deepEqual(routeWithHome(["chokhatauri"], house, ["chokhatauri"]), [
+      "chokhatauri",
+    ]);
+    assert.deepEqual(routeWithHome(["batumi"], house, []), [
+      "batumi",
+      "chokhatauri",
+    ]);
   });
 });
