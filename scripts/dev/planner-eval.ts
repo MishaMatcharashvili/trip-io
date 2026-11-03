@@ -20,6 +20,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { findHome } from "../../src/bll/home.ts";
 import { planningTurn } from "../../src/bll/intake.ts";
 import { GOOGLE_CONTENT_TTL_S } from "../../src/bll/place-enrichment.ts";
 import { destinationAt } from "../../src/bll/places.ts";
@@ -51,7 +52,11 @@ import type {
   Attempt,
   PlanCache,
 } from "../../src/domain/trip/generate/pipeline.ts";
-import { googleRatings, googleSights } from "../../src/infra/google-places.ts";
+import {
+  googleLocalities,
+  googleRatings,
+  googleSights,
+} from "../../src/infra/google-places.ts";
 import { mapboxDirections } from "../../src/infra/mapbox-directions.ts";
 import {
   type ObservedCall,
@@ -181,6 +186,11 @@ const sightFinder = logged(
   "google-places:sights",
 );
 
+const localityFinder = logged(
+  googleLocalities({ key: env.GOOGLE_PLACES_API_KEY }),
+  "google-places:localities",
+);
+
 /** Composes afresh every time: a cached plan would hide what the model does now. */
 const noCache: PlanCache = {
   get: async () => null,
@@ -272,6 +282,7 @@ async function play(scenario: Scenario, run: number): Promise<Run> {
       now,
       sightNamed: (name, route) =>
         sightNamed(sightFinder, EVAL_USER, name, route),
+      homeNamed: (name, route) => findHome(localityFinder, name, route),
     });
     if (!turn.ok) throw new Error(`turn refused: ${turn.reason}`);
     turns.push({
