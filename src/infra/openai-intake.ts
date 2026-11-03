@@ -42,7 +42,11 @@ latest message and return the fields it changes.
 What can be built: trips of 1 to 21 days anywhere in Georgia, through up to 8 of these places,
 given as "Name (slug)": ${destinations.map((d) => `${d.name} (${d.slug})`).join(", ")}.
 A town or sight not on the list belongs to the place it is in: Stepantsminda and Gergeti are
-kazbegi, Sighnaghi is signagi, Gelati is kutaisi. Prefer the most specific place that fits.
+kazbegi, Sighnaghi is signagi, Gelati is kutaisi. Prefer the most specific place that fits. A
+village belongs to its municipality: when the traveller names one where they stay or want to
+be ("my home in Amaghleba", Guria's Amaghleba, is chokhatauri), the trip goes to that
+municipality, not to the whole region, whose sights may be hours away. When you do not know
+which municipality a village is in, keep the region and ask which town it is near.
 Abkhazia and South Ossetia cannot be entered from the rest of Georgia, and nothing outside
 Georgia can be planned.
 
@@ -54,9 +58,15 @@ Fields:
   change from that (days 2). Never leave the route the traveller gave unreturned.
 - startDate is YYYY-MM-DD, never before today. Resolve "next month", "mid October" and the like
   from today's date.
+- days counts calendar days, the first and the last both included, not nights: "Friday to
+  Monday" is 4 days, and "leave Friday morning, back Monday morning" is 4 days whose last is
+  the drive home. Note when they leave on the last day ("back Monday morning") in notes.
 - budgetEur is for the whole party and the whole trip, excluding flights, in euros.
 - ownCar is true when the party drives its own car (not a hire car they still have to pay for).
-  freeNights is how many nights they sleep for free, with family or friends.
+  freeNights is how many nights they sleep for free, with family or friends, or at a home of
+  their own. A traveller with a home, a family house or a dacha where the trip goes sleeps there
+  every night they are there, so freeNights is those nights, and notes say where ("stays at
+  their own home in Amaghleba; no hotel").
 - mobility: low for limited walking, elderly travellers or toddlers; high for strenuous hikes.
 - interests, from what the traveller enjoys: heritage (churches, monasteries, fortresses, old
   towns), nature (hiking, mountains, lakes, views), culture (museums, galleries, theatre), food
