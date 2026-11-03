@@ -94,7 +94,15 @@ export type ScheduleInput = {
   dayEnds?: string;
   /** Fuel stations along the trip's long drives, where a drive rests (rests.ts). */
   stations?: readonly Candidate[];
+  /**
+   * The traveller's own home: a night the plan gives no bed is spent here,
+   * and a day based here ends with the drive back to it.
+   */
+  home?: { lonLat: LonLat; name: string } | null;
 };
+
+/** The base id of a night at the traveller's home, which has no catalogue place. */
+const HOME = "home";
 
 export function schedule(input: ScheduleInput): {
   nodes: Record<string, TripNode>;
@@ -104,6 +112,7 @@ export function schedule(input: ScheduleInput): {
   const startAt = input.start ?? null;
   const finish = input.finish ?? null;
   const dayEnds = input.dayEnds ?? DEFAULT_DAY_ENDS;
+  const home = input.home ?? null;
   const nodes: Record<string, TripNode> = {};
   const problems: ScheduleProblem[] = [];
   let baseId: string | null = null;
@@ -113,12 +122,21 @@ export function schedule(input: ScheduleInput): {
   const days = [...plan.days].sort((a, b) => a.day - b.day);
 
   const node = (
-    fields: Omit<TripNode, "meta"> & { title: string; rest?: boolean },
+    fields: Omit<TripNode, "meta"> & {
+      title: string;
+      rest?: boolean;
+      home?: boolean;
+    },
   ) => {
-    const { title, rest, ...at } = fields;
+    const { title, rest, home: atHome, ...at } = fields;
     nodes[newId()] = {
       ...at,
-      meta: { title, urban: false, ...(rest ? { rest } : {}) },
+      meta: {
+        title,
+        urban: false,
+        ...(rest ? { rest } : {}),
+        ...(atHome ? { home: atHome } : {}),
+      },
     };
   };
 
@@ -184,11 +202,14 @@ export function schedule(input: ScheduleInput): {
     const homeBy = ends + HOME_BY_MIN * MIN;
 
     let cursor = wall(date, DAY_START[pace]);
-    let here: LonLat | null = baseId
-      ? (places.get(baseId)?.lonLat ?? null)
-      : day === days[0]
-        ? startAt
-        : null;
+    let here: LonLat | null =
+      baseId === HOME
+        ? (home?.lonLat ?? null)
+        : baseId
+          ? (places.get(baseId)?.lonLat ?? null)
+          : day === days[0]
+            ? startAt
+            : null;
 
     const stops = [...day.stops].sort(
       (a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot),
@@ -279,6 +300,34 @@ export function schedule(input: ScheduleInput): {
       travel.minutes(here, finish.lonLat) > IMPLICIT_LEG_MAX_MIN;
     tail = { date, cursor, here };
     if (leaves) continue;
+
+    // A night the plan gives no bed is at home, when there is one: the first
+    // gets there and checks in, the rest drive back to it.
+    if (home && !day.stayId) {
+      const leg = here ? travel.minutes(here, home.lonLat) : 0;
+      let arrive = roundUp5(cursor);
+      if (here && leg > IMPLICIT_LEG_MAX_MIN) {
+        const road = driveOf(here, home.lonLat);
+        driveNodes(road, arrive, home.name);
+        arrive += road.ms;
+      } else if (leg > 0) {
+        arrive = roundUp5(cursor + (leg + LEG_BUFFER_MIN) * MIN);
+      }
+      if (baseId !== HOME) {
+        node({
+          kind: "stay",
+          placeId: null,
+          lonLat: home.lonLat,
+          startsAt: new Date(arrive).toISOString(),
+          durationMin: STAY_CHECK_IN_MIN,
+          indoor: true,
+          title: `Home · ${home.name}`,
+          home: true,
+        });
+        baseId = HOME;
+      }
+      continue;
+    }
 
     // A multi-night base is one stay node: only a new base gets a check-in.
     if (day.stayId && day.stayId !== baseId) {

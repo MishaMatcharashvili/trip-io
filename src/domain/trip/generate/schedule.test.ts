@@ -285,3 +285,62 @@ describe("rests on a long drive", () => {
     assert.deepEqual(errors, []);
   });
 });
+
+describe("nights at the traveller's home", () => {
+  // A house in Gudauri: the Kazbegi day is a drive up and a drive back.
+  const home = {
+    lonLat: [44.4769, 42.4785] as [number, number],
+    name: "Gudauri",
+  };
+  const atHome = (): Plan => {
+    const plan = kazbegiPlan([
+      stop(P.zetaCamp, "midday", "meal", 75),
+      stop(P.gergeti, "afternoon", "visit", 160),
+      stop(P.cafe5047, "evening", "meal", 90),
+    ]);
+    for (const day of plan.days) day.stayId = null;
+    return plan;
+  };
+
+  test("a day with no bed sleeps at home: one check-in, then the drive back each night", () => {
+    const { nodes, problems } = run(atHome(), { home });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(timeline(nodes), [
+      "14:30 visit Friendship Monument viewpoint (40)",
+      "15:35 stay Home · Gudauri (15)",
+      "09:00 transfer Drive to Zeta Camp (40)",
+      "12:30 meal Lunch · Zeta Camp (75)",
+      "14:30 visit Gergeti Trinity Church (160)",
+      "18:30 meal Dinner · Cafe 5047m (90)",
+      "20:00 transfer Drive to Gudauri (40)",
+    ]);
+    const stay = Object.values(nodes).find((n) => n.kind === "stay");
+    assert.deepEqual(stay?.lonLat, home.lonLat);
+    assert.equal(stay?.placeId, null);
+    assert.equal(stay?.meta.home, true);
+
+    const doc: TripDoc = {
+      trip: {
+        title: "Kazbegi from home",
+        startsAt: at(PREV, "00:00"),
+        endsAt: at(DAY, "23:59"),
+        party: { adults: 2, children: 0 },
+        pace: "moderate",
+        budget: "€0",
+        prefs: {},
+      },
+      nodes,
+    };
+    const errors = validateDoc(doc, {
+      places,
+      travel: straightLineTravel,
+      author: "system",
+    }).filter((v) => v.severity === "error");
+    assert.deepEqual(errors, []);
+  });
+
+  test("without a home, a day with no bed has no stay", () => {
+    const { nodes } = run(atHome());
+    assert.ok(!Object.values(nodes).some((n) => n.kind === "stay"));
+  });
+});
