@@ -16,6 +16,7 @@ import {
   type TripDoc,
   type TripNode,
 } from "../domain/trip/document.ts";
+import { home } from "../domain/trip/generate/constraints.ts";
 import { addDays } from "../domain/trip/generate/schedule.ts";
 import { at, kindLabel } from "../domain/watch/briefing.ts";
 import type { DaySegment, WeatherHour, WeatherSummary } from "../ui/bars.tsx";
@@ -240,7 +241,13 @@ export function tripModel(screen: TripScreen, now: Date = new Date()): Trip {
   const dates = tripDates(doc.trip.startsAt, doc.trip.endsAt);
   let base: string | null = null;
   const prefs = doc.trip.prefs;
+  // The traveller's house, where a trip that starts or ends in its place
+  // starts or ends: Amaghleba on the map, not the centre of Chokhatauri.
+  const house = home.safeParse(prefs.home).data;
   const endpoint = (slug: unknown): Waypoint | undefined => {
+    if (house && slug === house.place) {
+      return { lonLat: house.lonLat, label: house.name };
+    }
     const place = typeof slug === "string" ? destination(slug) : undefined;
     return place ? { lonLat: place.lonLat, label: place.name } : undefined;
   };
