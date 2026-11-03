@@ -2,16 +2,18 @@ import {
   countInArea,
   type PlaceHit,
   placeCards,
+  regionAt,
   searchPlaces,
 } from "../dal/places.ts";
 import type { CategoryGroup } from "../domain/catalogue/categories.ts";
+import { destination } from "../domain/catalogue/destinations.ts";
 import {
   areaBySlug,
   type FocusAreaSlug,
   focusAreas,
 } from "../domain/catalogue/focus-areas.ts";
 import { ownSite } from "../domain/catalogue/website.ts";
-import type { LonLat } from "../domain/geo.ts";
+import { inGeorgiaBbox, type LonLat } from "../domain/geo.ts";
 import { type SiteIcon, siteIcon } from "../infra/site-icon.ts";
 
 export type { PlaceHit };
@@ -59,4 +61,19 @@ export async function placeLogo(placeId: string): Promise<SiteIcon | null> {
   const place = (await placeCards([placeId])).get(placeId);
   const site = ownSite(place?.website);
   return site ? siteIcon(site) : null;
+}
+
+/**
+ * The destination a point lies in: where a traveller is, from their phone, as
+ * the place a trip starts from. The municipality it falls in, not the nearest
+ * town centre, so a village goes with its own municipality. Null outside
+ * Georgia, or in a region no trip goes to.
+ */
+export async function destinationAt(
+  at: LonLat,
+): Promise<{ slug: string; name: string } | null> {
+  if (!inGeorgiaBbox(at)) return null;
+  const region = await regionAt(at);
+  const place = region ? destination(region) : undefined;
+  return place ? { slug: place.slug, name: place.name } : null;
 }

@@ -2,7 +2,12 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { submitHoursReport } from "@/bll/hours-report";
-import { catalogueByArea, placeLogo, searchCatalogue } from "@/bll/places";
+import {
+  catalogueByArea,
+  destinationAt,
+  placeLogo,
+  searchCatalogue,
+} from "@/bll/places";
 import { categoryGroups } from "@/domain/catalogue/categories";
 import { focusAreaSlugs, focusAreas } from "@/domain/catalogue/focus-areas";
 import { roadSeason } from "@/domain/catalogue/road-season";
@@ -61,6 +66,11 @@ export const places = new Hono()
       roads: roadSeason(month),
     });
   })
+  // Where the traveller is, as a place a trip can start from: /new asks the
+  // browser for a position and the trip starts there rather than in Tbilisi.
+  .get("/where", zValidator("query", z.object({ at: lonLat })), async (c) =>
+    c.json({ place: await destinationAt(c.req.valid("query").at) }),
+  )
   .get(
     "/:id/logo",
     zValidator("param", z.object({ id: z.uuid() })),
