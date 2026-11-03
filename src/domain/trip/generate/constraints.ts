@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { destinationSlugs, MAX_PLACES } from "../../catalogue/destinations.ts";
-import { paces } from "../document.ts";
+import { lonLat, paces } from "../document.ts";
 
 // What the traveller asks for on /new. No IO and no Node built-ins: the browser
 // imports this schema too. The warm-start cache key made from it is in
@@ -47,6 +47,19 @@ export const dayEnds = z
     message: `expected between ${DAY_ENDS_RANGE[0]} and ${DAY_ENDS_RANGE[1]}`,
   });
 
+/**
+ * Where the traveller sleeps for free: their own home, or family's, in a
+ * village or town the catalogue does not hold ("my house in Amaghleba"). The
+ * point is the settlement's, found by name (src/bll/home.ts); `place` is the
+ * destination it lies in. Every night the trip spends in `place` is there.
+ */
+export const home = z.object({
+  name: z.string().trim().min(1).max(80),
+  lonLat,
+  place: z.enum(destinationSlugs),
+});
+export type Home = z.infer<typeof home>;
+
 export const constraints = z.object({
   startDate: z.iso.date(),
   days: z.number().int().min(1).max(21),
@@ -78,6 +91,8 @@ export const constraints = z.object({
   ownCar: z.boolean().default(false),
   /** Nights the party sleeps for free, with family or friends. */
   freeNights: z.number().int().min(0).max(21).default(0),
+  /** The traveller's home on the route, where its nights in that place are spent. */
+  home: home.nullable().default(null),
   /** Sights the plan must include, each on a day spent in its destination. */
   mustSee: z.array(mustSee).max(MAX_MUST_SEE).default([]),
   /**

@@ -24,6 +24,7 @@ const base: Constraints = {
   budgetEur: 450,
   ownCar: false,
   freeNights: 0,
+  home: null,
   mustSee: [],
   notes: "",
 };

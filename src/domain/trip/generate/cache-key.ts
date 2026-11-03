@@ -44,6 +44,8 @@ export function cacheKey(c: Constraints): string {
     notes: c.notes.trim().toLowerCase().replace(/\s+/g, " "),
     // A plan composed without a sight the traveller insists on is not theirs.
     mustSee: c.mustSee.map((s) => s.id).sort(),
+    // Days planned around one house do not suit a stay somewhere else.
+    home: c.home ? c.home.lonLat.map((x) => x.toFixed(3)) : null,
   };
   return createHash("sha256").update(JSON.stringify(shape)).digest("hex");
 }

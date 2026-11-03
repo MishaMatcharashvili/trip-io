@@ -268,6 +268,22 @@ describe("tier, by author", () => {
     );
     assert.deepEqual(only(validateDay(doc, DAY, ctx("user")), "tier"), []);
   });
+
+  test("a night at the traveller's own home needs no catalogue place", () => {
+    const at = (home: boolean) =>
+      edit(kazbegiDoc(), N.stayKazbegi, {
+        placeId: null,
+        lonLat: [44.6436, 42.6568],
+        meta: { title: "Home · Stepantsminda", urban: false, home },
+      });
+    assert.deepEqual(
+      only(validateDay(at(true), DAY, ctx("system")), "tier"),
+      [],
+    );
+    assert.ok(
+      rules(validateDay(at(false), DAY, ctx("system"))).includes("error:tier"),
+    );
+  });
 });
 
 describe("window, pace, hours-unknown", () => {
