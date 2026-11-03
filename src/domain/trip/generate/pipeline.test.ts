@@ -11,6 +11,7 @@ import {
   type ComposeInput,
   type Composer,
   candidateRefs,
+  endpointOf,
   generate,
   mustSeeProblems,
   type PlanCache,
@@ -1044,5 +1045,40 @@ describe("splitDays", () => {
       splitDays(1, ["svaneti", "kakheti"], () => 1),
       ["svaneti"],
     );
+  });
+});
+
+describe("a trip from the traveller's home", () => {
+  const house = {
+    name: "Gudauri",
+    lonLat: [44.4769, 42.4785] as [number, number],
+    place: "kazbegi",
+  };
+  const fromHome: Constraints = { ...constraints, home: house, freeNights: 1 };
+  const noBeds = (): RefPlan => {
+    const plan = fullPlan();
+    for (const day of plan.days) day.stayRef = null;
+    return plan;
+  };
+
+  test("sleeps at the house, and the map is told where it is", async () => {
+    const result = await generate(fromHome, deps(scripted(noBeds()).compose));
+    assert.ok(result.ok);
+    const stays = Object.values(result.doc.nodes).filter(
+      (n) => n.kind === "stay",
+    );
+    assert.equal(stays.length, 1);
+    assert.deepEqual(stays[0].lonLat, house.lonLat);
+    assert.equal(stays[0].meta.title, "Home · Gudauri");
+    assert.deepEqual(result.doc.trip.prefs.home, house);
+  });
+
+  test("a trip that starts where the house is starts from the house", () => {
+    assert.deepEqual(endpointOf(fromHome, "kazbegi"), {
+      lonLat: house.lonLat,
+      name: "Gudauri",
+    });
+    assert.equal(endpointOf(fromHome, "tbilisi")?.name, "Tbilisi");
+    assert.equal(endpointOf(constraints, "kazbegi")?.name, "Kazbegi");
   });
 });
