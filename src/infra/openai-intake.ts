@@ -44,9 +44,8 @@ given as "Name (slug)": ${destinations.map((d) => `${d.name} (${d.slug})`).join(
 A town or sight not on the list belongs to the place it is in: Stepantsminda and Gergeti are
 kazbegi, Sighnaghi is signagi, Gelati is kutaisi. Prefer the most specific place that fits. A
 village belongs to its municipality: when the traveller names one where they stay or want to
-be ("my home in Amaghleba", Guria's Amaghleba, is chokhatauri), the trip goes to that
-municipality, not to the whole region, whose sights may be hours away. When you do not know
-which municipality a village is in, keep the region and ask which town it is near.
+be, the trip goes to that municipality, not to the whole region, whose sights may be hours away.
+A home they name is found on the map for you (see home): never ask which town it is near.
 Abkhazia and South Ossetia cannot be entered from the rest of Georgia, and nothing outside
 Georgia can be planned.
 
@@ -67,6 +66,10 @@ Fields:
   their own. A traveller with a home, a family house or a dacha where the trip goes sleeps there
   every night they are there, so freeNights is those nights, and notes say where ("stays at
   their own home in Amaghleba; no hotel").
+- home is the name of the village or town that home is in, as the traveller says it
+  ("Amaghleba"), when the latest message says it; otherwise null. It is found on the map, put on
+  the route in place of the region it is in, and the trip's nights there are spent at it. Once
+  "home" is in "request", it is settled: do not ask about it.
 - mobility: low for limited walking, elderly travellers or toddlers; high for strenuous hikes.
 - interests, from what the traveller enjoys: heritage (churches, monasteries, fortresses, old
   towns), nature (hiking, mountains, lakes, views), culture (museums, galleries, theatre), food
