@@ -65,9 +65,21 @@ rankings are what make a restaurant list useful. It is kept apart from the Terra
 **To stop:** unset `APIFY_TOKEN` (trips rate by Google alone, and ask for nothing), remove the
 `tripadvisor-lists` schedule, and `DELETE FROM tripadvisor_listing`.
 
+## Known from the first live reads (2026-11-03)
+
+- **A search by name reads one page.** `query: "Tbilisi, Georgia"` returned 33 restaurants however deep
+  the list was asked for (the actor reserves deeper search for caps above 3,000, about $11 a town). So
+  a restaurant list that comes back short, from one town (`geoOf()`: most of its links name one geo),
+  is read again through the town's own pages, `Restaurants-g294195-oa30-Tbilisi.html` and on, about 32
+  places each. The monthly refresh pages directly. Regions, whose lists span towns, keep the first page.
+- **Tbilisi:** 151 restaurants and 76 things to do kept (4 sights came without a position, and were
+  dropped). Rated places a Tbilisi trip can choose from went from **15 places to eat and 5 sights**
+  (Google alone) to **108 places to eat, 102 with a town rank, and 21 sights**.
+- **Cost so far:** about $2 of the free plan's $5 monthly credit for Tbilisi, test reads included.
+- Some ranks are within a narrower list ("#1 of 187", which is bars and pubs, not all restaurants).
+  They are kept as given.
+
 ## Not known yet
 
-- **Whether the actor reads Georgian destinations as documented.** It has not run against the live
-  API (no token yet). The first `--destination tbilisi --kind restaurant --max 20` answers it,
-  including whether `"<name>, Georgia"` finds the right place for regions such as Kakheti or Guria.
-- Match rate against the catalogue, and how many small-town listings fall under `MIN_REVIEWS` (30).
+- How regions such as Kakheti or Guria read: their restaurant list spans towns, so it stays one page.
+- How many small-town listings fall under `MIN_REVIEWS` (30).
