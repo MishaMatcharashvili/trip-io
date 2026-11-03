@@ -148,6 +148,42 @@ describe("score", () => {
     assert.equal(repeats.got, "Guriis Tsikhe (2 days)");
   });
 
+  test("a home is judged by where it is, where the nights are, and where the map pins", () => {
+    const home = { name: "Amaghleba", lonLat: HOME, place: "chokhatauri" };
+    const atHome = doc([
+      node("visit", "Guriis Tsikhe", FRI, "10:00", 60, PARK),
+      {
+        ...node("stay", "Home · Amaghleba", FRI, "20:00", 15),
+        meta: { title: "Home · Amaghleba", urban: false, home: true },
+      },
+    ]);
+    const t = trace({
+      constraints: {
+        ...trace().constraints,
+        home,
+        start: "chokhatauri",
+        finish: "chokhatauri",
+      },
+      build: { ok: true, doc: atHome },
+    });
+    const expect: Expectation[] = [
+      { kind: "homeAt", name: "Amaghleba", at: HOME, withinKm: 3 },
+      { kind: "endpointsAt", name: "Amaghleba", at: HOME, withinKm: 3 },
+      { kind: "noLodging" },
+    ];
+    assert.deepEqual(
+      judge(expect, t).map((r) => r.pass),
+      [true, true, true],
+    );
+
+    // The trip as it was reported: no home, a resort, pins in Tbilisi.
+    const [home0, pins0, beds0] = judge(expect);
+    assert.equal(home0.got, "no home");
+    assert.equal(pins0.pass, false);
+    assert.match(pins0.got, /^Tbilisi/);
+    assert.equal(beds0.pass, false);
+  });
+
   test("a check on the plan fails, with the reason, when there is none", () => {
     const [built] = judge(
       [{ kind: "built" }],

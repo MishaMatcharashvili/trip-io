@@ -8,6 +8,7 @@ import {
 } from "../document.ts";
 import type { Constraints } from "../generate/constraints.ts";
 import { MAX_IDLE_MIN } from "../generate/idle.ts";
+import { endpointOf } from "../generate/pipeline.ts";
 import { weekdayOf } from "../generate/request.ts";
 import type { Expectation, Scenario } from "./scenarios.ts";
 
@@ -228,13 +229,58 @@ function check(e: Expectation, trace: Trace): Omit<CheckResult, "kind"> {
     case "noLodging":
       return needsPlan((d) => {
         const beds = Object.values(d.nodes)
-          .filter((n) => n.kind === "stay")
+          .filter((n) => n.kind === "stay" && !n.meta.home)
           .map((n) => n.meta.title);
         return {
           pass: beds.length === 0,
           got: beds.length ? list(beds) : "no hotel",
         };
       }, "no hotel");
+    case "homeAt": {
+      const km = (at: LonLat) => haversineM(at, e.at) / 1000;
+      const held = c.home
+        ? `home ${c.home.name} in ${c.home.place}, ${km(c.home.lonLat).toFixed(1)} km from ${e.name}`
+        : "no home";
+      if (!c.home || km(c.home.lonLat) > e.withinKm) {
+        return { pass: false, expected: `a home at ${e.name}`, got: held };
+      }
+      return needsPlan((d) => {
+        const stays = Object.values(d.nodes).filter((n) => n.kind === "stay");
+        const away = stays.filter(
+          (n) => !n.meta.home || !n.lonLat || km(n.lonLat) > e.withinKm,
+        );
+        return {
+          pass: stays.length > 0 && away.length === 0,
+          got: `${held}; ${
+            stays.length
+              ? away.length
+                ? `nights away: ${list(away.map((n) => n.meta.title))}`
+                : `nights at ${list(stays.map((n) => n.meta.title))}`
+              : "no night at it"
+          }`,
+        };
+      }, `a home at ${e.name}, and every night there`);
+    }
+    case "endpointsAt": {
+      const pins = [c.start, c.finish].map((slug) => endpointOf(c, slug));
+      const off = pins.filter(
+        (p) =>
+          !p ||
+          p.name !== e.name ||
+          haversineM(p.lonLat, e.at) / 1000 > e.withinKm,
+      );
+      return {
+        pass: off.length === 0,
+        expected: `start and finish pinned at ${e.name}`,
+        got: pins
+          .map((p) =>
+            p
+              ? `${p.name} (${(haversineM(p.lonLat, e.at) / 1000).toFixed(1)} km away)`
+              : "nowhere",
+          )
+          .join(" → "),
+      };
+    }
     case "maxIdle": {
       const limit = e.minutes ?? MAX_IDLE_MIN[c.pace];
       return needsPlan((d) => {

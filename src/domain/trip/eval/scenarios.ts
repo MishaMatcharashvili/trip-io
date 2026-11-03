@@ -27,6 +27,10 @@ export type Expectation =
   | { kind: "near"; name: string; at: LonLat; withinKm: number }
   /** No night in a hotel: the traveller has somewhere to sleep. */
   | { kind: "noLodging" }
+  /** The request holds the home, and the plan's nights are spent at it. */
+  | { kind: "homeAt"; name: string; at: LonLat; withinKm: number }
+  /** The map's start and finish pins are here, by this name. */
+  | { kind: "endpointsAt"; name: string; at: LonLat; withinKm: number }
   /** No day with more than this between one stop ending and the next starting; by default the pace's limit. */
   | { kind: "maxIdle"; minutes?: number }
   /** No sight visited on two days: a thin catalogue shows as the same fortress every morning. */
@@ -63,7 +67,6 @@ export const scenarios: Scenario[] = [
     here: AMAGHLEBA,
     says: [
       "I need a weekend in Guria. Start on Friday morning and get back on Monday morning. I have my home there in Amaghleba",
-      "It's near Chokhatauri",
       "Nature and food, two of us, relaxed",
     ],
     expect: [
@@ -77,6 +80,8 @@ export const scenarios: Scenario[] = [
       { kind: "calendarDays", equals: 4 },
       { kind: "near", name: "Amaghleba", at: AMAGHLEBA, withinKm: 30 },
       { kind: "noLodging" },
+      { kind: "homeAt", name: "Amaghleba", at: AMAGHLEBA, withinKm: 3 },
+      { kind: "endpointsAt", name: "Amaghleba", at: AMAGHLEBA, withinKm: 3 },
       { kind: "maxIdle" },
       { kind: "noRepeats" },
       { kind: "homeBy", time: "13:00" },
@@ -100,6 +105,7 @@ export const scenarios: Scenario[] = [
       { kind: "freeNights", atLeast: 3 },
       { kind: "built" },
       { kind: "calendarDays", equals: 4 },
+      { kind: "homeAt", name: "Amaghleba", at: AMAGHLEBA, withinKm: 3 },
       { kind: "maxIdle" },
       { kind: "noRepeats" },
     ],
