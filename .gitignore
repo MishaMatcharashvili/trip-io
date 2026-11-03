@@ -55,3 +55,6 @@ next-env.d.ts
 
 # server declarations for the Expo app (tsc -b tsconfig.api.json)
 /.types
+
+# planner eval reports (pnpm planner:eval)
+/eval-runs
