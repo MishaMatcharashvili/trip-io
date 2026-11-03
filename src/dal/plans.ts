@@ -62,6 +62,25 @@ export async function recordGeneration(
   `);
 }
 
+/** What the generation log holds for a trip: how its plan was made, attempt by attempt. */
+export async function generationsFor(tripId: string): Promise<
+  {
+    source: string;
+    attempts: Attempt[];
+    createdAt: string;
+  }[]
+> {
+  const rows = await db.execute(sql`
+    SELECT source, attempts, created_at FROM trip_generation
+    WHERE trip_id = ${tripId} ORDER BY created_at
+  `);
+  return rows.rows.map((r) => ({
+    source: r.source as string,
+    attempts: r.attempts as Attempt[],
+    createdAt: new Date(r.created_at as string).toISOString(),
+  }));
+}
+
 /** A pending claim this old belongs to a function that is no longer running. */
 const STALE_CLAIM = "5 minutes";
 
