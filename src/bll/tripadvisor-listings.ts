@@ -11,6 +11,9 @@ import {
 } from "../domain/catalogue/destinations.ts";
 import type { EnrichFailure } from "../domain/catalogue/enrichment.ts";
 import {
+  geoOf,
+  type Listing,
+  type ListingGeo,
   type ListingQuery,
   type ListingSource,
   listingQueries,
@@ -28,6 +31,11 @@ import { apifyTripadvisor } from "../infra/apify-tripadvisor.ts";
 // itself again a few minutes on with the read's id; each later run asks
 // whether the read has finished, and either queues itself again or keeps the
 // list. The script (`pnpm catalogue:tripadvisor`) does the same in one sitting.
+//
+// A destination is first found by its name, which reads one page of its
+// restaurants (about thirty). When that page is one town's, its links say where
+// the town's list lives, and the list is read again page by page to its depth;
+// the monthly refresh pages straight away.
 
 export const LISTING_JOB = "tripadvisor-list";
 
@@ -106,22 +114,42 @@ export function tripadvisorRatings(configured: boolean) {
 
 /** The monthly refresh: every destination that has lists is read again. */
 export async function scheduleListingRefresh(
-  deps: { enqueue: typeof enqueue; listed: typeof listedDestinations } = {
-    enqueue,
-    listed: listedDestinations,
-  },
+  deps: {
+    enqueue: typeof enqueue;
+    listed: typeof listedDestinations;
+    stored: typeof listingsFor;
+  } = { enqueue, listed: listedDestinations, stored: listingsFor },
 ): Promise<{ queued: number }> {
   let queued = 0;
   for (const slug of await deps.listed()) {
     const d = destination(slug);
     if (!d) continue;
     for (const q of listingQueries(d)) {
-      await deps.enqueue(LISTING_JOB, q);
+      // Where the last read found the town's list, it is paged directly.
+      const geo =
+        q.kind === "restaurant" ? geoOf(await deps.stored(slug, q.kind)) : null;
+      await deps.enqueue(LISTING_JOB, geo ? { ...q, geo } : q);
       queued++;
     }
   }
   return { queued };
 }
+
+/**
+ * Where a list read by name should be read again, page by page: a restaurant
+ * list that came back short of its depth, all from one town.
+ */
+function deeper(query: ListingQuery, listings: Listing[]): ListingGeo | null {
+  if (query.kind !== "restaurant" || query.geo) return null;
+  if (listings.length >= query.max) return null;
+  return geoOf(listings);
+}
+
+const isGeo = (g: unknown): g is ListingGeo =>
+  typeof g === "object" &&
+  g !== null &&
+  /^\d+$/.test(String((g as ListingGeo).id)) &&
+  /^[\w-]+$/.test(String((g as ListingGeo).slug));
 
 const isKind = (k: unknown): k is RatedKind =>
   (ratedKinds as readonly unknown[]).includes(k);
@@ -145,6 +173,7 @@ export async function listingStep(
     name: job.name,
     kind: job.kind,
     max: job.max,
+    ...(isGeo(job.geo) ? { geo: job.geo } : {}),
   };
   const later = () => new Date(deps.now().getTime() + CHECK_EVERY_MS);
 
@@ -172,6 +201,8 @@ export async function listingStep(
     return { state: "running", runId: job.runId };
   }
   await deps.save(query.destination, query.kind, result.listings, deps.now());
+  const geo = deeper(query, result.listings);
+  if (geo) await deps.enqueue(LISTING_JOB, { ...query, geo });
   return { state: "saved", listings: result.listings.length };
 }
 
@@ -192,6 +223,14 @@ export async function readListing(
     if (!result.ok) return { state: "failed", reason: result.reason };
     if (result.state === "running") continue;
     await deps.save(query.destination, query.kind, result.listings, deps.now());
+    const geo = deeper(query, result.listings);
+    if (geo) {
+      const paged = await readListing({ ...query, geo }, deps, checkEveryMs);
+      // The first page is kept if paging fails; it is still a list.
+      return paged.state === "saved"
+        ? paged
+        : { state: "saved", listings: result.listings.length };
+    }
     return { state: "saved", listings: result.listings.length };
   }
   return { state: "failed", reason: "gave-up" };

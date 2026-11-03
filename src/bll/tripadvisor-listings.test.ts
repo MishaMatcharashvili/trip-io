@@ -174,6 +174,7 @@ describe("scheduleListingRefresh", () => {
     const { queued: n } = await scheduleListingRefresh({
       enqueue: deps.enqueue,
       listed: async () => ["tbilisi", "kutaisi", "atlantis"],
+      stored: async () => [],
     });
     assert.equal(n, 4);
     assert.deepEqual(
@@ -199,5 +200,90 @@ describe("readListing", () => {
     });
     assert.equal(asked.collect, 2);
     assert.equal(saved[0].n, 2);
+  });
+});
+
+describe("reading a town's whole list", () => {
+  const inTown = (n: number): Listing => ({
+    ...listing,
+    id: String(n),
+    url: `https://www.tripadvisor.com/Restaurant_Review-g294195-d${n}-Reviews-Place_${n}-Tbilisi.html`,
+  });
+  const tbilisi = { id: "294195", slug: "Tbilisi" };
+
+  test("a name search that came back short is read again, page by page", async () => {
+    const { deps, queued } = world([
+      { ok: true, state: "done", listings: [inTown(1), inTown(2), inTown(3)] },
+    ]);
+    await listingStep({ ...query, runId: "run1" }, deps);
+    assert.equal(queued.length, 1);
+    assert.deepEqual((queued[0].payload as { geo: unknown }).geo, tbilisi);
+    // Started now, as a new read, not checked on later.
+    assert.equal((queued[0].payload as { runId?: string }).runId, undefined);
+  });
+
+  test("a paged read is not paged again, and a full list is not either", async () => {
+    const paged = world([
+      { ok: true, state: "done", listings: [inTown(1), inTown(2)] },
+    ]);
+    await listingStep({ ...query, runId: "run1", geo: tbilisi }, paged.deps);
+    assert.equal(paged.queued.length, 0);
+
+    const full = world([
+      { ok: true, state: "done", listings: [inTown(1), inTown(2)] },
+    ]);
+    await listingStep({ ...query, max: 2, runId: "run1" }, full.deps);
+    assert.equal(full.queued.length, 0);
+  });
+
+  test("a job's geo that is not the shape Tripadvisor gives is ignored", async () => {
+    const { deps } = world();
+    let asked: unknown;
+    deps.source.start = async (q) => {
+      asked = q;
+      return { ok: true, runId: "run1" };
+    };
+    await listingStep(
+      { ...query, geo: { id: "1/../x", slug: "Tbilisi" } },
+      deps,
+    );
+    assert.equal((asked as { geo?: unknown }).geo, undefined);
+  });
+
+  test("the script reads the pages too, and keeps the deeper list", async () => {
+    const { deps, saved } = world([
+      { ok: true, state: "done", listings: [inTown(1), inTown(2)] },
+      {
+        ok: true,
+        state: "done",
+        listings: [inTown(1), inTown(2), inTown(3), inTown(4)],
+      },
+    ]);
+    assert.deepEqual(await readListing(query, deps), {
+      state: "saved",
+      listings: 4,
+    });
+    assert.deepEqual(
+      saved.map((s) => s.n),
+      [2, 4],
+    );
+  });
+
+  test("the monthly refresh pages a town whose list it has", async () => {
+    const { deps, queued } = world();
+    await scheduleListingRefresh({
+      enqueue: deps.enqueue,
+      listed: async () => ["tbilisi"],
+      stored: async (_d, kind) =>
+        kind === "restaurant" ? [inTown(1), inTown(2)] : [],
+    });
+    const byKind = Object.fromEntries(
+      queued.map((q) => {
+        const p = q.payload as { kind: string; geo?: unknown };
+        return [p.kind, p.geo];
+      }),
+    );
+    assert.deepEqual(byKind.restaurant, tbilisi);
+    assert.equal(byKind.attraction, undefined);
   });
 });
