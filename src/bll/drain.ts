@@ -6,6 +6,7 @@ import { judgeMatch } from "./judge.ts";
 import { JUDGE_JOB } from "./match.ts";
 import { EXTRACT_JOB, extractItem } from "./news.ts";
 import { proposeFromNotice, ROAD_NOTICE_JOB } from "./road-proposals.ts";
+import { LISTING_JOB, listingStep } from "./tripadvisor-listings.ts";
 
 // The twenty lines that make the system survive a spike.
 //
@@ -100,6 +101,8 @@ export const handlers: Record<string, Handler> = {
     }
     return extractItem(itemId);
   },
+
+  [LISTING_JOB]: (payload) => listingStep(payload),
 };
 
 export type DrainReport = {
