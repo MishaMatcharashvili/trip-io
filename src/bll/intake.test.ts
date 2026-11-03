@@ -35,6 +35,7 @@ const answer = {
   budgetEur: null,
   ownCar: null,
   freeNights: null,
+  home: null,
   notes: null,
   unsupported: [],
   sights: [],

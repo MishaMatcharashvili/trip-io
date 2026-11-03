@@ -28,6 +28,7 @@ const unchanged = {
   budgetEur: null,
   ownCar: null,
   freeNights: null,
+  home: null,
   notes: null,
   unsupported: [],
   sights: [],
@@ -613,5 +614,17 @@ describe("a trip given by its weekdays", () => {
     );
     assert.equal(turn?.state.constraints.startDate, "2026-10-09");
     assert.ok(turn?.state.said.includes("startDate"));
+  });
+});
+
+describe("a home the traveller names", () => {
+  test("is handed on by name, for the use case to find", () => {
+    const turn = readIntake(
+      { ...unchanged, home: "  Amaghleba " },
+      initialState(TODAY),
+      TODAY,
+    );
+    assert.equal(turn?.home, "Amaghleba");
+    assert.equal(readIntake(unchanged, initialState(TODAY), TODAY)?.home, null);
   });
 });

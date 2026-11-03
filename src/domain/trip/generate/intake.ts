@@ -82,6 +82,7 @@ const stated = [
   "ownCar",
   "freeNights",
   "mustSee",
+  "home",
 ] as const satisfies readonly (keyof Constraints)[];
 type Stated = (typeof stated)[number];
 
@@ -142,6 +143,8 @@ export const intakeReply = z.object({
   ownCar: z.boolean().nullable(),
   /** Nights the party sleeps for free, with family or friends. */
   freeNights: z.number().nullable(),
+  /** The village or town of the traveller's own home or family's, as they named it. */
+  home: z.string().nullable(),
   /** The whole of the notes after this turn, not an addition to them. */
   notes: z.string().nullable(),
   /** Places the traveller asked for that no trip can go to. */
@@ -203,6 +206,8 @@ export type IntakeTurn = {
    * (src/bll/sight-search.ts): the domain cannot look them up.
    */
   sights: string[];
+  /** The settlement the traveller's home is in, by name, for the use case to find (src/bll/home.ts). */
+  home: string | null;
   ready: boolean;
   /** Answers to offer as one-tap replies. Empty once the planner has nothing to ask. */
   suggestions: string[];
@@ -331,6 +336,7 @@ export function readIntake(
     sights: [
       ...new Set(r.sights.map((s) => s.trim().slice(0, 100)).filter(Boolean)),
     ].slice(0, SIGHTS_PER_TURN),
+    home: r.home?.trim().slice(0, 80) || null,
     ready,
     suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
     options,
@@ -576,6 +582,7 @@ export function fallbackTurn(
     state: next,
     unsupported: read.refused.map((r) => r.name),
     sights: [],
+    home: null,
     ready: essentials && !follow,
     suggestions: follow?.suggestions ?? [],
     options: [],
