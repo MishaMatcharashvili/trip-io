@@ -3,6 +3,7 @@ import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { askAboutTrip } from "@/bll/ask.ts";
 import { briefingPage } from "@/bll/briefing.ts";
+import { findHome } from "@/bll/home.ts";
 import { planningTurn } from "@/bll/intake.ts";
 import { alertsPage } from "@/bll/interventions.ts";
 import { GOOGLE_CONTENT_TTL_S } from "@/bll/place-enrichment.ts";
@@ -56,7 +57,11 @@ import {
 } from "@/domain/trip/generate/intake.ts";
 import { patchOps } from "@/domain/trip/patch.ts";
 import { CLOCK_TIME, channels, muteFamilies } from "@/domain/watch/settings.ts";
-import { googleRatings, googleSights } from "@/infra/google-places.ts";
+import {
+  googleLocalities,
+  googleRatings,
+  googleSights,
+} from "@/infra/google-places.ts";
 import { mapboxDirections } from "@/infra/mapbox-directions.ts";
 import { upstashRatings } from "@/infra/upstash.ts";
 import { env } from "@/lib/env.ts";
@@ -93,6 +98,9 @@ const ratings: RatingDeps = {
 
 /** Sights by name for /new: the catalogue's, then Google's (docs/google-places.md). */
 const sightFinder = googleSights({ key: env.GOOGLE_PLACES_API_KEY });
+
+/** Villages by name, for a traveller's home (src/bll/home.ts). */
+const localityFinder = googleLocalities({ key: env.GOOGLE_PLACES_API_KEY });
 
 /** One search session on the page: what ties Google's typing to the pick it ends in. */
 const sightSession = z.uuid();
@@ -229,6 +237,7 @@ export const trips = new Hono<SessionEnv>()
       const turn = await planningTurn(userId, state, messages, {
         sightNamed: (name, route) =>
           sightNamed(sightFinder, userId, name, route),
+        homeNamed: (name, route) => findHome(localityFinder, name, route),
       });
       return turn.ok
         ? c.json({
