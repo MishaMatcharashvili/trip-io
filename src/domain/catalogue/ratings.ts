@@ -36,7 +36,15 @@ export const matchRadiusM: Record<RatedKind, number> = {
   attraction: FAR_M,
 };
 
-export type Rating = { value: number; count: number };
+/** "#3 of 120 things to do in Tbilisi", as numbers. */
+export type Ranking = { rank: number; of: number };
+
+export type Rating = {
+  value: number;
+  count: number;
+  /** Where the source ranks it among its town's others, when the source ranks. */
+  rank?: Ranking;
+};
 
 /** A place as the provider lists it, with what travellers gave it. */
 export type RatedListing = Listing & { rating: Rating };
