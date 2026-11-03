@@ -1,6 +1,10 @@
 import { enqueue } from "../dal/jobs.ts";
-import { listedDestinations, saveListings } from "../dal/listings.ts";
-import type { countUse } from "../dal/usage.ts";
+import {
+  listedDestinations,
+  listingsFor,
+  saveListings,
+} from "../dal/listings.ts";
+import { countUse } from "../dal/usage.ts";
 import {
   type Destination,
   destination,
@@ -81,6 +85,23 @@ export async function requestListings(
   const queries = listingQueries(d);
   for (const q of queries) await deps.enqueue(LISTING_JOB, q);
   return { queued: queries.length };
+}
+
+/**
+ * Tripadvisor's lists as trip generation rates by them (src/bll/ratings.ts):
+ * read from what is kept, and asked for when a destination has none.
+ */
+export function tripadvisorRatings(configured: boolean) {
+  return {
+    lists: listingsFor,
+    request: (d: Pick<Destination, "slug" | "name">) =>
+      requestListings(d, {
+        configured,
+        enqueue,
+        count: countUse,
+        now: () => new Date(),
+      }),
+  };
 }
 
 /** The monthly refresh: every destination that has lists is read again. */

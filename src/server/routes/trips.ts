@@ -37,6 +37,7 @@ import {
   myTrips,
   tripScreen,
 } from "@/bll/trip-screen.ts";
+import { tripadvisorRatings } from "@/bll/tripadvisor-listings.ts";
 import { demoCheckout, offerFor, startFreeWatch } from "@/bll/watch-pass.ts";
 import {
   watchSettings as readWatchSettings,
@@ -72,7 +73,8 @@ const roads = mapboxDirections({ token: env.MAPBOX_DIRECTIONS_TOKEN });
 /**
  * What travellers rate the places a trip goes, from Google, kept in Redis for
  * as long as its other answers are (docs/google-places.md). Without Redis
- * every trip searches, under the same daily ceiling.
+ * every trip searches, under the same daily ceiling. Tripadvisor's lists rate
+ * them too, where they have been read (docs/tripadvisor-lists.md).
  */
 const ratings: RatingDeps = {
   ...ratingDefaults(),
@@ -86,6 +88,7 @@ const ratings: RatingDeps = {
         })
       : undefined,
   ttlSeconds: env.GOOGLE_PLACES_CONTENT_TTL_S ?? GOOGLE_CONTENT_TTL_S,
+  tripadvisor: tripadvisorRatings(Boolean(env.APIFY_TOKEN)),
 };
 
 /** Sights by name for /new: the catalogue's, then Google's (docs/google-places.md). */
