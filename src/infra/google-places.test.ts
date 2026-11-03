@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   classify,
+  googleLocalities,
   googlePlaces,
   googleRatings,
   googleSights,
@@ -476,5 +477,42 @@ describe("sights by name", () => {
       await googleSights({ key: "k", fetch: gone.fetch }).details("ChIJx", "s"),
       { ok: true, value: null },
     );
+  });
+});
+
+describe("villages by name", () => {
+  // The answer Google gave for Guria's Amaghleba on 2026-11-03.
+  const found = {
+    places: [
+      {
+        id: "ChIJamaghleba",
+        displayName: { text: "Amaghleba", languageCode: "en" },
+        location: { latitude: 42.0357525, longitude: 42.1892451 },
+      },
+      { id: "ChIJnowhere", displayName: { text: "Nowhere" } },
+    ],
+  };
+
+  test("asks for localities in Georgia, named with the region, and keeps what has a place", async () => {
+    const { fetch, calls } = fake({ "/places:searchText": found });
+    const result = await googleLocalities({ key: "secret", fetch }).find(
+      "Amaghleba",
+      "Guria",
+    );
+    assert.deepEqual(result, {
+      ok: true,
+      localities: [{ name: "Amaghleba", lonLat: [42.1892451, 42.0357525] }],
+    });
+    const body = JSON.parse(String(calls[0].init.body));
+    assert.equal(body.textQuery, "Amaghleba, Guria, Georgia");
+    assert.equal(body.includedType, "locality");
+    assert.equal(body.regionCode, "GE");
+  });
+
+  test("without a key nothing is asked", async () => {
+    const { fetch, calls } = fake({});
+    const result = await googleLocalities({ fetch }).find("Amaghleba");
+    assert.deepEqual(result, { ok: false, reason: "not-configured" });
+    assert.equal(calls.length, 0);
   });
 });
