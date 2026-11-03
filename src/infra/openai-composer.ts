@@ -51,8 +51,8 @@ Rules:
   outdoor visit has to finish before dusk.
 - durationMin is how long the traveller spends there: a viewpoint 30-45, a church or museum 60-90,
   a hike or a national park 150-240, lunch 60-75, dinner 75-90.
-- Fill the day. Between one stop ending and the next starting there may be at most 3 hours on a
-  relaxed day, 2 hours on a moderate one and 90 minutes on a packed one. A full day has, besides
+- Fill the day. Between one stop ending and the next starting there may be at most 2 hours on a
+  relaxed day, 90 minutes on a moderate one and an hour on a packed one. A full day has, besides
   its two meals, 2-3 visits when relaxed, 3-4 when moderate and 5-6 when packed, spread over the
   morning and the afternoon: two in the afternoon, not one with dinner hours after it. Fewer only
   on a day cut short by a drive.

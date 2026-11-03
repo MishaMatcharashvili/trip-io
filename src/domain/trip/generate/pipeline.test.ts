@@ -100,13 +100,13 @@ const goodPlan = (): RefPlan => ({
 });
 
 /** The same trip with its second day filled from morning to dinner. */
-const fullPlan = (): RefPlan => {
+const fullPlan = (morningMin = 90): RefPlan => {
   const plan = goodPlan();
   plan.days[1].stops.unshift({
     ref: ref(P.friendship),
     slot: "morning",
     kind: "visit",
-    durationMin: 45,
+    durationMin: morningMin,
   });
   return plan;
 };
@@ -280,7 +280,7 @@ describe("generate", () => {
 
   describe("days with holes in them", () => {
     // goodPlan() leaves day 2's morning empty after the drive: 2h50, and a
-    // moderate day leaves at most 2h.
+    // moderate day leaves at most 1h30.
     test("the model is told where, and a fuller retry is used and cached", async () => {
       const { compose, seen } = scripted(goodPlan(), fullPlan());
       const cache = memoryCache();
@@ -366,13 +366,21 @@ describe("generate", () => {
     });
 
     test("a relaxed day may rest between its stops", async () => {
-      const result = await generate(
+      // A short morning visit, then lunch: 1h40 between them on a moderate
+      // day, which starts earlier, and 1h10 on a relaxed one.
+      const relaxed = await generate(
         { ...constraints, pace: "relaxed" },
-        deps(scripted(goodPlan()).compose),
+        deps(scripted(fullPlan(45)).compose),
       );
-      assert.ok(result.ok);
-      assert.equal(result.source, "model");
-      assert.equal(result.attempts.length, 1);
+      assert.ok(relaxed.ok);
+      assert.equal(relaxed.source, "model");
+      assert.equal(relaxed.attempts.length, 1);
+      const moderate = await generate(
+        constraints,
+        deps(scripted(fullPlan(45), fullPlan()).compose),
+      );
+      assert.ok(moderate.ok);
+      assert.equal(moderate.source, "retry");
     });
   });
 });
