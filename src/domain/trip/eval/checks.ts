@@ -252,6 +252,23 @@ function check(e: Expectation, trace: Trace): Omit<CheckResult, "kind"> {
         };
       }, `no gap over ${limit} min (${c.pace})`);
     }
+    case "noRepeats":
+      return needsPlan((d) => {
+        const days = new Map<string, Set<string>>();
+        for (const n of Object.values(d.nodes)) {
+          if (n.kind !== "visit" || n.meta.rest || !n.placeId) continue;
+          const seen = days.get(n.meta.title) ?? new Set();
+          seen.add(dayKey(n.startsAt));
+          days.set(n.meta.title, seen);
+        }
+        const repeated = [...days]
+          .filter(([, on]) => on.size > 1)
+          .map(([title, on]) => `${title} (${on.size} days)`);
+        return {
+          pass: repeated.length === 0,
+          got: repeated.length ? list(repeated) : "each sight once",
+        };
+      }, "no sight on two days");
     case "homeBy":
       return needsPlan((d) => {
         const lastNode = sortedNodes(d.nodes).at(-1)?.node;

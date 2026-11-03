@@ -134,6 +134,20 @@ describe("score", () => {
     assert.match(home.got, /ends Sun 2026-11-15 21:00/);
   });
 
+  test("names a sight planned on more than one day", () => {
+    const twice = doc([
+      node("visit", "Guriis Tsikhe", FRI, "10:00", 60, PARK),
+      node("visit", "Guriis Tsikhe", "2026-11-14", "10:00", 60, PARK),
+      node("meal", "Lunch", "2026-11-14", "12:30", 60),
+    ]);
+    const [repeats] = judge(
+      [{ kind: "noRepeats" }],
+      trace({ build: { ok: true, doc: twice } }),
+    );
+    assert.equal(repeats.pass, false);
+    assert.equal(repeats.got, "Guriis Tsikhe (2 days)");
+  });
+
   test("a check on the plan fails, with the reason, when there is none", () => {
     const [built] = judge(
       [{ kind: "built" }],

@@ -29,6 +29,8 @@ export type Expectation =
   | { kind: "noLodging" }
   /** No day with more than this between one stop ending and the next starting; by default the pace's limit. */
   | { kind: "maxIdle"; minutes?: number }
+  /** No sight visited on two days: a thin catalogue shows as the same fortress every morning. */
+  | { kind: "noRepeats" }
   /** The last day's last drive arrives by this time ("12:00"). */
   | { kind: "homeBy"; time: string };
 
@@ -76,6 +78,7 @@ export const scenarios: Scenario[] = [
       { kind: "near", name: "Amaghleba", at: AMAGHLEBA, withinKm: 30 },
       { kind: "noLodging" },
       { kind: "maxIdle" },
+      { kind: "noRepeats" },
       { kind: "homeBy", time: "13:00" },
     ],
   },
@@ -98,6 +101,7 @@ export const scenarios: Scenario[] = [
       { kind: "built" },
       { kind: "calendarDays", equals: 4 },
       { kind: "maxIdle" },
+      { kind: "noRepeats" },
     ],
   },
   {
@@ -114,6 +118,7 @@ export const scenarios: Scenario[] = [
       { kind: "days", equals: 3 },
       { kind: "built" },
       { kind: "maxIdle" },
+      { kind: "noRepeats" },
     ],
   },
   {
@@ -131,6 +136,7 @@ export const scenarios: Scenario[] = [
       { kind: "places", includes: ["mtskheta"] },
       { kind: "built" },
       { kind: "maxIdle" },
+      { kind: "noRepeats" },
     ],
   },
   {
@@ -149,6 +155,7 @@ export const scenarios: Scenario[] = [
       { kind: "built" },
       { kind: "calendarDays", equals: 5 },
       { kind: "maxIdle" },
+      { kind: "noRepeats" },
     ],
   },
   {
@@ -165,6 +172,7 @@ export const scenarios: Scenario[] = [
       { kind: "places", includes: ["batumi"] },
       { kind: "built" },
       { kind: "maxIdle" },
+      { kind: "noRepeats" },
     ],
   },
 ];
