@@ -511,7 +511,9 @@ describe("villages by name", () => {
 
   test("without a key nothing is asked", async () => {
     const { fetch, calls } = fake({});
-    const result = await googleLocalities({ fetch }).find("Amaghleba");
+    const result = await googleLocalities({ key: undefined, fetch }).find(
+      "Amaghleba",
+    );
     assert.deepEqual(result, { ok: false, reason: "not-configured" });
     assert.equal(calls.length, 0);
   });
