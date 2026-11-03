@@ -24,6 +24,9 @@ export type Listing = {
   url: string | null;
 };
 
+/** Where Tripadvisor files a destination: its geo id, and the name in its links. */
+export type ListingGeo = { id: string; slug: string };
+
 /** One list to read: a destination, a kind, how deep. */
 export type ListingQuery = {
   destination: string;
@@ -31,7 +34,41 @@ export type ListingQuery = {
   name: string;
   kind: RatedKind;
   max: number;
+  /**
+   * Known once a list has been read: lets a read page through the list itself
+   * rather than take what a search for the name shows, which is one page.
+   */
+  geo?: ListingGeo;
 };
+
+/** How many places one page of a Tripadvisor list holds. */
+export const LIST_PAGE = 30;
+
+/** A list this much from one town is that town's, and can be paged through. */
+const ONE_TOWN = 0.6;
+
+/**
+ * The town a list was read for, from its places' links
+ * (".../Restaurant_Review-g294195-d27421845-Reviews-Olives-Tbilisi.html"): the
+ * geo most of them name, when most do. A link names the town the place is in,
+ * so a region's list names many towns, and has no one list to page through.
+ */
+export function geoOf(
+  listings: readonly Pick<Listing, "url">[],
+): ListingGeo | null {
+  const seen = new Map<string, { geo: ListingGeo; n: number }>();
+  for (const { url } of listings) {
+    const m = url?.match(/-g(\d+)-d\d+-Reviews-.+-([^-/]+)\.html$/);
+    if (!m) continue;
+    const key = `${m[1]}:${m[2]}`;
+    const known = seen.get(key) ?? { geo: { id: m[1], slug: m[2] }, n: 0 };
+    known.n++;
+    seen.set(key, known);
+  }
+  const [top] = [...seen.values()].sort((a, b) => b.n - a.n);
+  const named = [...seen.values()].reduce((n, v) => n + v.n, 0);
+  return top && top.n >= named * ONE_TOWN ? top.geo : null;
+}
 
 /**
  * How far down each list is read: lists come best first, and the tail stops

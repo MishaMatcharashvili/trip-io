@@ -89,7 +89,39 @@ describe("toListings", () => {
   });
 });
 
+const queryOf = (input: ReturnType<typeof actorInput>) =>
+  "query" in input ? input.query : undefined;
+
 describe("actorInput", () => {
+  test("a town whose geo is known is paged through, not searched for", () => {
+    const input = actorInput({
+      ...restaurants,
+      max: 150,
+      geo: { id: "294195", slug: "Tbilisi" },
+    });
+    assert.equal("query" in input, false);
+    assert.deepEqual(
+      "startUrls" in input ? input.startUrls.map((u) => u.url) : [],
+      [
+        "https://www.tripadvisor.com/Restaurants-g294195-Tbilisi.html",
+        "https://www.tripadvisor.com/Restaurants-g294195-oa30-Tbilisi.html",
+        "https://www.tripadvisor.com/Restaurants-g294195-oa60-Tbilisi.html",
+        "https://www.tripadvisor.com/Restaurants-g294195-oa90-Tbilisi.html",
+        "https://www.tripadvisor.com/Restaurants-g294195-oa120-Tbilisi.html",
+      ],
+    );
+  });
+
+  test("without a geo, or for sights, the destination is searched for by name", () => {
+    assert.equal(queryOf(actorInput(restaurants)), "Tbilisi, Georgia");
+    const sights = actorInput({
+      ...restaurants,
+      kind: "attraction",
+      geo: { id: "294195", slug: "Tbilisi" },
+    });
+    assert.equal(queryOf(sights), "Tbilisi, Georgia");
+  });
+
   test("asks for one kind of place in one Georgian town, without the extras that cost time", () => {
     const input = actorInput({
       destination: "mestia",
@@ -97,7 +129,7 @@ describe("actorInput", () => {
       kind: "attraction",
       max: 80,
     });
-    assert.equal(input.query, "Mestia, Georgia");
+    assert.equal(queryOf(input), "Mestia, Georgia");
     assert.equal(input.maxItemsPerQuery, 80);
     assert.equal(input.includeAttractions, true);
     assert.equal(input.includeRestaurants, false);

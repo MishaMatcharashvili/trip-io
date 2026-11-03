@@ -7,7 +7,7 @@ import type {
   ListingSource,
   ListingStart,
 } from "../domain/catalogue/listings.ts";
-import { parseRanking } from "../domain/catalogue/listings.ts";
+import { LIST_PAGE, parseRanking } from "../domain/catalogue/listings.ts";
 import type { Ranking } from "../domain/catalogue/ratings.ts";
 import { inGeorgiaBbox } from "../domain/geo.ts";
 
@@ -103,10 +103,32 @@ export function toListings(body: unknown, query: ListingQuery): Listing[] {
 }
 
 /** What the actor is asked: one destination, one kind of place, best first. */
+/**
+ * The pages of a town's restaurant list, as the site addresses them: the first,
+ * then "-oa30-", "-oa60-"… A search by name reads one page, whatever the depth
+ * asked for (checked live, 2026-11-03: 33 of 150), so a known town is paged.
+ */
+export function listPages(query: ListingQuery): string[] | null {
+  if (!query.geo || query.kind !== "restaurant") return null;
+  const { id, slug } = query.geo;
+  const pages = Math.ceil(query.max / LIST_PAGE);
+  return Array.from({ length: pages }, (_, i) =>
+    i === 0
+      ? `https://www.tripadvisor.com/Restaurants-g${id}-${slug}.html`
+      : `https://www.tripadvisor.com/Restaurants-g${id}-oa${i * LIST_PAGE}-${slug}.html`,
+  );
+}
+
 export function actorInput(query: ListingQuery) {
+  const pages = listPages(query);
   return {
-    query: `${query.name}, Georgia`,
-    maxItemsPerQuery: query.max,
+    ...(pages
+      ? {
+          startUrls: pages.map((url) => ({ url })),
+          // Per page: a little over a page, so a long one is not cut short.
+          maxItemsPerQuery: LIST_PAGE + 10,
+        }
+      : { query: `${query.name}, Georgia`, maxItemsPerQuery: query.max }),
     includeRestaurants: query.kind === "restaurant",
     includeAttractions: query.kind === "attraction",
     includeHotels: query.kind === "hotel",

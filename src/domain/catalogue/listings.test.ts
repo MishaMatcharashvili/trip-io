@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import { destination } from "./destinations.ts";
 import {
   asRated,
+  geoOf,
   type Listing,
   listingQueries,
   parseRanking,
@@ -63,5 +64,38 @@ describe("asRated", () => {
 
   test("a listing nobody has rated yet says nothing", () => {
     assert.equal(asRated({ ...barbarestan, rating: null }), null);
+  });
+});
+
+describe("geoOf", () => {
+  const link = (g: number, d: number, name: string, town: string) => ({
+    url: `https://www.tripadvisor.com/Restaurant_Review-g${g}-d${d}-Reviews-${name}-${town}.html`,
+  });
+
+  test("a town's list names the town: its geo id and the name in its links", () => {
+    assert.deepEqual(
+      geoOf([
+        link(294195, 1, "Olives_Restaurant", "Tbilisi"),
+        link(294195, 2, "Barbarestan", "Tbilisi"),
+        link(294195, 3, "Shavi-Lomi", "Tbilisi"),
+        { url: null },
+      ]),
+      { id: "294195", slug: "Tbilisi" },
+    );
+  });
+
+  test("a region's list, spread over its towns, has no one list to page", () => {
+    assert.equal(
+      geoOf([
+        link(1, 1, "A", "Telavi_Kakheti_Region"),
+        link(2, 2, "B", "Sighnaghi_Kakheti_Region"),
+        link(3, 3, "C", "Kvareli_Kakheti_Region"),
+      ]),
+      null,
+    );
+  });
+
+  test("nothing to go by, nothing found", () => {
+    assert.equal(geoOf([]), null);
   });
 });
