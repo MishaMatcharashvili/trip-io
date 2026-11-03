@@ -72,11 +72,13 @@ Rules:
   performing_arts_venue) are for a performance, in the evening, and only for a traveller who
   chose "culture". Never a daytime visit.
 - A meal is at a restaurant, an eatery or a café, never at a coffee shop or a market.
-- "rating" (out of 5) and "reviews" are what travellers give a candidate on Google Maps, when
-  enough have. Prefer what many rate well: a meal at a restaurant rated 4.3 or more by hundreds
-  over one nobody has rated; a night at the best-rated lodging near the day's stops; and a sight
-  with thousands of reviews is one the place is known for. Never choose a far-off place for its
-  rating alone: a day still keeps its stops close together.
+- "rating" (out of 5) and "reviews" are what travellers give a candidate on Tripadvisor or
+  Google Maps, when enough have; "townRank" is where Tripadvisor ranks it among its town's
+  restaurants or things to do ("#12 of 3104"). Prefer what many rate well: a meal at a
+  restaurant near the top of its town's list, or rated 4.3 or more by hundreds, over one nobody
+  has rated; a night at the best-rated lodging near the day's stops; and a sight with thousands
+  of reviews, or high in its town's things to do, is one the place is known for. Never choose a
+  far-off place for its rating alone: a day still keeps its stops close together.
 - A candidate with "mustSee" is a sight the traveller asked for by name. Every one is a stop, on
   a day spent in one of its "areas", in a slot its hours and the daylight allow. Plan the rest of
   that day around it.
@@ -112,6 +114,9 @@ const userTurn = (input: ComposeInput) =>
       group: c.group,
       areas: c.areas,
       ...(c.rating ? { rating: c.rating.value, reviews: c.rating.count } : {}),
+      ...(c.rating?.rank
+        ? { townRank: `#${c.rating.rank.rank} of ${c.rating.rank.of}` }
+        : {}),
       ...(c.mustSee ? { mustSee: true } : {}),
       outdoor: c.outdoor,
       hours: c.hours,

@@ -88,6 +88,22 @@ export function ratingScore({ value, count }: Rating): number {
   return (value * count + PRIOR.value * PRIOR.count) / (count + PRIOR.count);
 }
 
+/** A ranking out of fewer places than this says little. */
+const MIN_RANKED = 10;
+
+/**
+ * 0 to 1: where a place stands in its town, on a log scale, because the top
+ * of a list is where the difference is: #1 and #10 of 3,000 are far apart,
+ * #1,500 and #1,600 are not. Unranked, or ranked among few, is 0.
+ */
+export function standing(rank: Ranking | undefined): number {
+  if (!rank || rank.of < MIN_RANKED) return 0;
+  return Math.max(
+    0,
+    Math.min(1, 1 - Math.log10(rank.rank) / Math.log10(rank.of)),
+  );
+}
+
 /**
  * Which catalogue places the provider's listings are, by the same test the
  * place panel uses (chooseMatch): the name and the pin must agree. A listing

@@ -5,6 +5,7 @@ import {
   type RatedListing,
   rateCatalogue,
   ratingScore,
+  standing,
 } from "./ratings.ts";
 
 const listing = (
@@ -60,5 +61,19 @@ describe("ratings", () => {
       [listing("g1", "Newly Opened", [42.7, 42.27], 5, MIN_REVIEWS - 1)],
     );
     assert.equal(ratings.size, 0);
+  });
+});
+
+describe("standing", () => {
+  test("the top of a list is where the difference is", () => {
+    const at = (rank: number) => standing({ rank, of: 3_000 });
+    assert.equal(at(1), 1);
+    assert.ok(at(1) - at(30) > at(1_500) - at(1_600) + 0.1);
+    assert.ok(at(30) > at(300));
+  });
+
+  test("unranked, or ranked among few, stands nowhere", () => {
+    assert.equal(standing(undefined), 0);
+    assert.equal(standing({ rank: 1, of: 4 }), 0);
   });
 });

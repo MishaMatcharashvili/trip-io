@@ -1,5 +1,5 @@
 import { destination, destinationName } from "../../catalogue/destinations.ts";
-import { ratingScore } from "../../catalogue/ratings.ts";
+import { ratingScore, standing } from "../../catalogue/ratings.ts";
 import { haversineM, type LonLat } from "../../geo.ts";
 import type { Pace } from "../document.ts";
 import { straightLineTravel } from "../travel.ts";
@@ -275,10 +275,12 @@ export function fallbackPlan(
                 (p) => p.group === "food" && !NOT_A_MEAL.has(p.category),
               ),
               // A good restaurant can come round again, but prefer a new one,
-              // and one travellers rate well over the nearest door.
+              // and one travellers rate well over the nearest door; among
+              // those, the one its town ranks higher, distance breaking ties.
               (p) =>
                 (usedMeals.has(p.id) ? 2 : 0) +
-                (wellRatedNear(here, p) ? 0 : 1),
+                (wellRatedNear(here, p) ? 0 : 1) +
+                (1 - standing(p.rating?.rank)) * 0.99,
             );
       if (!pick) continue;
       const durationMin =
