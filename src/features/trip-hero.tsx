@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { RecordedRoad } from "@/data/georgia-road";
 import type { Trip } from "@/data/trip";
 import { ButtonLink } from "@/ui/button";
 import { Card } from "@/ui/card";
@@ -30,6 +31,8 @@ export type Hero = {
   /** Changes the traveller applied: "4 changes handled". */
   applied: number;
   example?: boolean;
+  /** The example's road, recorded: it is shown before there is a session to ask with. */
+  road?: RecordedRoad;
 };
 
 function StatusLine({ hero }: { hero: Hero }) {
@@ -102,7 +105,11 @@ export function TripHero({ hero }: { hero: Hero }) {
       <div className="relative h-[140px] shrink-0 overflow-hidden lg:h-auto lg:min-h-[200px] lg:w-[296px]">
         <RoutedTripMap
           stops={hero.stops}
-          routing={{ enabled: !hero.example }}
+          // An example asks for nothing: it draws its recorded road, or none.
+          routing={{
+            enabled: !hero.example || hero.road !== undefined,
+            recorded: hero.road,
+          }}
           interactive={false}
           fitPadding={24}
           className="absolute inset-0 size-full"

@@ -20,7 +20,7 @@ import {
   TripMap,
   type TripMapHandle,
 } from "@/ui/map/trip-map";
-import { useTripRoute } from "@/ui/map/use-trip-route";
+import { type TripRouteOptions, useTripRoute } from "@/ui/map/use-trip-route";
 import { Eyebrow, Num, Title } from "@/ui/text";
 import { describeRoute } from "./route-model";
 import { RouteSection } from "./route-section";
@@ -64,6 +64,7 @@ export function TripMapScreen({
   cards,
   routed = true,
   overview,
+  recordedRoad,
   dimmed = false,
 }: {
   stops: MapStop[];
@@ -77,6 +78,8 @@ export function TripMapScreen({
    * the stops.
    */
   overview?: MapStop[];
+  /** The example trip's road, drawn instead of asking for one. */
+  recordedRoad?: TripRouteOptions["recorded"];
   dimmed?: boolean;
 }) {
   const router = useRouter();
@@ -98,6 +101,7 @@ export function TripMapScreen({
     refresh,
   } = useTripRoute(overview ?? (routed ? stops : []), {
     alternatives: !overview && routed && stops.length === 2,
+    recorded: recordedRoad,
   });
   // What the road runs through: the overview's points, else the stops.
   const roadStops = overview ?? stops;

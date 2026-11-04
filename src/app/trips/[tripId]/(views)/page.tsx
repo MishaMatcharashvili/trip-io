@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { interventionCard } from "@/bll/interventions";
 import { offerFor } from "@/bll/watch-pass";
+import { georgiaRoad } from "@/data/georgia-road";
 import {
   advisory,
   calmStrip,
@@ -300,6 +301,8 @@ export default async function ActiveTripPage({
         // days are spent in, since through every stop it would join the days.
         routed={view.mode === "day"}
         overview={overview}
+        // The example's visitor usually has no session to ask for a road with.
+        recordedRoad={fixture ? georgiaRoad : undefined}
         dimmed={view.forcePaused}
       />
       <ActiveTripDesktop view={view} />
