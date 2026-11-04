@@ -89,7 +89,8 @@ export function RouteSection({
       )}
 
       <div className="flex items-center gap-3 text-mini">
-        {view.kind === "ready" || (view.kind === "failed" && view.canRetry) ? (
+        {(view.kind === "ready" && view.canRefresh) ||
+        (view.kind === "failed" && view.canRetry) ? (
           <button
             type="button"
             onClick={onRefresh}

@@ -49,6 +49,32 @@ describe("describeRoute", () => {
     assert.deepEqual(view.warnings, []);
     assert.equal(view.via, "via Kakheti Hwy");
     assert.deepEqual(view.choices, []);
+    assert.equal(view.canRefresh, true);
+  });
+
+  test("a recorded road says where it came from, and is not refreshed", () => {
+    const view = describeRoute(
+      {
+        status: "ready",
+        answer: answer({ traffic: "none" }),
+        refreshing: false,
+        recorded: { source: "OpenStreetMap via OSRM" },
+      },
+      0,
+      two,
+      NOW,
+    );
+    assert.ok(view.kind === "ready");
+    assert.equal(
+      view.basis,
+      "An example road from OpenStreetMap via OSRM, without traffic",
+    );
+    assert.doesNotMatch(view.basis, /Calculated|Walking/);
+    assert.equal(view.canRefresh, false);
+    assert.equal(
+      view.scope,
+      "Driving time only. Time at stops isn't included.",
+    );
   });
 
   test("a future departure is called a prediction, never live traffic", () => {

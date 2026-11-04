@@ -18,6 +18,8 @@ export type RouteView =
       typical: string | null;
       /** What sort of estimate this is, and when it was made. */
       basis: string;
+      /** Whether asking again could change it: not for a recorded road. */
+      canRefresh: boolean;
       /** What the time leaves out: the visits are the app's own, not the drive. */
       scope: string;
       updating: boolean;
@@ -153,7 +155,11 @@ export function describeRoute(
           usual !== null && minutes(usual) !== minutes(chosen.durationS)
             ? `Usually ${minutes(usual)}`
             : null,
-        basis: basisOf(answer, now),
+        // A recorded road is not an estimate of now, and says so.
+        basis: route.recorded
+          ? `An example road from ${route.recorded.source}, without traffic`
+          : basisOf(answer, now),
+        canRefresh: !route.recorded,
         scope:
           answer.mode === "walk"
             ? "Walking time only. Time at stops isn't included."

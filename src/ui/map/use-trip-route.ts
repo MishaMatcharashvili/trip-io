@@ -46,6 +46,8 @@ export type TripRoute =
       answer: RouteAnswer;
       /** Asked again for the same stops: the answer shown is the previous one. */
       refreshing: boolean;
+      /** A road recorded once and drawn without asking, and where it came from. */
+      recorded?: { source: string };
     }
   | {
       status: "failed";
@@ -60,6 +62,12 @@ export type TripRouteOptions = {
   mode?: RouteMode;
   /** Ask for other ways between two stops. */
   alternatives?: boolean;
+  /**
+   * A road already in hand, drawn instead of asking: the example trip's, which
+   * a visitor sees before they have the session a request needs. Nothing is
+   * requested, and refreshing does nothing.
+   */
+  recorded?: { answer: RouteAnswer; source: string };
 };
 
 export function useTripRoute(
@@ -68,9 +76,11 @@ export function useTripRoute(
     enabled = true,
     mode = "drive",
     alternatives = false,
+    recorded,
   }: TripRouteOptions = {},
 ) {
   const active = enabled && stops.length >= 2;
+  const asking = active && !recorded;
   const key = routeSignature({
     mode,
     alternatives,
@@ -92,7 +102,7 @@ export function useTripRoute(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the stops; `tick` is the refresh button
   useEffect(() => {
-    if (!active) return;
+    if (!asking) return;
     let live = true;
     const refresh = refreshAsked.current;
     refreshAsked.current = false;
@@ -121,10 +131,17 @@ export function useTripRoute(
       live = false;
       clearTimeout(timer);
     };
-  }, [key, active, tick]);
+  }, [key, asking, tick]);
 
   let route: TripRoute = { status: "off" };
-  if (active) {
+  if (active && recorded) {
+    route = {
+      status: "ready",
+      answer: recorded.answer,
+      refreshing: false,
+      recorded: { source: recorded.source },
+    };
+  } else if (active) {
     // An answer for other stops is not this trip's route, however recent.
     const current = result?.key === key ? result.outcome : null;
     route = !current
@@ -145,6 +162,7 @@ export function useTripRoute(
     select: (index: number) => setPick({ of: identity, index }),
     /** Ask again for the same stops, on the traveller's word. */
     refresh: () => {
+      if (recorded) return;
       refreshAsked.current = true;
       setRefreshing(true);
       setTick((t) => t + 1);
