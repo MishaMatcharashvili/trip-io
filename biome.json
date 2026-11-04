@@ -17,7 +17,8 @@
       "!dist",
       "!build",
       "!src/dal/migrations",
-      "!src/domain/catalogue/corridors.geo.json"
+      "!src/domain/catalogue/corridors.geo.json",
+      "!src/data/georgia-road.json"
     ]
   },
   "formatter": {

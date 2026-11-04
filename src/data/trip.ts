@@ -659,7 +659,7 @@ export const georgiaMapStops: Array<{
   { id: "3a", lonLat: [44.4787, 42.4776], label: "Gudauri", state: "done" },
   {
     id: "3b",
-    lonLat: [44.5316, 42.5317],
+    lonLat: [44.4529, 42.4923],
     label: "Friendship Monument",
     state: "done",
   },

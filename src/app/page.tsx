@@ -4,6 +4,7 @@ import Link from "next/link";
 import { pendingSurvey } from "@/bll/survey";
 import { myTrips, type TripListRow, tripScreen } from "@/bll/trip-screen";
 import { passesHeldBy } from "@/bll/watch-pass";
+import { georgiaRoad } from "@/data/georgia-road";
 import { georgia, georgiaMapStops } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { HomePlan } from "@/features/home-plan";
@@ -136,6 +137,7 @@ export default async function TripsHome({ searchParams }: PageProps<"/">) {
                 hero={{
                   trip: georgia,
                   stops: georgiaMapStops,
+                  road: georgiaRoad,
                   state: "live",
                   decision: {
                     title: "1 change needs your decision",

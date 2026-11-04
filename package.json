@@ -20,6 +20,7 @@
     "smoke:interrupt": "node --env-file=.env scripts/dev/smoke-interrupt.ts",
     "smoke:road": "node --env-file=.env scripts/dev/smoke-road.ts",
     "smoke:route": "node --env-file=.env scripts/dev/smoke-route.ts",
+    "record:example-road": "node scripts/dev/record-example-road.ts",
     "smoke:wikimedia": "node scripts/dev/smoke-wikimedia.ts",
     "smoke:tripadvisor": "node --env-file=.env scripts/dev/smoke-tripadvisor.ts",
     "smoke:google-places": "node --env-file=.env scripts/dev/smoke-google-places.ts",

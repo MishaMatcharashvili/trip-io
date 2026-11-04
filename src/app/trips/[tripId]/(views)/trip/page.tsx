@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { georgiaRoad, type RecordedRoad } from "@/data/georgia-road";
 import { georgiaMapStops, getTrip, type Trip, todayWeather } from "@/data/trip";
 import { dayKey } from "@/domain/trip/document";
 import { DayAccordion, type DayRow } from "@/features/day-accordion";
@@ -42,6 +43,7 @@ function WholeTrip({
   totals,
   stops,
   road,
+  recorded,
   switcher,
   days,
   actions,
@@ -52,6 +54,8 @@ function WholeTrip({
   stops: MapStop[];
   /** Where the road runs through, for every day at once: not through every stop. */
   road?: MapStop[];
+  /** The example's road, recorded: drawn instead of asking for one. */
+  recorded?: RecordedRoad;
   switcher?: React.ReactNode;
   /** The days, each opening in place. */
   days: React.ReactNode;
@@ -66,6 +70,7 @@ function WholeTrip({
         <RoutedTripMap
           stops={stops}
           road={road}
+          routing={{ recorded }}
           className="absolute inset-0 size-full"
         />
       }
@@ -101,6 +106,7 @@ export default async function FullTripPage({
           { label: "Changes I proposed", value: "8 · 6 applied" },
         ]}
         stops={georgiaMapStops}
+        recorded={georgiaRoad}
         days={
           <DayAccordion
             tripId={fixture.id}
