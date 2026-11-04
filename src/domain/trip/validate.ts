@@ -167,7 +167,10 @@ export function validateDay(
     } else if (
       !node.placeId &&
       ctx.author !== "user" &&
-      (node.kind === "visit" || node.kind === "meal" || node.kind === "stay")
+      (node.kind === "visit" ||
+        node.kind === "meal" ||
+        // A night at the traveller's own home has no catalogue place to have.
+        (node.kind === "stay" && !node.meta.home))
     ) {
       add("tier", [id], `${title(node)} has no catalogue place`);
     }

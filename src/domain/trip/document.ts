@@ -12,7 +12,7 @@ import type { LonLat } from "../geo.ts";
 
 const isoInstant = z.iso.datetime({ offset: true });
 
-const lonLat = z.tuple([
+export const lonLat = z.tuple([
   z.number().min(-180).max(180),
   z.number().min(-90).max(90),
 ]);
@@ -33,6 +33,9 @@ export const nodeMeta = z.object({
   // A stop on a long drive for fuel and a rest (generate/roads.ts): part of
   // the drive, not something to see.
   rest: z.boolean().optional(),
+  // The night is at the traveller's own home or family's: a stay at a point,
+  // with no catalogue place, that nobody books.
+  home: z.boolean().optional(),
 });
 
 // - visit, meal: the itinerary itself.

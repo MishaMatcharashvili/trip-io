@@ -108,6 +108,12 @@ export function TripPlanner({
   const [details, setDetails] = useState(false);
   const started = useRef(false);
   const end = useRef<HTMLDivElement>(null);
+  /** Where the traveller is, once the browser says: the start until they name another. */
+  const here = useRef<string | null>(null);
+  const startHere = (s: IntakeState) =>
+    here.current && !s.said.includes("start")
+      ? applyEdit(s, { start: here.current })
+      : s;
 
   const { messages, state, ready, unsupported } = conversation;
   // Offered only under the message they answer: the planner's last word, with
@@ -152,7 +158,8 @@ export function TripPlanner({
       const turn = await takeTurn(from.state, asked);
       update({
         messages: [...asked, { role: "planner", text: turn.reply }],
-        state: turn.state,
+        // A turn asked before the position came back starts from Tbilisi.
+        state: startHere(turn.state),
         ready: turn.ready,
         unsupported: turn.unsupported,
         suggestions: turn.suggestions,
@@ -184,6 +191,33 @@ export function TripPlanner({
     }
     const kept = restore();
     if (kept) setConversation(kept);
+  }, []);
+
+  // Where the traveller is, asked once: a trip planned from a village in
+  // Guria should not begin with a drive from Tbilisi. Refused, unavailable or
+  // outside Georgia, the start stays Tbilisi until they say otherwise.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on mount
+  useEffect(() => {
+    if (!("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        const res = await apiClient.api.places.where
+          .$get({ query: { at: `${coords.longitude},${coords.latitude}` } })
+          .catch(() => null);
+        const body = res?.ok ? await res.json() : null;
+        if (!body?.place) return;
+        here.current = body.place.slug;
+        setConversation((prev) => {
+          const state = startHere(prev.state);
+          if (state === prev.state) return prev;
+          const next = { ...prev, state };
+          keep(next);
+          return next;
+        });
+      },
+      () => {},
+      { maximumAge: 10 * 60_000, timeout: 15_000 },
+    );
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: follows the transcript

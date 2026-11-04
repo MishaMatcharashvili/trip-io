@@ -35,6 +35,7 @@ const answer = {
   budgetEur: null,
   ownCar: null,
   freeNights: null,
+  home: null,
   notes: null,
   unsupported: [],
   sights: [],
@@ -132,5 +133,66 @@ describe("sights named in conversation", () => {
     assert.ok(turn.ok);
     assert.deepEqual(turn.state.constraints.mustSee, []);
     assert.deepEqual(turn.state.constraints.places, ["svaneti"]);
+  });
+});
+
+describe("a home named in conversation", () => {
+  const amaghleba = {
+    home: {
+      name: "Amaghleba",
+      lonLat: [42.1892, 42.0358] as [number, number],
+      place: "chokhatauri",
+    },
+    within: ["guria"],
+  };
+  const inGuria = {
+    ...answer,
+    places: ["guria"],
+    days: 4,
+    home: "Amaghleba",
+  };
+
+  test("is found on the route said, and stands in for the region it is in", async () => {
+    const asked: [string, readonly string[]][] = [];
+    const turn = await planningTurn("u1", state, messages, {
+      ...deps(async () => inGuria),
+      homeNamed: async (name, route) => {
+        asked.push([name, route]);
+        return amaghleba;
+      },
+    });
+    assert.ok(turn.ok);
+    assert.deepEqual(asked, [["Amaghleba", ["guria"]]]);
+    assert.deepEqual(turn.state.constraints.home, amaghleba.home);
+    assert.deepEqual(turn.state.constraints.places, ["chokhatauri"]);
+    // Four days, three nights: every one of them at the house.
+    assert.equal(turn.state.constraints.freeNights, 3);
+    assert.ok(turn.state.said.includes("home"));
+  });
+
+  test("the free nights the traveller gave are kept", async () => {
+    const turn = await planningTurn("u1", state, messages, {
+      ...deps(async () => ({ ...inGuria, freeNights: 2 })),
+      homeNamed: async () => amaghleba,
+    });
+    assert.ok(turn.ok);
+    assert.equal(turn.state.constraints.freeNights, 2);
+  });
+
+  test("one that cannot be found, or fails to be looked up, changes nothing", async () => {
+    for (const homeNamed of [
+      async () => null,
+      async () => {
+        throw new Error("down");
+      },
+    ]) {
+      const turn = await planningTurn("u1", state, messages, {
+        ...deps(async () => inGuria),
+        homeNamed,
+      });
+      assert.ok(turn.ok);
+      assert.equal(turn.state.constraints.home, null);
+      assert.deepEqual(turn.state.constraints.places, ["guria"]);
+    }
   });
 });

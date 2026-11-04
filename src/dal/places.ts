@@ -626,6 +626,18 @@ export async function sourcedIds(
   return new Set(rows.rows.map((r) => r.source_id as string));
 }
 
+/** Whether a point lies in an area, by the rule the catalogue is retrieved by. */
+export async function pointInArea(
+  [lon, lat]: LonLat,
+  match: AreaMatch,
+): Promise<boolean> {
+  const rows = await db.execute(sql`
+    SELECT ${areaPredicate(match)} AS inside
+    FROM (SELECT ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography AS geom) p
+  `);
+  return rows.rows[0]?.inside === true;
+}
+
 /** The region a point lies in, or null outside every one. */
 export async function regionAt([lon, lat]: LonLat): Promise<string | null> {
   const rows = await db.execute(sql`

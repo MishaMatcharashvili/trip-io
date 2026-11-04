@@ -72,6 +72,34 @@ export type JsonCall = {
   effort: Effort;
 };
 
+/** One call as it was made and answered, for whoever is watching. */
+export type ObservedCall = {
+  purpose: ModelPurpose;
+  model: string;
+  instructions: string;
+  input: Turn[];
+  /** The parsed answer, or null when there was none. */
+  output: unknown;
+  error: string | null;
+  latencyMs: number;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+const observers = new Set<(call: ObservedCall) => void>();
+
+/**
+ * Be told of every call: what was asked and what came back. For evals and
+ * debugging scripts, which need the conversation itself and not only the
+ * `model_call` row. Returns the way to stop.
+ */
+export function observeModelCalls(
+  observer: (call: ObservedCall) => void,
+): () => void {
+  observers.add(observer);
+  return () => observers.delete(observer);
+}
+
 /**
  * One structured call, returned as parsed JSON and nothing more.
  *
@@ -106,11 +134,35 @@ export async function generateJson(call: JsonCall): Promise<unknown> {
     if (!text) throw new Error("the model returned no content");
     const parsed = JSON.parse(text);
     await record(call, response, started, null);
+    observe(call, response, started, parsed, null);
     return parsed;
   } catch (error) {
     await record(call, response, started, (error as Error).message);
+    observe(call, response, started, null, (error as Error).message);
     throw error;
   }
+}
+
+function observe(
+  call: JsonCall,
+  response: Response | undefined,
+  started: number,
+  output: unknown,
+  error: string | null,
+) {
+  if (!observers.size) return;
+  const seen: ObservedCall = {
+    purpose: call.purpose,
+    model: MODEL,
+    instructions: call.instructions,
+    input: call.input,
+    output,
+    error,
+    latencyMs: Date.now() - started,
+    inputTokens: response?.usage?.input_tokens ?? 0,
+    outputTokens: response?.usage?.output_tokens ?? 0,
+  };
+  for (const observer of observers) observer(seen);
 }
 
 /**

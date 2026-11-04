@@ -11,6 +11,7 @@ import {
   type ComposeInput,
   type Composer,
   candidateRefs,
+  endpointOf,
   generate,
   mustSeeProblems,
   type PlanCache,
@@ -38,6 +39,7 @@ const constraints: Constraints = {
   budgetEur: 700,
   ownCar: false,
   freeNights: 0,
+  home: null,
   mustSee: [],
   notes: "",
 };
@@ -100,13 +102,13 @@ const goodPlan = (): RefPlan => ({
 });
 
 /** The same trip with its second day filled from morning to dinner. */
-const fullPlan = (): RefPlan => {
+const fullPlan = (morningMin = 90): RefPlan => {
   const plan = goodPlan();
   plan.days[1].stops.unshift({
     ref: ref(P.friendship),
     slot: "morning",
     kind: "visit",
-    durationMin: 45,
+    durationMin: morningMin,
   });
   return plan;
 };
@@ -280,7 +282,7 @@ describe("generate", () => {
 
   describe("days with holes in them", () => {
     // goodPlan() leaves day 2's morning empty after the drive: 2h50, and a
-    // moderate day leaves at most 2h.
+    // moderate day leaves at most 1h30.
     test("the model is told where, and a fuller retry is used and cached", async () => {
       const { compose, seen } = scripted(goodPlan(), fullPlan());
       const cache = memoryCache();
@@ -366,13 +368,21 @@ describe("generate", () => {
     });
 
     test("a relaxed day may rest between its stops", async () => {
-      const result = await generate(
+      // A short morning visit, then lunch: 1h40 between them on a moderate
+      // day, which starts earlier, and 1h10 on a relaxed one.
+      const relaxed = await generate(
         { ...constraints, pace: "relaxed" },
-        deps(scripted(goodPlan()).compose),
+        deps(scripted(fullPlan(45)).compose),
       );
-      assert.ok(result.ok);
-      assert.equal(result.source, "model");
-      assert.equal(result.attempts.length, 1);
+      assert.ok(relaxed.ok);
+      assert.equal(relaxed.source, "model");
+      assert.equal(relaxed.attempts.length, 1);
+      const moderate = await generate(
+        constraints,
+        deps(scripted(fullPlan(45), fullPlan()).compose),
+      );
+      assert.ok(moderate.ok);
+      assert.equal(moderate.source, "retry");
     });
   });
 });
@@ -1035,5 +1045,40 @@ describe("splitDays", () => {
       splitDays(1, ["svaneti", "kakheti"], () => 1),
       ["svaneti"],
     );
+  });
+});
+
+describe("a trip from the traveller's home", () => {
+  const house = {
+    name: "Gudauri",
+    lonLat: [44.4769, 42.4785] as [number, number],
+    place: "kazbegi",
+  };
+  const fromHome: Constraints = { ...constraints, home: house, freeNights: 1 };
+  const noBeds = (): RefPlan => {
+    const plan = fullPlan();
+    for (const day of plan.days) day.stayRef = null;
+    return plan;
+  };
+
+  test("sleeps at the house, and the map is told where it is", async () => {
+    const result = await generate(fromHome, deps(scripted(noBeds()).compose));
+    assert.ok(result.ok);
+    const stays = Object.values(result.doc.nodes).filter(
+      (n) => n.kind === "stay",
+    );
+    assert.equal(stays.length, 1);
+    assert.deepEqual(stays[0].lonLat, house.lonLat);
+    assert.equal(stays[0].meta.title, "Home · Gudauri");
+    assert.deepEqual(result.doc.trip.prefs.home, house);
+  });
+
+  test("a trip that starts where the house is starts from the house", () => {
+    assert.deepEqual(endpointOf(fromHome, "kazbegi"), {
+      lonLat: house.lonLat,
+      name: "Gudauri",
+    });
+    assert.equal(endpointOf(fromHome, "tbilisi")?.name, "Tbilisi");
+    assert.equal(endpointOf(constraints, "kazbegi")?.name, "Kazbegi");
   });
 });

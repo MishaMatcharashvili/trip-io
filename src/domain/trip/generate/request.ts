@@ -186,6 +186,56 @@ function readDays(text: string): number | null {
   return null;
 }
 
+const WEEKDAYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+export type WeekdaySpan = {
+  /** YYYY-MM-DD: the first day's next occurrence, today included. */
+  startDate: string;
+  /** Both ends included: Friday to Monday is four days. */
+  days: number;
+  /** 0 (Sunday) to 6: the weekday the trip starts on. */
+  firstWeekday: number;
+};
+
+/** 0 (Sunday) to 6, for a YYYY-MM-DD. */
+export const weekdayOf = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).getUTCDay();
+
+/**
+ * "Friday morning to Monday morning", "leave Friday, back on Monday": the
+ * first and the last weekday named, as the days they span, both included.
+ * Counting is the code's, not the model's: asked for Friday to Monday, a model
+ * counts the nights and leaves Monday out. One weekday, or the same one twice,
+ * is no span.
+ */
+export function readWeekdaySpan(
+  text: string,
+  today: string,
+): WeekdaySpan | null {
+  const named = [
+    ...text.matchAll(
+      /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi,
+    ),
+  ].map((m) => WEEKDAYS.indexOf(m[1].toLowerCase()));
+  if (named.length < 2) return null;
+  const first = named[0];
+  const last = named[named.length - 1];
+  if (first === last) return null;
+  return {
+    startDate: addDays(today, (first - weekdayOf(today) + 7) % 7),
+    days: ((last - first + 7) % 7) + 1,
+    firstWeekday: first,
+  };
+}
+
 /** A start date: "2026-10-12", "12 October", "Oct 12", "in October", "next week". */
 function readStart(text: string, today: string): string | null {
   const iso = text.match(/\b(20\d\d-\d\d-\d\d)\b/);
@@ -335,7 +385,10 @@ export function understand(text: string, today: string): Understood {
     return value;
   };
 
-  const days = pick("days", readDays(text), 5);
+  // The weekdays named say the length better than "weekend" does: Friday to
+  // Monday is four days whatever it is called.
+  const span = readWeekdaySpan(text, today);
+  const days = pick("days", span?.days ?? readDays(text), 5);
   const clampedDays = Math.min(21, Math.max(1, days));
   const route = readRoute(text);
   const places = pick(
@@ -359,7 +412,11 @@ export function understand(text: string, today: string): Understood {
   const people = party.adults + party.children;
 
   const constraints: Constraints = {
-    startDate: pick("startDate", readStart(text, today), addDays(today, 14)),
+    startDate: pick(
+      "startDate",
+      readStart(text, today) ?? span?.startDate ?? null,
+      addDays(today, 14),
+    ),
     days: clampedDays,
     places,
     start,
@@ -379,6 +436,7 @@ export function understand(text: string, today: string): Understood {
     ),
     ownCar: false,
     freeNights: 0,
+    home: null,
     mustSee: [],
     notes: "",
   };

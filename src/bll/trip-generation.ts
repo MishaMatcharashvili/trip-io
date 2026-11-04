@@ -38,6 +38,7 @@ import {
   type Attempt,
   type Composer,
   generate,
+  type PlanCache,
   type Source,
   tripHeader as tripHeaderFor,
 } from "../domain/trip/generate/pipeline.ts";
@@ -241,40 +242,44 @@ function explain(
   ];
 }
 
+export type PlanOptions = {
+  compose?: Composer;
+  /** Routes the long drives, to find the stations they rest at. Without one they do not rest. */
+  roads?: RoutesProvider;
+  /** What travellers rate the places in each destination. Without it nothing is rated. */
+  ratings?: RatingDeps;
+  /** Where plans are kept between requests; the shared plan cache unless told otherwise. */
+  cache?: PlanCache;
+};
+
 /**
- * Constraints in, a saved trip out: retrieve candidates, run the pipeline, mint
- * the trip and write the plan as its first patch. Every outcome, success or
- * not, leaves a row in the generation log.
- *
- * The model runs inline — a plan takes tens of seconds, and there is no job
- * queue until Phase 3.
+ * The plan for a request, written nowhere: the candidates and stations it was
+ * chosen from, and what the pipeline made of them. `generateTrip` writes it;
+ * the planner eval (scripts/dev/planner-eval.ts) reads it.
  */
-export async function generateTrip(
+export async function planTrip(
   wanted: Constraints,
   userId: string | null,
   {
     compose = composeWithOpenAI,
-    stillWanted = async () => true,
     roads,
     ratings,
-  }: {
-    compose?: Composer;
-    /** Asked once the plan is ready and before anything is written. */
-    stillWanted?: () => Promise<boolean>;
-    /** Routes the long drives, to find the stations they rest at. Without one they do not rest. */
-    roads?: RoutesProvider;
-    /** What travellers rate the places in each destination. Without it nothing is rated. */
-    ratings?: RatingDeps;
-  } = {},
-): Promise<GeneratedTrip | GenerationFailure> {
-  const key = cacheKey(wanted);
-
+    cache = planCache,
+  }: PlanOptions = {},
+): Promise<
+  | { possible: false; explanations: string[] }
+  | {
+      possible: true;
+      candidates: Candidate[];
+      stations: Candidate[];
+      result: Awaited<ReturnType<typeof generate>>;
+    }
+> {
   // The screen judged the request before sending it; this is the same
   // judgement again, because the screen is not what decides.
   const verdict = assess(wanted);
   if (!verdict.possible) {
-    await recordGeneration(null, key, "failed", []);
-    return { ok: false, reason: "impossible", explanations: reasons(verdict) };
+    return { possible: false, explanations: reasons(verdict) };
   }
 
   const [candidates, stations] = await Promise.all([
@@ -294,13 +299,46 @@ export async function generateTrip(
   ]);
   const result = await generate(wanted, {
     compose,
-    cache: planCache,
+    cache,
     candidates,
     stations,
     travel: straightLineTravel,
     newId: randomUUID,
     describeHours,
   });
+  return { possible: true, candidates, stations, result };
+}
+
+/**
+ * Constraints in, a saved trip out: retrieve candidates, run the pipeline, mint
+ * the trip and write the plan as its first patch. Every outcome, success or
+ * not, leaves a row in the generation log.
+ *
+ * The model runs inline — a plan takes tens of seconds, and there is no job
+ * queue until Phase 3.
+ */
+export async function generateTrip(
+  wanted: Constraints,
+  userId: string | null,
+  {
+    stillWanted = async () => true,
+    ...options
+  }: Omit<PlanOptions, "cache"> & {
+    /** Asked once the plan is ready and before anything is written. */
+    stillWanted?: () => Promise<boolean>;
+  } = {},
+): Promise<GeneratedTrip | GenerationFailure> {
+  const key = cacheKey(wanted);
+  const planned = await planTrip(wanted, userId, options);
+  if (!planned.possible) {
+    await recordGeneration(null, key, "failed", []);
+    return {
+      ok: false,
+      reason: "impossible",
+      explanations: planned.explanations,
+    };
+  }
+  const { result } = planned;
 
   if (!result.ok) {
     await recordGeneration(null, key, "failed", result.attempts);

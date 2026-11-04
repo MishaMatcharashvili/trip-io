@@ -18,7 +18,7 @@ import {
   routeOf,
   sightsOnRoute,
 } from "./constraints.ts";
-import { understand } from "./request.ts";
+import { readWeekdaySpan, understand, weekdayOf } from "./request.ts";
 
 // The conversation on /new. The traveller says what they want, a planner
 // replies and keeps the constraints generation will run on, and nothing is
@@ -82,6 +82,7 @@ const stated = [
   "ownCar",
   "freeNights",
   "mustSee",
+  "home",
 ] as const satisfies readonly (keyof Constraints)[];
 type Stated = (typeof stated)[number];
 
@@ -142,6 +143,8 @@ export const intakeReply = z.object({
   ownCar: z.boolean().nullable(),
   /** Nights the party sleeps for free, with family or friends. */
   freeNights: z.number().nullable(),
+  /** The village or town of the traveller's own home or family's, as they named it. */
+  home: z.string().nullable(),
   /** The whole of the notes after this turn, not an addition to them. */
   notes: z.string().nullable(),
   /** Places the traveller asked for that no trip can go to. */
@@ -203,6 +206,8 @@ export type IntakeTurn = {
    * (src/bll/sight-search.ts): the domain cannot look them up.
    */
   sights: string[];
+  /** The settlement the traveller's home is in, by name, for the use case to find (src/bll/home.ts). */
+  home: string | null;
   ready: boolean;
   /** Answers to offer as one-tap replies. Empty once the planner has nothing to ask. */
   suggestions: string[];
@@ -291,6 +296,7 @@ export function readIntake(
   if (r.startDate !== null && realDate(r.startDate) && r.startDate >= today) {
     patch.startDate = r.startDate;
   }
+  Object.assign(patch, spanned(patch, state, latest, today));
   if (r.start !== null) patch.start = r.start;
   if (r.finish !== null) patch.finish = r.finish;
   if (r.adults !== null || r.children !== null) {
@@ -330,6 +336,7 @@ export function readIntake(
     sights: [
       ...new Set(r.sights.map((s) => s.trim().slice(0, 100)).filter(Boolean)),
     ].slice(0, SIGHTS_PER_TURN),
+    home: r.home?.trim().slice(0, 80) || null,
     ready,
     suggestions: ready || options.length ? [] : cleanSuggestions(r.suggestions),
     options,
@@ -368,6 +375,33 @@ function missed(
     patch.days = read.constraints.days;
   }
   return patch;
+}
+
+/**
+ * The length and start the latest message gives by its weekdays, over the
+ * model's: "Friday morning to Monday morning" is four days, and a model
+ * counting nights makes it three and leaves Monday out. A start date already
+ * on the first weekday is kept, since "next Friday" may be a week further than
+ * the nearest one.
+ */
+function spanned(
+  patch: Partial<Constraints>,
+  state: IntakeState,
+  latest: string,
+  today: string,
+): Partial<Constraints> {
+  const span = readWeekdaySpan(latest, today);
+  if (!span) return {};
+  // The default start is nobody's date, even when it falls on a Friday.
+  const startDate =
+    patch.startDate ??
+    (state.said.includes("startDate") ? state.constraints.startDate : null);
+  return {
+    days: span.days,
+    ...(startDate && weekdayOf(startDate) === span.firstWeekday
+      ? {}
+      : { startDate: span.startDate }),
+  };
 }
 
 /**
@@ -548,6 +582,7 @@ export function fallbackTurn(
     state: next,
     unsupported: read.refused.map((r) => r.name),
     sights: [],
+    home: null,
     ready: essentials && !follow,
     suggestions: follow?.suggestions ?? [],
     options: [],

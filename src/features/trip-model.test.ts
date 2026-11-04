@@ -379,6 +379,15 @@ describe("overviewStops", () => {
     assert.equal(overviewStops({ ...trip, days }).length, 3);
   });
 
+  test("a trip from the traveller's house starts and ends there, by its name", () => {
+    const fromHome = roundTrip();
+    const house = { name: "Kakabeti", lonLat: [45.5, 41.6], place: "tbilisi" };
+    fromHome.doc.trip.prefs = { ...fromHome.doc.trip.prefs, home: house };
+    const trip = tripModel(fromHome, new Date(at("2026-09-10", "12:00")));
+    assert.deepEqual(trip.start, { lonLat: house.lonLat, label: "Kakabeti" });
+    assert.deepEqual(trip.finish, { lonLat: house.lonLat, label: "Kakabeti" });
+  });
+
   test("a trip that does not say where it starts is its days", () => {
     const trip = tripModel(roundTrip(), new Date(at("2026-09-10", "12:00")));
     const { start: _s, finish: _f, ...bare } = trip;

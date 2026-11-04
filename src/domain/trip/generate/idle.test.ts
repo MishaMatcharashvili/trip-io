@@ -40,7 +40,7 @@ const doc = (pace: Pace, nodes: TripNode[]): TripDoc => ({
 
 // The day that was planned: a museum at 14:30, then dinner at 19:00.
 const emptyAfternoon = [
-  node("visit", "Svetitskhoveli Cathedral", "09:40", 75),
+  node("visit", "Svetitskhoveli Cathedral", "09:45", 75),
   node("meal", "Lunch · Tsiskvili", "12:30", 75),
   node("visit", "Georgian National Museum", "14:30", 75),
   node("meal", "Dinner · Restaurant Tiflisi", "19:00", 90),
@@ -61,7 +61,7 @@ describe("idleGaps", () => {
   test("how long a day may rest depends on its pace", () => {
     const rest = [
       node("visit", "A", "10:00", 60),
-      node("meal", "B", "14:00", 60), // 11:00 → 14:00, 3h
+      node("meal", "B", "13:00", 60), // 11:00 → 13:00, 2h
     ];
     assert.deepEqual(idleGaps(doc("relaxed", rest)), []);
     assert.equal(idleGaps(doc("moderate", rest)).length, 1);
@@ -74,11 +74,11 @@ describe("idleGaps", () => {
     const limit = MAX_IDLE_MIN.moderate;
     const on = [
       node("visit", "A", "10:00", 60),
-      node("visit", "B", "13:00", 60), // 11:00 → 13:00
+      node("visit", "B", "12:30", 60), // 11:00 → 12:30
     ];
-    assert.equal(limit, 120);
+    assert.equal(limit, 90);
     assert.deepEqual(idleGaps(doc("moderate", on)), []);
-    on[1] = node("visit", "B", "13:05", 60);
+    on[1] = node("visit", "B", "12:35", 60);
     assert.equal(idleGaps(doc("moderate", on)).length, 1);
   });
 
@@ -104,7 +104,7 @@ describe("idleGaps", () => {
   test("a day over hours before it was meant to end has a hole at its end", () => {
     // The day trip as it was built: home from Mtskheta by four.
     const morning = [
-      node("visit", "Jvari Monastery", "09:30", 60),
+      node("visit", "Jvari Monastery", "10:30", 60),
       node("meal", "Lunch · Salobie Bia", "12:30", 75),
       node("visit", "Svetitskhoveli Cathedral", "14:00", 60),
       node("transfer", "Drive to Tbilisi", "15:15", 40),

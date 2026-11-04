@@ -11,6 +11,10 @@ import type {
   SearchOutcome,
 } from "../domain/catalogue/enrichment.ts";
 import type {
+  Locality,
+  LocalityFinder,
+} from "../domain/catalogue/localities.ts";
+import type {
   RatedKind,
   RatedListing,
   RatedOutcome,
@@ -562,4 +566,55 @@ export function googleSights(options: CallOptions): SightFinder {
       }
     },
   };
+}
+
+/** Namesakes to choose between: Georgia has several villages of most names. */
+const LOCALITIES = 5;
+
+/**
+ * Villages and towns by name, for a traveller's home: one Text Search held to
+ * localities in Georgia, asking only for the name and where it is. Mapbox's
+ * geocoder knows one Amaghleba, in Imereti; Google knows the one in Guria.
+ */
+export function googleLocalities(options: CallOptions): LocalityFinder {
+  const call = caller(options);
+  return {
+    provider: "google",
+    configured: Boolean(options.key),
+
+    async find(place, near) {
+      const reply = await call(
+        "/places:searchText",
+        "places.id,places.displayName,places.location",
+        {},
+        {
+          textQuery: [place.slice(0, 100), near?.slice(0, 100), "Georgia"]
+            .filter(Boolean)
+            .join(", "),
+          includedType: "locality",
+          languageCode: "en",
+          regionCode: "GE",
+          pageSize: LOCALITIES,
+        },
+      );
+      if (!reply.ok) {
+        return {
+          ok: false,
+          reason:
+            reply.reason === "not-configured" ? reply.reason : "unavailable",
+        };
+      }
+      try {
+        return { ok: true, localities: toLocalities(reply.body) };
+      } catch {
+        return { ok: false, reason: "unavailable" };
+      }
+    },
+  };
+}
+
+export function toLocalities(body: unknown): Locality[] {
+  return toCandidates(body).flatMap((c) =>
+    c.lonLat && c.names[0] ? [{ name: c.names[0], lonLat: c.lonLat }] : [],
+  );
 }

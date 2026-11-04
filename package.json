@@ -27,6 +27,7 @@
     "smoke:ops": "node --env-file=.env scripts/dev/smoke-ops.ts",
     "kill:count": "node --env-file=.env scripts/dev/synthetic-count.ts",
     "judge:eval": "node --env-file=.env scripts/dev/judge-eval.ts",
+    "planner:eval": "node --env-file=.env scripts/dev/planner-eval.ts",
     "roads:spike": "node --env-file=.env scripts/dev/roads-spike.ts",
     "trigger:dev": "trigger.dev dev",
     "trigger:deploy": "trigger.dev deploy",

@@ -4,6 +4,7 @@ import {
   type MustSee,
   pinSight,
   routeOf,
+  routeWithHome,
 } from "../domain/trip/generate/constraints.ts";
 import {
   applyEdit,
@@ -16,6 +17,7 @@ import {
   type Sights,
 } from "../domain/trip/generate/intake.ts";
 import { intakeWithOpenAI } from "../infra/openai-intake.ts";
+import type { FoundHome } from "./home.ts";
 import { sightsInPlay } from "./sights.ts";
 
 // One turn of the conversation on /new. The planner is a model; when it is
@@ -35,6 +37,14 @@ export type PlanningDeps = {
     name: string,
     route: readonly string[],
   ) => Promise<MustSee | null>;
+  /**
+   * The traveller's home, by the name of its village or town (home.ts), on
+   * the route said so far. Without one, the home stays in the notes.
+   */
+  homeNamed?: (
+    name: string,
+    route: readonly string[],
+  ) => Promise<FoundHome | null>;
 };
 
 export type PlanningResult =
@@ -83,7 +93,11 @@ export async function planningTurn(
         ok: true,
         source: "model",
         ...turn,
-        state: await withSights(turn.state, turn.sights, deps.sightNamed),
+        state: await withHome(
+          await withSights(turn.state, turn.sights, deps.sightNamed),
+          turn.home,
+          deps.homeNamed,
+        ),
       };
     }
   } catch {
@@ -116,4 +130,31 @@ async function withSights(
   );
   if (pinned === state.constraints) return state;
   return applyEdit(state, { places: pinned.places, mustSee: pinned.mustSee });
+}
+
+/**
+ * The state with the traveller's home found and placed: its place on the
+ * route in place of the wider one that holds it, and its nights free unless
+ * the traveller said how many. One that cannot be found, or fails to be
+ * looked up, leaves the state as it was; one already held is not looked up
+ * again.
+ */
+async function withHome(
+  state: IntakeState,
+  name: string | null,
+  find: PlanningDeps["homeNamed"],
+): Promise<IntakeState> {
+  if (!find || !name) return state;
+  const c = state.constraints;
+  if (c.home?.name.toLowerCase() === name.toLowerCase()) return state;
+  const route = state.said.includes("places") ? c.places : [];
+  const found = await find(name, route).catch(() => null);
+  if (!found) return state;
+  return applyEdit(state, {
+    home: found.home,
+    places: routeWithHome(route, found.home, found.within),
+    ...(state.said.includes("freeNights")
+      ? {}
+      : { freeNights: Math.max(0, c.days - 1) }),
+  });
 }

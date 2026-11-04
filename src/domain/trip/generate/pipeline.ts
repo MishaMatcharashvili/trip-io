@@ -175,9 +175,20 @@ export function mustSeeProblems(
     .map((s) => `${s.name} is a must-see but no day visits it`);
 }
 
-/** Where the traveller leaves from, as the scheduler drives there. */
-const finishOf = (c: Constraints) => {
-  const at = destination(c.finish);
+/**
+ * Where a trip starts or finishes, as the scheduler drives from or to it: the
+ * traveller's home when it is in that place, so a trip from Chokhatauri that
+ * starts at the house in Amaghleba is driven from Amaghleba and not from the
+ * town's centre; otherwise the place's own point.
+ */
+export const endpointOf = (
+  c: Pick<Constraints, "home">,
+  slug: string,
+): { lonLat: LonLat; name: string } | null => {
+  if (c.home && c.home.place === slug) {
+    return { lonLat: c.home.lonLat, name: c.home.name };
+  }
+  const at = destination(slug);
   return at ? { lonLat: at.lonLat, name: at.name } : null;
 };
 
@@ -196,6 +207,8 @@ export function tripHeader(c: Constraints): TripHeader {
       finish: c.finish,
       interests: c.interests,
       mobility: c.mobility,
+      // The map pins the start and the finish here when they are in its place.
+      ...(c.home ? { home: c.home } : {}),
     },
   };
 }
@@ -233,8 +246,8 @@ function dayLimits(
 ): { arrives?: string; leavesBy?: string } {
   // With its rests: a stop for fuel at Gori is half an hour the day does not have.
   const drive = (a: string, b: string) => {
-    const from = destination(a)?.lonLat;
-    const to = destination(b)?.lonLat;
+    const from = endpointOf(c, a)?.lonLat;
+    const to = endpointOf(c, b)?.lonLat;
     const minutes = from && to && a !== b ? travel.minutes(from, to) : 0;
     return minutes > IMPLICIT_LEG_MAX_MIN && from && to
       ? restedMinutes(from, to, stations, travel)
@@ -290,10 +303,11 @@ export async function generate(
       places,
       travel: deps.travel,
       newId: deps.newId,
-      start: destination(c.start)?.lonLat ?? null,
-      finish: finishOf(c),
+      start: endpointOf(c, c.start)?.lonLat ?? null,
+      finish: endpointOf(c, c.finish),
       dayEnds: c.dayEnds,
       stations,
+      home: c.home,
     });
     const doc: TripDoc = { trip: header, nodes };
     const violations = validateDoc(doc, {

@@ -16,10 +16,12 @@ import {
 
 /** Minutes between one stop ending and the next starting before a day counts as having a hole. */
 export const MAX_IDLE_MIN: Record<Pace, number> = {
-  // A relaxed day is allowed its rest between lunch and dinner.
-  relaxed: 180,
-  moderate: 120,
-  packed: 90,
+  // A relaxed day rests over a long lunch, not through the afternoon: a
+  // traveller handed two and a half hours of nothing before dinner called it
+  // a hole, and it was one.
+  relaxed: 120,
+  moderate: 90,
+  packed: 60,
 };
 
 const clock = new Intl.DateTimeFormat("en-GB", {
